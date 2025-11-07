@@ -70,8 +70,8 @@ class BirthdayService {
         return dateA.getTime() - dateB.getTime();
       });
 
-      const message = `📅 Upcoming Birthdays in ${monthName}:\n\n` +
-        sortedDates.map(date => `🎂 ${date}: ${birthdaysByDate[date].join(', ')}`).join('\n');
+      const message = `📅 Upcoming Birthdays in ${monthName}:\n\n${ 
+        sortedDates.map(date => `🎂 ${date}: ${birthdaysByDate[date].join(', ')}`).join('\n')}`;
 
       await whatsappService.sendMessage(message);
       console.log(`Sent monthly digest with ${birthdays.length} birthday(s)`);

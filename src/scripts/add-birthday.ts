@@ -4,21 +4,15 @@ import { createQuestionInterface, askQuestion, askConfirmation } from '../utils/
 import { formatDateISO } from '../utils/date.js';
 import { createReadWriteCalendarClient } from '../utils/calendar-auth.js';
 import { fetchEvents, getFullName, eventNameMatches, formatDuplicateEvent } from '../utils/calendar-helpers.js';
+import type { BirthdayInput } from './add-birthday-parser.js';
 
 /**
  * Script to add birthday events to Google Calendar
- * Usage: npm run add-birthday
- * Or: npm run add-birthday "John Doe" "1990-05-15"
+ * Usage: yarn add-birthday
+ * Or: yarn add-birthday "John Doe" "1990-05-15"
  */
 
-interface BirthdayInput {
-  firstName: string;
-  lastName?: string;
-  birthday: Date;
-  year?: number;
-}
-
-function parseInput(input: string): BirthdayInput | null {
+function parseInputLocal(input: string): BirthdayInput | null {
   // Try different formats:
   // 1. "John Doe 1990-05-15"
   // 2. "John Doe May 15, 1990"
@@ -166,7 +160,7 @@ async function main(): Promise<void> {
   if (filteredArgs.length > 0) {
     // Command line mode: parse arguments
     const input = filteredArgs.join(' ');
-    const birthday = parseInput(input);
+    const birthday = parseInputLocal(input);
     
     if (!birthday) {
       console.error('❌ Could not parse input. Please use format:');
@@ -213,7 +207,7 @@ async function main(): Promise<void> {
       const lastName = lastNameInput || undefined;
       
       const birthdayInput = await askQuestion(rl, 'Birthday (YYYY-MM-DD, MM-DD, or "Month DD, YYYY"): ');
-      const birthday = parseInput(`${firstName} ${lastName || ''} ${birthdayInput}`.trim());
+      const birthday = parseInputLocal(`${firstName} ${lastName || ''} ${birthdayInput}`.trim());
       
       if (!birthday) {
         console.error('\n❌ Could not parse birthday. Please use format:');

@@ -41,8 +41,8 @@ async function deleteEvent(
 ): Promise<boolean> {
   try {
     await calendar.events.delete({
-      calendarId: calendarId,
-      eventId: eventId,
+      calendarId,
+      eventId,
     });
     return true;
   } catch (error) {
@@ -99,14 +99,6 @@ async function main(): Promise<void> {
 
     console.log(`\n📅 Found ${events.length} event(s)\n`);
 
-    // Ask for confirmation before starting
-    const proceed = await askConfirmation(rl, `Do you want to review and delete events? (y/n): `);
-    if (!proceed) {
-      console.log('❌ Cancelled.');
-      rl.close();
-      process.exit(0);
-    }
-
     let deletedCount = 0;
     let skippedCount = 0;
     let errorCount = 0;
@@ -143,15 +135,6 @@ async function main(): Promise<void> {
       } else {
         console.log('⏭️  Skipped');
         skippedCount++;
-      }
-
-      // Ask if user wants to continue
-      if (i < events.length - 1) {
-        const continueDeleting = await askConfirmation(rl, '\nContinue to next event? (y/n): ');
-        if (!continueDeleting) {
-          console.log('\n⏸️  Stopped by user');
-          break;
-        }
       }
     }
 
