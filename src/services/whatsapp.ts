@@ -13,7 +13,9 @@ class WhatsAppService {
   private ready: boolean = false;
 
   async initialize(): Promise<void> {
-    if (this.ready) return;
+    if (this.ready) {
+      return;
+    }
 
     this.client = new Client({
       authStrategy: new LocalAuth(),

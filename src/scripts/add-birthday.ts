@@ -1,8 +1,9 @@
 import { calendar_v3 } from 'googleapis';
 import { config } from '../config.js';
 import { createQuestionInterface, askQuestion, askConfirmation } from '../utils/cli.js';
-import { startOfDay, endOfDay, formatDateISO } from '../utils/date.js';
+import { formatDateISO } from '../utils/date.js';
 import { createReadWriteCalendarClient } from '../utils/calendar-auth.js';
+import { fetchEvents, getFullName, eventNameMatches, formatDuplicateEvent } from '../utils/calendar-helpers.js';
 
 /**
  * Script to add birthday events to Google Calendar
@@ -87,106 +88,51 @@ async function checkForDuplicates(
   calendar: calendar_v3.Calendar,
   birthday: BirthdayInput
 ): Promise<calendar_v3.Schema$Event[]> {
-  const fullName = birthday.lastName 
-    ? `${birthday.firstName} ${birthday.lastName}`
-    : birthday.firstName;
-  
-  // Check for events on the same date
-  const eventDate = new Date(birthday.birthday);
-  const start = startOfDay(eventDate);
-  const end = endOfDay(eventDate);
-  
   try {
-    const response = await calendar.events.list({
-      calendarId: config.google.calendarId,
-      timeMin: start.toISOString(),
-      timeMax: end.toISOString(),
-      singleEvents: true,
-      orderBy: 'startTime',
+    const eventDate = new Date(birthday.birthday);
+    const events = await fetchEvents(calendar, {
+      startDate: eventDate,
+      endDate: eventDate,
     });
     
-    const events = response.data.items || [];
-    
-    // Filter for potential duplicates: same date and similar name
-    const duplicates = events.filter(event => {
-      const eventSummary = (event.summary || '').toLowerCase();
-      const firstNameLower = birthday.firstName.toLowerCase();
-      const lastNameLower = birthday.lastName?.toLowerCase() || '';
-      const fullNameLower = fullName.toLowerCase();
-      
-      // Check if event is a birthday and name matches
-      const isBirthday = eventSummary.includes('birthday');
-      const nameMatches = 
-        eventSummary.includes(firstNameLower) ||
-        eventSummary.includes(fullNameLower) ||
-        (lastNameLower && eventSummary.includes(lastNameLower));
-      
-      return isBirthday && nameMatches;
+    return events.filter(event => {
+      const summary = (event.summary || '').toLowerCase();
+      return summary.includes('birthday') && 
+             eventNameMatches(event.summary || '', birthday.firstName, birthday.lastName);
     });
-    
-    return duplicates;
   } catch (error) {
     console.error('Error checking for duplicates:', error);
     return [];
   }
 }
 
+function displayDuplicates(duplicates: calendar_v3.Schema$Event[], fullName: string, date: Date): void {
+  console.log('\n⚠️  Potential duplicate(s) found:');
+  duplicates.forEach((dup, index) => console.log(formatDuplicateEvent(dup, index + 1)));
+  console.log(`\n   Trying to add: ${fullName}'s Birthday`);
+  console.log(`   Date: ${date.toLocaleDateString()}\n`);
+}
+
 async function addBirthdayToCalendar(birthday: BirthdayInput, skipDuplicateCheck: boolean = false): Promise<void> {
   const calendar = createReadWriteCalendarClient();
+  const fullName = getFullName(birthday.firstName, birthday.lastName);
   
-  // Check for duplicates before adding
   if (!skipDuplicateCheck) {
     const duplicates = await checkForDuplicates(calendar, birthday);
-    
     if (duplicates.length > 0) {
-      const fullName = birthday.lastName 
-        ? `${birthday.firstName} ${birthday.lastName}`
-        : birthday.firstName;
-      
-      console.log('\n⚠️  Potential duplicate(s) found:');
-      duplicates.forEach((dup, index) => {
-        console.log(`   ${index + 1}. ${dup.summary || '(No title)'}`);
-        console.log(`      Event ID: ${dup.id}`);
-        console.log(`      Date: ${dup.start?.date || dup.start?.dateTime || '(No date)'}`);
-      });
-      
-      console.log(`\n   Trying to add: ${fullName}'s Birthday`);
-      console.log(`   Date: ${new Date(birthday.birthday).toLocaleDateString()}\n`);
-      
-      return; // Don't add, let user decide
+      displayDuplicates(duplicates, fullName, new Date(birthday.birthday));
+      return;
     }
   }
 
-  // Create event title
-  const fullName = birthday.lastName 
-    ? `${birthday.firstName} ${birthday.lastName}`
-    : birthday.firstName;
-  const eventTitle = `${fullName}'s Birthday`;
-
-  // Create event date (all-day event)
   const dateString = formatDateISO(new Date(birthday.birthday));
-
-  // Create recurring event (yearly)
-  const recurrence = ['RRULE:FREQ=YEARLY;INTERVAL=1'];
-
   const event: calendar_v3.Schema$Event = {
-    summary: eventTitle,
+    summary: `${fullName}'s Birthday`,
     description: `Birthday of ${fullName}${birthday.year ? ` (born ${birthday.year})` : ''}`,
-    start: {
-      date: dateString,
-      timeZone: 'UTC',
-    },
-    end: {
-      date: dateString,
-      timeZone: 'UTC',
-    },
-    recurrence: recurrence,
-    reminders: {
-      useDefault: false,
-      overrides: [
-        { method: 'popup', minutes: 1440 }, // 1 day before
-      ],
-    },
+    start: { date: dateString, timeZone: 'UTC' },
+    end: { date: dateString, timeZone: 'UTC' },
+    recurrence: ['RRULE:FREQ=YEARLY;INTERVAL=1'],
+    reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: 1440 }] },
   };
 
   try {
@@ -196,7 +142,7 @@ async function addBirthdayToCalendar(birthday: BirthdayInput, skipDuplicateCheck
     });
 
     console.log('\n✅ Birthday event created successfully!');
-    console.log(`   Title: ${eventTitle}`);
+    console.log(`   Title: ${event.summary}`);
     console.log(`   Date: ${dateString}`);
     console.log(`   Event ID: ${response.data.id}`);
     console.log(`   Calendar: ${config.google.calendarId}`);
@@ -236,27 +182,15 @@ async function main(): Promise<void> {
       const duplicates = await checkForDuplicates(calendar, birthday);
       
       if (duplicates.length > 0 && !forceFlag) {
-        const fullName = birthday.lastName 
-          ? `${birthday.firstName} ${birthday.lastName}`
-          : birthday.firstName;
-        
-        console.log('\n⚠️  Potential duplicate(s) found:');
-        duplicates.forEach((dup, index) => {
-          console.log(`   ${index + 1}. ${dup.summary || '(No title)'}`);
-          console.log(`      Event ID: ${dup.id}`);
-          console.log(`      Date: ${dup.start?.date || dup.start?.dateTime || '(No date)'}`);
-        });
-        
-        console.log(`\n   Trying to add: ${fullName}'s Birthday`);
-        console.log(`   Date: ${new Date(birthday.birthday).toLocaleDateString()}\n`);
+        displayDuplicates(duplicates, getFullName(birthday.firstName, birthday.lastName), new Date(birthday.birthday));
         console.log('❌ Duplicate detected. Use --force flag to add anyway:');
-        console.log(`   npm run add-birthday "${input}" --force\n`);
+        console.log(`   yarn add-birthday "${input}" --force\n`);
         process.exit(1);
       }
       
       await addBirthdayToCalendar(birthday, forceFlag);
       process.exit(0);
-    } catch (error) {
+    } catch {
       process.exit(1);
     }
   } else {
@@ -300,23 +234,9 @@ async function main(): Promise<void> {
       const duplicates = await checkForDuplicates(calendar, birthday);
       
       if (duplicates.length > 0) {
-        const fullName = birthday.lastName 
-          ? `${birthday.firstName} ${birthday.lastName}`
-          : birthday.firstName;
-        
-        console.log('\n⚠️  Potential duplicate(s) found:');
-        duplicates.forEach((dup, index) => {
-          console.log(`   ${index + 1}. ${dup.summary || '(No title)'}`);
-          console.log(`      Event ID: ${dup.id}`);
-          console.log(`      Date: ${dup.start?.date || dup.start?.dateTime || '(No date)'}`);
-        });
-        
-        console.log(`\n   Trying to add: ${fullName}'s Birthday`);
-        console.log(`   Date: ${new Date(birthday.birthday).toLocaleDateString()}\n`);
-        
+        displayDuplicates(duplicates, getFullName(birthday.firstName, birthday.lastName), new Date(birthday.birthday));
         const confirm = await askConfirmation(rl, 'Add anyway? (y/n): ');
         rl.close();
-        
         if (!confirm) {
           console.log('❌ Cancelled. Birthday not added.');
           process.exit(0);
@@ -327,7 +247,7 @@ async function main(): Promise<void> {
       
       await addBirthdayToCalendar(birthday, duplicates.length > 0);
       process.exit(0);
-    } catch (error) {
+    } catch {
       rl.close();
       process.exit(1);
     }

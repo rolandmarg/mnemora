@@ -1,9 +1,9 @@
 import { calendar_v3 } from 'googleapis';
 import { config } from '../config.js';
 import { createQuestionInterface, askConfirmation } from '../utils/cli.js';
-import { startOfDay, endOfDay } from '../utils/date.js';
 import { createReadWriteCalendarClient } from '../utils/calendar-auth.js';
 import { formatEvent } from '../utils/event-formatter.js';
+import { fetchEvents } from '../utils/calendar-helpers.js';
 
 /**
  * Script to interactively delete events from Google Calendar
@@ -24,28 +24,14 @@ async function getEvents(
 ): Promise<calendar_v3.Schema$Event[]> {
   const startDate = options.startDate || new Date(new Date().getFullYear(), 0, 1);
   const endDate = options.endDate || new Date(new Date().getFullYear(), 11, 31, 23, 59, 59);
-  const calendarId = options.calendarId || config.google.calendarId;
-
-  const start = startOfDay(startDate);
-  const end = endOfDay(endDate);
-
-  try {
-    console.log(`\nFetching events from ${start.toLocaleDateString()} to ${end.toLocaleDateString()}...`);
-    
-    const response = await calendar.events.list({
-      calendarId: calendarId,
-      timeMin: start.toISOString(),
-      timeMax: end.toISOString(),
-      singleEvents: true,
-      orderBy: 'startTime',
-      maxResults: 2500, // Google Calendar API limit
-    });
-
-    return response.data.items || [];
-  } catch (error) {
-    console.error('Error fetching events:', error);
-    throw error;
-  }
+  
+  console.log(`\nFetching events from ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}...`);
+  return fetchEvents(calendar, {
+    startDate,
+    endDate,
+    calendarId: options.calendarId,
+    maxResults: 2500,
+  });
 }
 
 async function deleteEvent(

@@ -24,7 +24,7 @@ export function formatEvent(event: calendar_v3.Schema$Event): string {
     formatted += `\n  Description: ${description}`;
   }
   if (event.recurrence && event.recurrence.length > 0) {
-    formatted += `\n  Recurring: Yes`;
+    formatted += '\n  Recurring: Yes';
   }
   
   return formatted;

@@ -116,6 +116,20 @@ yarn type-check
 
 This checks TypeScript types without compiling.
 
+### Linting
+
+```bash
+yarn lint
+```
+
+This runs ESLint to check code quality and style.
+
+```bash
+yarn lint:fix
+```
+
+This runs ESLint and automatically fixes fixable issues.
+
 ## How It Works
 
 1. **Daily Check (9am)**: The bot checks Google Calendar for birthdays today and sends congratulations messages to the WhatsApp group.

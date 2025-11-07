@@ -1,6 +1,6 @@
 import { google, calendar_v3 } from 'googleapis';
 import { config } from '../config.js';
-import { startOfDay, endOfDay } from '../utils/date.js';
+import { fetchEvents, type EventListOptions } from '../utils/calendar-helpers.js';
 
 type CalendarEvent = calendar_v3.Schema$Event;
 
@@ -9,7 +9,9 @@ class CalendarService {
   private initialized: boolean = false;
 
   async initialize(): Promise<void> {
-    if (this.initialized) return;
+    if (this.initialized) {
+      return;
+    }
 
     if (!config.google.clientEmail || !config.google.privateKey) {
       throw new Error('Google Calendar credentials not configured. Please set GOOGLE_CLIENT_EMAIL and GOOGLE_PRIVATE_KEY in .env');
@@ -26,89 +28,40 @@ class CalendarService {
     this.initialized = true;
   }
 
-  /**
-   * Fetch events for a specific date
-   * @param date - The date to fetch events for
-   * @returns Array of events
-   */
-  async getEventsForDate(date: Date): Promise<CalendarEvent[]> {
+  private async fetchEventsInternal(options: EventListOptions): Promise<CalendarEvent[]> {
     await this.initialize();
-
-    const start = startOfDay(date);
-    const end = endOfDay(date);
-
+    if (!this.calendar) {
+      throw new Error('Calendar client not initialized');
+    }
     try {
-      const response = await this.calendar!.events.list({
-        calendarId: config.google.calendarId,
-        timeMin: start.toISOString(),
-        timeMax: end.toISOString(),
-        singleEvents: true,
-        orderBy: 'startTime',
-      });
-
-      return response.data.items || [];
+      return await fetchEvents(this.calendar, options);
     } catch (error) {
       console.error('Error fetching calendar events:', error);
       throw error;
     }
+  }
+
+  /**
+   * Fetch events for a specific date
+   */
+  async getEventsForDate(date: Date): Promise<CalendarEvent[]> {
+    return this.fetchEventsInternal({ startDate: date, endDate: date });
   }
 
   /**
    * Get all events for a month
-   * @param date - Any date in the month
-   * @returns Array of events for the month
    */
   async getEventsForMonth(date: Date): Promise<CalendarEvent[]> {
-    await this.initialize();
-
-    const startOfMonthDate = new Date(date.getFullYear(), date.getMonth(), 1);
-    const endOfMonthDate = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-    const startOfMonth = startOfDay(startOfMonthDate);
-    const endOfMonth = endOfDay(endOfMonthDate);
-
-    try {
-      const response = await this.calendar!.events.list({
-        calendarId: config.google.calendarId,
-        timeMin: startOfMonth.toISOString(),
-        timeMax: endOfMonth.toISOString(),
-        singleEvents: true,
-        orderBy: 'startTime',
-      });
-
-      return response.data.items || [];
-    } catch (error) {
-      console.error('Error fetching calendar events:', error);
-      throw error;
-    }
+    const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+    const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+    return this.fetchEventsInternal({ startDate: startOfMonth, endDate: endOfMonth });
   }
 
   /**
    * Get all events for a date range
-   * @param startDate - Start date
-   * @param endDate - End date
-   * @param calendarId - Optional calendar ID (defaults to config)
-   * @returns Array of events for the date range
    */
   async getEventsForDateRange(startDate: Date, endDate: Date, calendarId?: string): Promise<CalendarEvent[]> {
-    await this.initialize();
-
-    const { start, end } = { start: startOfDay(startDate), end: endOfDay(endDate) };
-    const targetCalendarId = calendarId || config.google.calendarId;
-
-    try {
-      const response = await this.calendar!.events.list({
-        calendarId: targetCalendarId,
-        timeMin: start.toISOString(),
-        timeMax: end.toISOString(),
-        singleEvents: true,
-        orderBy: 'startTime',
-      });
-
-      return response.data.items || [];
-    } catch (error) {
-      console.error('Error fetching calendar events:', error);
-      throw error;
-    }
+    return this.fetchEventsInternal({ startDate, endDate, calendarId });
   }
   
   /**
@@ -117,9 +70,12 @@ class CalendarService {
    */
   async getCalendars(): Promise<calendar_v3.Schema$CalendarListEntry[]> {
     await this.initialize();
+    if (!this.calendar) {
+      throw new Error('Calendar client not initialized');
+    }
     
     try {
-      const response = await this.calendar!.calendarList.list();
+      const response = await this.calendar.calendarList.list();
       return response.data.items || [];
     } catch (error) {
       console.error('Error fetching calendars:', error);
@@ -143,92 +99,55 @@ class CalendarService {
 
   /**
    * Check if an event is a birthday
-   * @param event - Calendar event object
-   * @returns true if the event is a birthday
    */
   isBirthdayEvent(event: CalendarEvent): boolean {
-    // Check if event is recurring (birthdays are usually recurring)
-    // and has "birthday" in summary or description
     const summary = (event.summary || '').toLowerCase();
     const description = (event.description || '').toLowerCase();
+    const hasBirthdayKeyword = summary.includes('birthday') || description.includes('birthday');
     
-    // Google Calendar contact birthdays often have patterns like:
-    // - "John's Birthday"
-    // - "Birthday: John"
-    // - Just the contact's name (when synced from Birthdays calendar)
-    // - Recurring yearly events (YEARLY recurrence)
-    
-    // Check for explicit "birthday" in title or description
-    if (summary.includes('birthday') || description.includes('birthday')) {
+    if (hasBirthdayKeyword) {
       return true;
     }
     
-    // Check for recurring yearly events - these are likely birthdays from contacts
-    // Contact birthdays sync from Birthdays calendar to main calendar as YEARLY recurring events
-    if (event.recurrence && event.recurrence.length > 0) {
-      const hasYearlyRecurrence = event.recurrence.some(r => 
-        r.includes('YEARLY') || r.includes('FREQ=YEARLY')
-      );
-      
-      // If it's a yearly recurring event, it's likely a birthday
-      // Especially if it's an all-day event (birthdays are usually all-day)
-      if (hasYearlyRecurrence) {
-        // Additional check: birthdays are usually all-day events
-        const isAllDay = event.start?.date && !event.start?.dateTime;
-        if (isAllDay) {
-          return true;
-        }
-        // Or if the summary doesn't look like a regular recurring event
-        // (contact birthdays often just have the name, not "birthday" in the title)
-        if (!summary.includes('meeting') && !summary.includes('reminder') && 
-            !summary.includes('appointment') && summary.length > 0) {
-          return true;
-        }
-      }
+    const hasYearlyRecurrence = event.recurrence?.some(r => r.includes('YEARLY') || r.includes('FREQ=YEARLY'));
+    if (!hasYearlyRecurrence) {
+      return false;
     }
     
-    return false;
+    const isAllDay = event.start?.date && !event.start?.dateTime;
+    if (isAllDay) {
+      return true;
+    }
+    
+    const excludedKeywords = ['meeting', 'reminder', 'appointment'];
+    return summary.length > 0 && !excludedKeywords.some(keyword => summary.includes(keyword));
   }
   
   /**
    * Check if an event is from the Birthdays calendar
-   * Contact birthdays are usually in a special calendar
-   * @param event - Calendar event object
-   * @returns true if likely from Birthdays calendar
    */
   isFromBirthdaysCalendar(event: CalendarEvent): boolean {
-    // Birthdays calendar events are usually:
-    // - Recurring yearly events
-    // - Have the contact name as the title
-    // - Don't always have "birthday" in the title
-    return !!event.recurrence && event.recurrence.length > 0 &&
-           event.recurrence.some(r => r.includes('YEARLY'));
+    return !!event.recurrence?.some(r => r.includes('YEARLY'));
   }
 
   /**
    * Extract person name from birthday event
-   * @param event - Calendar event object
-   * @returns Person's name
    */
   extractName(event: CalendarEvent): string {
     const summary = event.summary || '';
+    const patterns = [
+      /^(.+?)(?:'s)?\s*(?:birthday|birth)/i,
+      /birthday[:\s]+(.+)/i,
+      /(.+?)\s+birthday/i,
+    ];
     
-    // Try different patterns:
-    // 1. "John's Birthday" -> "John"
-    // 2. "Birthday: John" -> "John"
-    // 3. "John Birthday" -> "John"
-    // 4. Just the name if it's from Birthdays calendar
+    for (const pattern of patterns) {
+      const match = summary.match(pattern);
+      if (match) {
+        return match[1].trim();
+      }
+    }
     
-    let match = summary.match(/^(.+?)(?:'s)?\s*(?:birthday|birth)/i);
-    if (match) return match[1].trim();
-    
-    match = summary.match(/birthday[:\s]+(.+)/i);
-    if (match) return match[1].trim();
-    
-    match = summary.match(/(.+?)\s+birthday/i);
-    if (match) return match[1].trim();
-    
-    // If no pattern matches, return the summary as-is (might just be the name)
     return summary.trim();
   }
 }

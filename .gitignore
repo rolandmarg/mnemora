@@ -31,6 +31,9 @@ Thumbs.db
 dist/
 build/
 
+# ESLint cache
+.eslintcache
+
 # WhatsApp session data
 .wwebjs_auth/
 .wwebjs_cache/

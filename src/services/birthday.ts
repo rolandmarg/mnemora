@@ -12,23 +12,19 @@ class BirthdayService {
   async checkTodaysBirthdays(): Promise<void> {
     try {
       const today = new Date();
-      const events = await calendarService.getEventsForDate(today);
-      
-      const birthdays = events.filter(event => calendarService.isBirthdayEvent(event));
+      const birthdays = (await calendarService.getEventsForDate(today))
+        .filter(event => calendarService.isBirthdayEvent(event));
       
       if (birthdays.length === 0) {
-      console.log('No birthdays today!');
+        console.log('No birthdays today!');
         return;
       }
 
-      const messages = birthdays.map(event => {
-        const name = calendarService.extractName(event);
-        return `🎉 Happy Birthday ${name}! 🎂🎈`;
-      });
-
-      const message = messages.join('\n\n');
-      await whatsappService.sendMessage(message);
+      const message = birthdays
+        .map(event => `🎉 Happy Birthday ${calendarService.extractName(event)}! 🎂🎈`)
+        .join('\n\n');
       
+      await whatsappService.sendMessage(message);
       console.log(`Sent birthday wishes for ${birthdays.length} person(s)`);
     } catch (error) {
       console.error('Error checking today\'s birthdays:', error);
@@ -42,47 +38,40 @@ class BirthdayService {
   async sendMonthlyDigest(): Promise<void> {
     try {
       const today = new Date();
-      const events = await calendarService.getEventsForMonth(today);
-      
-      const birthdays = events.filter(event => calendarService.isBirthdayEvent(event));
+      const birthdays = (await calendarService.getEventsForMonth(today))
+        .filter(event => calendarService.isBirthdayEvent(event));
       
       if (birthdays.length === 0) {
-        const message = `📅 No birthdays scheduled for ${today.toLocaleString('default', { month: 'long', year: 'numeric' })}.`;
-        await whatsappService.sendMessage(message);
+        const monthName = today.toLocaleString('default', { month: 'long', year: 'numeric' });
+        await whatsappService.sendMessage(`📅 No birthdays scheduled for ${monthName}.`);
         return;
       }
 
       // Group birthdays by date
-      const birthdaysByDate: BirthdaysByDate = {};
-      birthdays.forEach(event => {
+      const birthdaysByDate = birthdays.reduce((acc, event) => {
         const startDate = event.start?.date || event.start?.dateTime;
-        if (!startDate) return;
-        
-        const date = new Date(startDate);
-        const dateKey = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        
-        if (!birthdaysByDate[dateKey]) {
-          birthdaysByDate[dateKey] = [];
+        if (!startDate) {
+          return acc;
         }
         
-        const name = calendarService.extractName(event);
-        birthdaysByDate[dateKey].push(name);
-      });
+        const dateKey = new Date(startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        if (!acc[dateKey]) {
+          acc[dateKey] = [];
+        }
+        acc[dateKey].push(calendarService.extractName(event));
+        return acc;
+      }, {} as BirthdaysByDate);
 
       // Build message
       const monthName = today.toLocaleString('default', { month: 'long', year: 'numeric' });
-      let message = `📅 Upcoming Birthdays in ${monthName}:\n\n`;
-      
       const sortedDates = Object.keys(birthdaysByDate).sort((a, b) => {
         const dateA = new Date(`${a}, ${today.getFullYear()}`);
         const dateB = new Date(`${b}, ${today.getFullYear()}`);
         return dateA.getTime() - dateB.getTime();
       });
 
-      sortedDates.forEach(date => {
-        const names = birthdaysByDate[date];
-        message += `🎂 ${date}: ${names.join(', ')}\n`;
-      });
+      const message = `📅 Upcoming Birthdays in ${monthName}:\n\n` +
+        sortedDates.map(date => `🎂 ${date}: ${birthdaysByDate[date].join(', ')}`).join('\n');
 
       await whatsappService.sendMessage(message);
       console.log(`Sent monthly digest with ${birthdays.length} birthday(s)`);

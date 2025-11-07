@@ -122,8 +122,9 @@ You are an expert in TypeScript, Node.js.
 3. **Error Messages**: Make error messages helpful and actionable
 4. **Documentation**: Add JSDoc comments for public functions
 5. **Consistency**: Follow existing patterns in the codebase
-6. **Testing**: Run `yarn type-check` before committing
+6. **Testing**: Run `yarn type-check` and `yarn lint` before committing
 7. **Scripts**: Always add new scripts to `package.json` and `launch.json`
+8. **Linting**: Follow ESLint rules - use `yarn lint:fix` to auto-fix issues
 
 ## Environment Variables
 - `GOOGLE_CALENDAR_ID` - Calendar ID (defaults to 'primary')
@@ -138,6 +139,8 @@ You are an expert in TypeScript, Node.js.
 - `yarn start` - Run compiled JavaScript
 - `yarn dev` - Development mode with auto-reload
 - `yarn type-check` - Type check without building
+- `yarn lint` - Run ESLint to check code quality
+- `yarn lint:fix` - Run ESLint and auto-fix issues
 - `yarn add-birthday` - Add birthday to calendar
 - `yarn delete-events` - Delete events interactively
 - `yarn check-all-events` - Check all calendar events
