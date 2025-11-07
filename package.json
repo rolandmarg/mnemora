@@ -18,9 +18,9 @@
     "add-birthday": "tsx src/scripts/add-birthday.ts",
     "batch-add-birthdays": "tsx src/scripts/batch-add-birthdays.ts",
     "delete-events": "tsx src/scripts/delete-events.ts",
-    "type-check": "tsc --noEmit",
-    "lint": "eslint src/**/*.ts",
-    "lint:fix": "eslint src/**/*.ts --fix",
+    "type-check": "tsc --noEmit --incremental",
+    "lint": "eslint --cache --cache-location .eslintcache src/**/*.ts",
+    "lint:fix": "eslint --cache --cache-location .eslintcache src/**/*.ts --fix",
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage"
