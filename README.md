@@ -21,7 +21,7 @@ A bot that fetches Google Calendar birthdays and sends WhatsApp notifications.
 ### 1. Install Dependencies
 
 ```bash
-npm install
+yarn install
 ```
 
 ### 2. Google Calendar API Setup
@@ -51,7 +51,7 @@ npm install
 
 1. Run the helper script:
    ```bash
-   npm run find-group
+   yarn find-group
    ```
 2. This will display all your WhatsApp groups with their IDs
 3. Copy the ID (without `@g.us`) to your `.env` file
@@ -87,7 +87,7 @@ SCHEDULE_TIME=09:00
 ### Build TypeScript
 
 ```bash
-npm run build
+yarn build
 ```
 
 This compiles TypeScript to JavaScript in the `dist/` directory.
@@ -95,7 +95,7 @@ This compiles TypeScript to JavaScript in the `dist/` directory.
 ### Start the Bot
 
 ```bash
-npm start
+yarn start
 ```
 
 This runs the compiled JavaScript from `dist/`.
@@ -103,7 +103,7 @@ This runs the compiled JavaScript from `dist/`.
 ### Development Mode (with auto-reload)
 
 ```bash
-npm run dev
+yarn dev
 ```
 
 This runs TypeScript directly with `tsx` and watches for changes.
@@ -111,7 +111,7 @@ This runs TypeScript directly with `tsx` and watches for changes.
 ### Type Checking
 
 ```bash
-npm run type-check
+yarn type-check
 ```
 
 This checks TypeScript types without compiling.
@@ -126,20 +126,22 @@ This checks TypeScript types without compiling.
 
 ```
 mnemora/
-├── services/
-│   ├── calendar.ts      # Google Calendar integration
-│   ├── whatsapp.ts      # WhatsApp messaging
-│   └── birthday.ts      # Birthday logic
-├── scripts/
-│   └── find-group-id.ts # Helper script to find WhatsApp group IDs
-├── types/
-│   └── qrcode-terminal.d.ts  # Type definitions
-├── config.ts            # Configuration loader
-├── index.ts             # Main entry point with scheduler
-├── tsconfig.json        # TypeScript configuration
+├── src/
+│   ├── services/
+│   │   ├── calendar.ts      # Google Calendar integration
+│   │   ├── whatsapp.ts      # WhatsApp messaging
+│   │   └── birthday.ts      # Birthday logic
+│   ├── scripts/
+│   │   ├── add-birthday.ts  # Add birthday to calendar
+│   │   └── check-all-events.ts # Check all calendar events
+│   ├── types/
+│   │   └── qrcode-terminal.d.ts  # Type definitions
+│   ├── config.ts            # Configuration loader
+│   └── index.ts             # Main entry point
 ├── dist/                # Compiled JavaScript (generated)
 ├── .env                 # Environment variables (create this)
-├── .env.example         # Example environment variables
+├── tsconfig.json        # TypeScript configuration
+├── yarn.lock            # Yarn lockfile
 └── package.json
 ```
 
