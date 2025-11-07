@@ -8,8 +8,15 @@ import whatsappService from '../services/whatsapp.js';
 async function findGroupIds(): Promise<void> {
   try {
     console.log('Initializing WhatsApp...');
+    console.log('This may take a moment. If you see a QR code, scan it with WhatsApp on your phone.\n');
+    
     await whatsappService.initialize();
-    await whatsappService.waitForReady();
+    
+    console.log('\nWaiting for WhatsApp to be ready...');
+    console.log('If you see a QR code above, please scan it with WhatsApp now.');
+    console.log('Waiting up to 60 seconds for authentication...\n');
+    
+    await whatsappService.waitForReady(60000); // 60 second timeout
 
     const client = whatsappService.clientInstance;
     if (!client) {

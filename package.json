@@ -9,6 +9,12 @@
     "start": "node dist/index.js",
     "dev": "tsx watch index.ts",
     "find-group": "tsx scripts/find-group-id.ts",
+    "test-calendar": "tsx scripts/test-calendar.ts",
+    "list-calendars": "tsx scripts/list-calendars.ts",
+    "get-all-birthdays": "tsx scripts/get-all-birthdays.ts",
+    "check-all-events": "tsx scripts/check-all-events.ts",
+    "check-permissions": "tsx scripts/check-calendar-permissions.ts",
+    "sanity-check": "tsx scripts/sanity-check.ts",
     "type-check": "tsc --noEmit",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

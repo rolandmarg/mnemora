@@ -1,51 +1,40 @@
-import cron from 'node-cron';
 import birthdayService from './services/birthday.js';
 import whatsappService from './services/whatsapp.js';
-import { config } from './config.js';
 
-// Initialize WhatsApp service on startup
-console.log('Initializing WhatsApp service...');
-whatsappService.initialize().catch(console.error);
+/**
+ * Manual execution mode - runs once and exits
+ * Scheduling is disabled. Run manually with: npm start or npm run dev
+ */
 
-// Parse schedule time (format: HH:MM)
-const [hours, minutes] = config.schedule.time.split(':').map(Number);
-
-// Schedule daily task at configured time
-const cronExpression = `${minutes} ${hours} * * *`;
-
-console.log(`Scheduling daily task at ${config.schedule.time} (cron: ${cronExpression})`);
-
-cron.schedule(cronExpression, async () => {
-  console.log(`\n[${new Date().toISOString()}] Running scheduled task...`);
-  
+async function runBirthdayCheck(): Promise<void> {
   try {
+    console.log('Initializing WhatsApp service...');
+    await whatsappService.initialize();
+    await whatsappService.waitForReady(60000); // 60 second timeout
+    
+    console.log('\n═══════════════════════════════════════════════════════');
+    console.log('Running birthday check...');
+    console.log('═══════════════════════════════════════════════════════\n');
+    
     // Check if it's the first day of the month
     if (birthdayService.isFirstDayOfMonth()) {
-      console.log('First day of month detected - sending monthly digest');
+      console.log('📅 First day of month detected - sending monthly digest');
       await birthdayService.sendMonthlyDigest();
     }
     
     // Always check for today's birthdays
     await birthdayService.checkTodaysBirthdays();
     
-    console.log('Scheduled task completed successfully');
+    console.log('\n✅ Birthday check completed successfully!');
   } catch (error) {
-    console.error('Error in scheduled task:', error);
+    console.error('\n❌ Error in birthday check:', error);
+    process.exit(1);
+  } finally {
+    // Exit after completion
+    process.exit(0);
   }
-});
+}
 
-// Also run immediately on startup for testing (optional)
-console.log('\nRunning initial check...');
-(async () => {
-  try {
-    if (birthdayService.isFirstDayOfMonth()) {
-      await birthdayService.sendMonthlyDigest();
-    }
-    await birthdayService.checkTodaysBirthdays();
-  } catch (error) {
-    console.error('Error in initial check:', error);
-  }
-})();
-
-console.log('Bot is running. Press Ctrl+C to stop.');
+// Run the check
+runBirthdayCheck();
 

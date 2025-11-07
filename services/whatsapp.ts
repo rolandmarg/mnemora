@@ -1,6 +1,11 @@
-import { Client, LocalAuth, Chat } from 'whatsapp-web.js';
+import WAWebJS from 'whatsapp-web.js';
 import qrcode from 'qrcode-terminal';
 import { config } from '../config.js';
+
+// Extract types and classes from namespace
+const Client = WAWebJS.Client;
+const LocalAuth = WAWebJS.LocalAuth;
+type Chat = WAWebJS.Chat;
 
 class WhatsAppService {
   private client: Client | null = null;
@@ -14,8 +19,15 @@ class WhatsAppService {
     });
 
     this.client.on('qr', (qr: string) => {
-      console.log('Scan this QR code with WhatsApp:');
+      console.log('\n═══════════════════════════════════════════════════════');
+      console.log('📱 SCAN THIS QR CODE WITH WHATSAPP:');
+      console.log('   1. Open WhatsApp on your phone');
+      console.log('   2. Go to Settings → Linked Devices');
+      console.log('   3. Tap "Link a Device"');
+      console.log('   4. Scan the QR code below');
+      console.log('═══════════════════════════════════════════════════════\n');
       qrcode.generate(qr, { small: true });
+      console.log('\n═══════════════════════════════════════════════════════\n');
     });
 
     this.client.on('ready', () => {
@@ -28,7 +40,13 @@ class WhatsAppService {
     });
 
     this.client.on('auth_failure', (msg: string) => {
-      console.error('WhatsApp authentication failed:', msg);
+      console.error('❌ WhatsApp authentication failed:', msg);
+      this.ready = false;
+    });
+
+    this.client.on('disconnected', (reason: string) => {
+      console.log('⚠️  WhatsApp client disconnected:', reason);
+      this.ready = false;
     });
 
     await this.client.initialize();
@@ -41,11 +59,19 @@ class WhatsAppService {
    */
   async waitForReady(timeout: number = 30000): Promise<void> {
     const startTime = Date.now();
+    let lastLogTime = 0;
     while (!this.ready && (Date.now() - startTime) < timeout) {
+      const elapsed = Date.now() - startTime;
+      // Log progress every 5 seconds
+      if (elapsed - lastLogTime >= 5000) {
+        const remaining = Math.ceil((timeout - elapsed) / 1000);
+        console.log(`Still waiting... (${remaining}s remaining)`);
+        lastLogTime = elapsed;
+      }
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
     if (!this.ready) {
-      throw new Error('WhatsApp client not ready within timeout');
+      throw new Error(`WhatsApp client not ready within ${timeout / 1000} seconds. Please scan the QR code and try again.`);
     }
   }
 
