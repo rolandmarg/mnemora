@@ -1,7 +1,8 @@
 import { google } from 'googleapis';
 import { config } from '../config.js';
 import { startOfMonth, endOfMonth, startOfDay, endOfDay } from '../utils/date.js';
-import type { CalendarEvent, CalendarClient } from '../utils/calendar/types.js';
+import { getFullName } from '../utils/name/name-helpers.js';
+import type { CalendarEvent, CalendarClient } from '../types/index.js';
 
 export interface EventListOptions {
   startDate: Date;
@@ -13,7 +14,7 @@ class CalendarService {
   private calendar: CalendarClient | null = null;
   private initialized: boolean = false;
 
-  async initialize(): Promise<void> {
+  private async initialize(): Promise<void> {
     if (this.initialized) {
       return;
     }
@@ -90,6 +91,36 @@ class CalendarService {
    */
   async getEventsForDateRange(startDate: Date, endDate: Date): Promise<CalendarEvent[]> {
     return this.fetchEvents({ startDate, endDate });
+  }
+
+  /**
+   * Check if event name matches birthday input
+   */
+  eventNameMatches(
+    eventSummary: string,
+    firstName: string,
+    lastName?: string
+  ): boolean {
+    const summary = eventSummary.toLowerCase();
+    const firstNameLower = firstName.toLowerCase();
+    const lastNameLower = lastName?.toLowerCase() ?? '';
+    const fullNameLower = getFullName(firstName, lastName).toLowerCase();
+
+    return !!(
+      summary.includes(firstNameLower) ||
+      summary.includes(fullNameLower) ||
+      (lastNameLower && summary.includes(lastNameLower))
+    );
+  }
+
+  /**
+   * Format duplicate event for display
+   */
+  formatDuplicateEvent(
+    event: CalendarEvent,
+    index: number
+  ): string {
+    return `   ${index + 1}. ${event.summary ?? '(No title)'}\n      Event ID: ${event.id}\n      Date: ${event.start?.date ?? event.start?.dateTime ?? '(No date)'}`;
   }
 }
 

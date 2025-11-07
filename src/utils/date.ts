@@ -50,6 +50,56 @@ export function parseDateFromString(dateString: string): Date {
 }
 
 /**
+ * Parse a date string into a Date object
+ * Supports formats:
+ * - "Dec 9", "Nov 8", "Mar 16" (abbreviated month + day)
+ * - "December 9", "May 15" (full month name + day)
+ * - "05-15" (MM-DD)
+ * - "1990-05-15" (YYYY-MM-DD)
+ * - "May 15, 1990" (Month DD, YYYY)
+ * 
+ * @param dateStr - Date string to parse
+ * @returns Date object if parsing succeeds, null otherwise
+ */
+export function parseDateString(dateStr: string): Date | null {
+  const trimmed = dateStr.trim();
+
+  // Try abbreviated month format: "Dec 9", "Nov 8", "Mar 16"
+  const abbreviatedMonthMatch = trimmed.match(/^([A-Za-z]{3,})\s+(\d{1,2})$/);
+  if (abbreviatedMonthMatch) {
+    const monthName = abbreviatedMonthMatch[1];
+    const day = parseInt(abbreviatedMonthMatch[2], 10);
+    const date = createDateFromMonthName(monthName, day);
+    if (date) {
+      return date;
+    }
+  }
+
+  // Try full month name format: "December 9", "May 15"
+  const fullMonthMatch = trimmed.match(/^([A-Za-z]+)\s+(\d{1,2})(?:,\s*(\d{4}))?$/);
+  if (fullMonthMatch) {
+    const monthName = fullMonthMatch[1];
+    const day = parseInt(fullMonthMatch[2], 10);
+    const year = fullMonthMatch[3] ? parseInt(fullMonthMatch[3], 10) : undefined;
+    const date = createDateFromMonthName(monthName, day, year);
+    if (date) {
+      return date;
+    }
+  }
+
+  // Try ISO format: "1990-05-15" or "05-15"
+  const isoMatch = trimmed.match(/^(\d{4}-)?(\d{1,2})-(\d{1,2})$/);
+  if (isoMatch) {
+    const year = isoMatch[1] ? parseInt(isoMatch[1].replace('-', ''), 10) : undefined;
+    const month = parseInt(isoMatch[2], 10);
+    const day = parseInt(isoMatch[3], 10);
+    return createDate(month, day, year);
+  }
+
+  return null;
+}
+
+/**
  * Normalize a date to the start of the day (00:00:00)
  */
 export function startOfDay(date: Date): Date {

@@ -1,7 +1,7 @@
 import calendarService from '../services/calendar.js';
 import birthdayService from '../services/birthday.js';
 import { extractNameFromEvent } from '../utils/name/name-helpers.js';
-import { isRecurring, isAllDay, getEventStartDate, groupEvents } from '../utils/calendar/event-helpers.js';
+import { isRecurring, isAllDay, getEventStartDate, groupEvents } from '../utils/event/event-helpers.js';
 import { today, startOfYear, endOfYear, formatDateRange } from '../utils/date.js';
 
 /**

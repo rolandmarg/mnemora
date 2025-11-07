@@ -12,7 +12,7 @@ class WhatsAppService {
   private client: ClientType | null = null;
   private ready: boolean = false;
 
-  async initialize(): Promise<void> {
+  private async initialize(): Promise<void> {
     if (this.ready) {
       return;
     }
@@ -60,7 +60,7 @@ class WhatsAppService {
    * @param timeout - Timeout in milliseconds
    * @returns Promise that resolves when ready
    */
-  async waitForReady(timeout: number = 30000): Promise<void> {
+  private async waitForReady(timeout: number = 30000): Promise<void> {
     const startTime = Date.now();
     let lastLogTime = 0;
     while (!this.ready && (Date.now() - startTime) < timeout) {

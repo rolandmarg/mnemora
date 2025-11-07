@@ -1,6 +1,6 @@
 import calendarService from '../../services/calendar.js';
 import { today, startOfYear, endOfYear, formatDateRange } from '../date.js';
-import type { CalendarEvent, CalendarClient } from './types.js';
+import type { CalendarEvent, CalendarClient } from '../../types/index.js';
 
 /**
  * Event deletion utilities

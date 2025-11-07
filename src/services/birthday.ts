@@ -1,11 +1,10 @@
 import { config } from '../config.js';
 import calendarService from './calendar.js';
-import { createReadWriteCalendarClient } from '../utils/calendar/calendar-auth.js';
+import { createReadWriteCalendarClient } from '../utils/event/calendar-auth.js';
 import { formatDateISO, fromDate, today, formatDateShort, formatDateMonthYear, parseDateFromString, startOfDay } from '../utils/date.js';
-import { eventNameMatches, formatDuplicateEvent } from '../utils/calendar/calendar-helpers.js';
 import { getFullName, extractNameFromEvent } from '../utils/name/name-helpers.js';
 import type { BirthdayInput } from '../utils/name/birthday-parser.js';
-import type { CalendarEvent, CalendarClient } from '../utils/calendar/types.js';
+import type { CalendarEvent, CalendarClient } from '../types/index.js';
 
 interface BirthdaysByDate {
   [dateKey: string]: string[];
@@ -162,7 +161,7 @@ class BirthdayService {
       return events.filter(event => {
         const summary = (event.summary ?? '').toLowerCase();
         return summary.includes('birthday') && 
-               eventNameMatches(event.summary ?? '', birthday.firstName, birthday.lastName);
+               calendarService.eventNameMatches(event.summary ?? '', birthday.firstName, birthday.lastName);
       });
     } catch (error) {
       console.error('Error checking for duplicates:', error);
@@ -175,7 +174,7 @@ class BirthdayService {
    */
   displayDuplicates(duplicates: CalendarEvent[], fullName: string, date: Date): void {
     console.log('\n⚠️  Potential duplicate(s) found:');
-    duplicates.forEach((dup, index) => console.log(formatDuplicateEvent(dup, index + 1)));
+    duplicates.forEach((dup, index) => console.log(calendarService.formatDuplicateEvent(dup, index + 1)));
     console.log(`\n   Trying to add: ${fullName}'s Birthday`);
     console.log(`   Date: ${date.toLocaleDateString()}\n`);
   }

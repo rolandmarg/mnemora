@@ -1,4 +1,4 @@
-import type { CalendarEvent } from '../calendar/types.js';
+import type { CalendarEvent } from '../../types/index.js';
 
 /**
  * Name helper utilities for sanitization and string manipulation

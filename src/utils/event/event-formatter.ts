@@ -1,4 +1,4 @@
-import type { CalendarEvent } from './types.js';
+import type { CalendarEvent } from '../../types/index.js';
 
 /**
  * Event formatting utilities

@@ -30,16 +30,21 @@ export default [
       '@typescript-eslint/no-unused-vars': ['error', { 
         argsIgnorePattern: '^_',
         varsIgnorePattern: '^_',
+        args: 'after-used', // Only check arguments after the last used one
+        ignoreRestSiblings: true, // Ignore rest siblings in destructuring
+        caughtErrors: 'all', // Check unused catch clause variables
+        caughtErrorsIgnorePattern: '^_', // Allow _ prefix for catch errors
       }],
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-non-null-assertion': 'off', // Allow non-null assertions when we've checked
-      '@typescript-eslint/prefer-nullish-coalescing': 'warn',
-      '@typescript-eslint/prefer-optional-chain': 'warn',
+      '@typescript-eslint/prefer-nullish-coalescing': 'error',
+      '@typescript-eslint/prefer-optional-chain': 'error',
       
       // General rules
       'no-console': 'off', // Allow console for scripts
       'no-unused-vars': 'off', // Use TypeScript version instead
+      'no-unused-private-class-members': 'error', // Detect unused private class methods, fields, and accessors
       'prefer-const': 'error',
       'no-var': 'error',
       'eqeqeq': ['error', 'always'],
@@ -47,11 +52,11 @@ export default [
       'brace-style': ['error', '1tbs'], // Consistent brace style
       'no-throw-literal': 'error',
       'prefer-promise-reject-errors': 'error',
-      'no-else-return': 'warn', // Prefer early returns
-      'prefer-arrow-callback': 'warn',
-      'arrow-body-style': ['warn', 'as-needed'],
-      'object-shorthand': 'warn',
-      'prefer-template': 'warn',
+      'no-else-return': 'error', // Prefer early returns
+      'prefer-arrow-callback': 'error',
+      'arrow-body-style': ['error', 'as-needed'],
+      'object-shorthand': 'error',
+      'prefer-template': 'error',
     },
   },
   {

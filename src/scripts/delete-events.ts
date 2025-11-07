@@ -1,14 +1,14 @@
 import { config } from '../config.js';
 import { createQuestionInterface, askConfirmation } from '../utils/cli/cli.js';
-import { createReadWriteCalendarClient } from '../utils/calendar/calendar-auth.js';
-import { formatEvent } from '../utils/calendar/event-formatter.js';
+import { createReadWriteCalendarClient } from '../utils/event/calendar-auth.js';
+import { formatEvent } from '../utils/event/event-formatter.js';
 import { parseDateFromString } from '../utils/date.js';
 import {
   getEventsForDeletion,
   deleteAllEvents,
   deleteEventsInteractively,
   displayDeletionSummary,
-} from '../utils/calendar/event-deletion.js';
+} from '../utils/event/event-deletion.js';
 
 /**
  * Script to interactively delete events from Google Calendar

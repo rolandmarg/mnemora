@@ -4,6 +4,7 @@ dotenv.config();
 
 export interface GoogleConfig {
   calendarId: string;
+  spreadsheetId: string | undefined;
   clientEmail: string | undefined;
   privateKey: string | undefined;
   projectId: string | undefined;
@@ -26,6 +27,7 @@ export interface AppConfig {
 export const config: AppConfig = {
   google: {
     calendarId: process.env.GOOGLE_CALENDAR_ID || 'primary',
+    spreadsheetId: process.env.GOOGLE_SPREADSHEET_ID,
     clientEmail: process.env.GOOGLE_CLIENT_EMAIL,
     privateKey: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
     projectId: process.env.GOOGLE_PROJECT_ID,

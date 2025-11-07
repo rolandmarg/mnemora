@@ -1,5 +1,5 @@
 import { createQuestionInterface, askQuestion, askConfirmation } from '../utils/cli/cli.js';
-import { createReadWriteCalendarClient } from '../utils/calendar/calendar-auth.js';
+import { createReadWriteCalendarClient } from '../utils/event/calendar-auth.js';
 import { getFullName } from '../utils/name/name-helpers.js';
 import { parseInput } from '../utils/name/birthday-parser.js';
 import { filterFlags } from '../utils/cli/script-helpers.js';

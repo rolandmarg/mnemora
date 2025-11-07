@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 import { config } from '../../config.js';
-import type { CalendarClient } from './types.js';
+import type { CalendarClient } from '../../types/index.js';
 
 /**
  * Calendar authentication utilities

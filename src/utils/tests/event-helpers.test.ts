@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import type { CalendarEvent } from '../calendar/types.js';
-import { isRecurring, isAllDay, getEventStartDate, groupEvents } from '../calendar/event-helpers.js';
+import type { CalendarEvent } from '../../types/index.js';
+import { isRecurring, isAllDay, getEventStartDate, groupEvents } from '../event/event-helpers.js';
 
 describe('event-helpers', () => {
   describe('isRecurring', () => {
