@@ -12,7 +12,7 @@ export function formatEvent(event: calendar_v3.Schema$Event): string {
   const start = event.start?.date || event.start?.dateTime || '(No date)';
   const location = event.location || '';
   const description = event.description ? 
-    (event.description.length > 100 ? event.description.substring(0, 100) + '...' : event.description) 
+    (event.description.length > 100 ? `${event.description.substring(0, 100)  }...` : event.description) 
     : '';
   
   let formatted = `  Title: ${summary}`;
