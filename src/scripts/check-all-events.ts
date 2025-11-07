@@ -35,10 +35,10 @@ async function checkAllEvents(): Promise<void> {
       { name: 'allDay', test: isAllDay },
     ]);
     
-    const birthdayEvents = groups.birthday || [];
-    const recurringEvents = groups.recurring || [];
-    const allDayEvents = groups.allDay || [];
-    const otherEvents = groups.other || [];
+    const birthdayEvents = groups.birthday ?? [];
+    const recurringEvents = groups.recurring ?? [];
+    const allDayEvents = groups.allDay ?? [];
+    const otherEvents = groups.other ?? [];
     
     // Display birthday events
     if (birthdayEvents.length > 0) {
@@ -46,7 +46,7 @@ async function checkAllEvents(): Promise<void> {
       console.log(`🎂 BIRTHDAY EVENTS (${birthdayEvents.length}):`);
       console.log('═══════════════════════════════════════════════════════\n');
       birthdayEvents.forEach((event, index) => {
-        console.log(`${index + 1}. ${event.summary || '(No title)'}`);
+        console.log(`${index + 1}. ${event.summary ?? '(No title)'}`);
         console.log(`   Date: ${getEventStartDate(event)}`);
         console.log(`   Type: ${isRecurring(event) ? 'Recurring' : 'One-time'}`);
         console.log(`   Extracted Name: ${calendarService.extractName(event)}`);
@@ -62,9 +62,9 @@ async function checkAllEvents(): Promise<void> {
       console.log(`🔄 RECURRING EVENTS (${recurringEvents.length}):`);
       console.log('═══════════════════════════════════════════════════════\n');
       recurringEvents.slice(0, 10).forEach((event, index) => {
-        console.log(`${index + 1}. ${event.summary || '(No title)'}`);
+        console.log(`${index + 1}. ${event.summary ?? '(No title)'}`);
         console.log(`   Date: ${getEventStartDate(event)}`);
-        console.log(`   Recurrence: ${event.recurrence?.[0]?.substring(0, 50) || 'Unknown'}...`);
+        console.log(`   Recurrence: ${event.recurrence?.[0]?.substring(0, 50) ?? 'Unknown'}...`);
         console.log(`   All-day: ${isAllDay(event) ? 'Yes' : 'No'}`);
         console.log(`   Detected as birthday: ${calendarService.isBirthdayEvent(event) ? '✅ Yes' : '❌ No'}`);
         console.log('');
@@ -80,7 +80,7 @@ async function checkAllEvents(): Promise<void> {
       console.log(`📅 ALL-DAY EVENTS (${allDayEvents.length}):`);
       console.log('═══════════════════════════════════════════════════════\n');
       allDayEvents.slice(0, 10).forEach((event, index) => {
-        console.log(`${index + 1}. ${event.summary || '(No title)'}`);
+        console.log(`${index + 1}. ${event.summary ?? '(No title)'}`);
         console.log(`   Date: ${getEventStartDate(event)}`);
         console.log(`   Recurring: ${isRecurring(event) ? 'Yes' : 'No'}`);
         console.log(`   Detected as birthday: ${calendarService.isBirthdayEvent(event) ? '✅ Yes' : '❌ No'}`);

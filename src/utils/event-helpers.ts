@@ -22,7 +22,7 @@ export function isAllDay(event: calendar_v3.Schema$Event): boolean {
  * Get event start date string
  */
 export function getEventStartDate(event: calendar_v3.Schema$Event): string {
-  return event.start?.date || event.start?.dateTime || '(No date)';
+  return event.start?.date ?? event.start?.dateTime ?? '(No date)';
 }
 
 /**
@@ -43,7 +43,7 @@ export function groupEvents(
     if (matched) {
       groups[matched.name].push(event);
     } else {
-      groups.other = groups.other || [];
+      groups.other = groups.other ?? [];
       groups.other.push(event);
     }
   });

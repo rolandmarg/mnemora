@@ -49,7 +49,7 @@ class BirthdayService {
 
       // Group birthdays by date
       const birthdaysByDate = birthdays.reduce((acc, event) => {
-        const startDate = event.start?.date || event.start?.dateTime;
+        const startDate = event.start?.date ?? event.start?.dateTime;
         if (!startDate) {
           return acc;
         }

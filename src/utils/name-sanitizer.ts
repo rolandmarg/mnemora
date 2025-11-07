@@ -34,7 +34,7 @@ export function sanitizeNames(firstName: string, lastName?: string): { firstName
   
   return {
     firstName: sanitizedFirstName,
-    lastName: sanitizedLastName || undefined,
+    lastName: sanitizedLastName ?? undefined,
   };
 }
 

@@ -76,7 +76,7 @@ class CalendarService {
     
     try {
       const response = await this.calendar.calendarList.list();
-      return response.data.items || [];
+      return response.data.items ?? [];
     } catch (error) {
       console.error('Error fetching calendars:', error);
       throw error;
@@ -90,19 +90,19 @@ class CalendarService {
   async findBirthdaysCalendarId(): Promise<string | null> {
     const calendars = await this.getCalendars();
     const birthdaysCalendar = calendars.find(cal => 
-      cal.summary?.toLowerCase().includes('birthday') ||
-      cal.id?.toLowerCase().includes('birthday') ||
+      (cal.summary?.toLowerCase() ?? '').includes('birthday') ||
+      (cal.id?.toLowerCase() ?? '').includes('birthday') ||
       cal.id?.includes('#contacts@group.v.calendar.google.com')
     );
-    return birthdaysCalendar?.id || null;
+    return birthdaysCalendar?.id ?? null;
   }
 
   /**
    * Check if an event is a birthday
    */
   isBirthdayEvent(event: CalendarEvent): boolean {
-    const summary = (event.summary || '').toLowerCase();
-    const description = (event.description || '').toLowerCase();
+    const summary = (event.summary ?? '').toLowerCase();
+    const description = (event.description ?? '').toLowerCase();
     const hasBirthdayKeyword = summary.includes('birthday') || description.includes('birthday');
     
     if (hasBirthdayKeyword) {
@@ -134,7 +134,7 @@ class CalendarService {
    * Extract person name from birthday event
    */
   extractName(event: CalendarEvent): string {
-    const summary = event.summary || '';
+    const summary = event.summary ?? '';
     const patterns = [
       /^(.+?)(?:'s)?\s*(?:birthday|birth)/i,
       /birthday[:\s]+(.+)/i,

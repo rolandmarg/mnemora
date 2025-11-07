@@ -8,9 +8,9 @@ import { calendar_v3 } from 'googleapis';
  * Format an event for display
  */
 export function formatEvent(event: calendar_v3.Schema$Event): string {
-  const summary = event.summary || '(No title)';
-  const start = event.start?.date || event.start?.dateTime || '(No date)';
-  const location = event.location || '';
+  const summary = event.summary ?? '(No title)';
+  const start = event.start?.date ?? event.start?.dateTime ?? '(No date)';
+  const location = event.location ?? '';
   const description = event.description ? 
     (event.description.length > 100 ? `${event.description.substring(0, 100)  }...` : event.description) 
     : '';
@@ -34,6 +34,6 @@ export function formatEvent(event: calendar_v3.Schema$Event): string {
  * Format event details for duplicate checking
  */
 export function formatEventForDuplicate(event: calendar_v3.Schema$Event): string {
-  return `${event.summary || '(No title)'} - ${event.start?.date || event.start?.dateTime || '(No date)'}`;
+  return `${event.summary ?? '(No title)'} - ${event.start?.date ?? event.start?.dateTime ?? '(No date)'}`;
 }
 

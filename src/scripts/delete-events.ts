@@ -9,6 +9,8 @@ import { fetchEvents } from '../utils/calendar-helpers.js';
  * Script to interactively delete events from Google Calendar
  * Usage: yarn delete-events
  * Or: yarn delete-events --date-range "2024-01-01" "2024-12-31"
+ * Or: yarn delete-events --all (delete all events without review)
+ * Or: yarn delete-events --all --date-range "2024-01-01" "2024-12-31"
  */
 
 interface DeleteOptions {
@@ -22,8 +24,8 @@ async function getEvents(
   calendar: calendar_v3.Calendar,
   options: DeleteOptions
 ): Promise<calendar_v3.Schema$Event[]> {
-  const startDate = options.startDate || new Date(new Date().getFullYear(), 0, 1);
-  const endDate = options.endDate || new Date(new Date().getFullYear(), 11, 31, 23, 59, 59);
+  const startDate = options.startDate ?? new Date(new Date().getFullYear(), 0, 1);
+  const endDate = options.endDate ?? new Date(new Date().getFullYear(), 11, 31, 23, 59, 59);
   
   console.log(`\nFetching events from ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}...`);
   return fetchEvents(calendar, {
@@ -60,6 +62,7 @@ async function main(): Promise<void> {
   let startDate: Date | undefined;
   let endDate: Date | undefined;
   let calendarId: string | undefined;
+  const deleteAll = args.includes('--all') || args.includes('-a');
 
   // Parse date range if provided
   if (args.includes('--date-range')) {
@@ -85,7 +88,7 @@ async function main(): Promise<void> {
     console.log('🗑️  Delete Events from Google Calendar');
     console.log('═══════════════════════════════════════════════════════\n');
 
-    const targetCalendarId = calendarId || config.google.calendarId;
+    const targetCalendarId = calendarId ?? config.google.calendarId;
     console.log(`Calendar: ${targetCalendarId}\n`);
 
     // Fetch events
@@ -103,38 +106,75 @@ async function main(): Promise<void> {
     let skippedCount = 0;
     let errorCount = 0;
 
-    console.log('\n═══════════════════════════════════════════════════════');
-    console.log('Reviewing events...');
-    console.log('═══════════════════════════════════════════════════════\n');
+    if (deleteAll) {
+      // Delete all events without review
+      console.log('\n═══════════════════════════════════════════════════════');
+      console.log('⚠️  DELETE ALL MODE - Deleting all events without review');
+      console.log('═══════════════════════════════════════════════════════\n');
 
-    for (let i = 0; i < events.length; i++) {
-      const event = events[i];
-      const eventNumber = i + 1;
-      const totalEvents = events.length;
+      const confirm = await askConfirmation(rl, `⚠️  WARNING: This will delete ALL ${events.length} event(s). Continue? (y/n): `);
+      if (!confirm) {
+        console.log('❌ Cancelled. No events deleted.');
+        rl.close();
+        process.exit(0);
+      }
 
-      console.log(`\n[${eventNumber}/${totalEvents}]`);
-      console.log(formatEvent(event));
-      console.log('');
+      console.log('\nDeleting events...\n');
 
-      const shouldDelete = await askConfirmation(rl, 'Delete this event? (y/n): ');
+      for (let i = 0; i < events.length; i++) {
+        const event = events[i];
+        const eventNumber = i + 1;
+        const totalEvents = events.length;
 
-      if (shouldDelete) {
         if (event.id) {
           const success = await deleteEvent(calendar, event.id, targetCalendarId);
           if (success) {
-            console.log('✅ Event deleted successfully');
+            console.log(`[${eventNumber}/${totalEvents}] ✅ Deleted: ${event.summary ?? 'Untitled Event'}`);
             deletedCount++;
           } else {
-            console.log('❌ Failed to delete event');
+            console.log(`[${eventNumber}/${totalEvents}] ❌ Failed to delete: ${event.summary ?? 'Untitled Event'}`);
             errorCount++;
           }
         } else {
-          console.log('⚠️  Event has no ID, cannot delete');
+          console.log(`[${eventNumber}/${totalEvents}] ⚠️  Event has no ID, cannot delete: ${event.summary ?? 'Untitled Event'}`);
           errorCount++;
         }
-      } else {
-        console.log('⏭️  Skipped');
-        skippedCount++;
+      }
+    } else {
+      // Interactive mode - review each event
+      console.log('\n═══════════════════════════════════════════════════════');
+      console.log('Reviewing events...');
+      console.log('═══════════════════════════════════════════════════════\n');
+
+      for (let i = 0; i < events.length; i++) {
+        const event = events[i];
+        const eventNumber = i + 1;
+        const totalEvents = events.length;
+
+        console.log(`\n[${eventNumber}/${totalEvents}]`);
+        console.log(formatEvent(event));
+        console.log('');
+
+        const shouldDelete = await askConfirmation(rl, 'Delete this event? (y/n): ');
+
+        if (shouldDelete) {
+          if (event.id) {
+            const success = await deleteEvent(calendar, event.id, targetCalendarId);
+            if (success) {
+              console.log('✅ Event deleted successfully');
+              deletedCount++;
+            } else {
+              console.log('❌ Failed to delete event');
+              errorCount++;
+            }
+          } else {
+            console.log('⚠️  Event has no ID, cannot delete');
+            errorCount++;
+          }
+        } else {
+          console.log('⏭️  Skipped');
+          skippedCount++;
+        }
       }
     }
 

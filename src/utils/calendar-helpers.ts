@@ -23,7 +23,7 @@ export async function fetchEvents(
   const { startDate, endDate, calendarId, maxResults } = options;
   const start = startOfDay(startDate);
   const end = endOfDay(endDate);
-  const targetCalendarId = calendarId || config.google.calendarId;
+  const targetCalendarId = calendarId ?? config.google.calendarId;
 
   const response = await calendar.events.list({
     calendarId: targetCalendarId,
@@ -34,7 +34,7 @@ export async function fetchEvents(
     ...(maxResults && { maxResults }),
   });
 
-  return response.data.items || [];
+  return response.data.items ?? [];
 }
 
 /**
@@ -54,7 +54,7 @@ export function eventNameMatches(
 ): boolean {
   const summary = eventSummary.toLowerCase();
   const firstNameLower = firstName.toLowerCase();
-  const lastNameLower = lastName?.toLowerCase() || '';
+  const lastNameLower = lastName?.toLowerCase() ?? '';
   const fullNameLower = getFullName(firstName, lastName).toLowerCase();
 
   return !!(
@@ -71,6 +71,6 @@ export function formatDuplicateEvent(
   event: calendar_v3.Schema$Event,
   index: number
 ): string {
-  return `   ${index + 1}. ${event.summary || '(No title)'}\n      Event ID: ${event.id}\n      Date: ${event.start?.date || event.start?.dateTime || '(No date)'}`;
+  return `   ${index + 1}. ${event.summary ?? '(No title)'}\n      Event ID: ${event.id}\n      Date: ${event.start?.date ?? event.start?.dateTime ?? '(No date)'}`;
 }
 

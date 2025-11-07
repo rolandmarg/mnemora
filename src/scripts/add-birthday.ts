@@ -4,78 +4,13 @@ import { createQuestionInterface, askQuestion, askConfirmation } from '../utils/
 import { formatDateISO } from '../utils/date.js';
 import { createReadWriteCalendarClient } from '../utils/calendar-auth.js';
 import { fetchEvents, getFullName, eventNameMatches, formatDuplicateEvent } from '../utils/calendar-helpers.js';
-import type { BirthdayInput } from './add-birthday-parser.js';
+import { parseInput, type BirthdayInput } from './add-birthday-parser.js';
 
 /**
  * Script to add birthday events to Google Calendar
  * Usage: yarn add-birthday
  * Or: yarn add-birthday "John Doe" "1990-05-15"
  */
-
-function parseInputLocal(input: string): BirthdayInput | null {
-  // Try different formats:
-  // 1. "John Doe 1990-05-15"
-  // 2. "John Doe May 15, 1990"
-  // 3. "John 1990-05-15"
-  // 4. "John Doe 05-15"
-  // 5. "John 05-15"
-  
-  const trimmed = input.trim();
-  
-  // Try ISO date format: YYYY-MM-DD or MM-DD
-  const isoDateMatch = trimmed.match(/^(.+?)\s+(\d{4}-)?(\d{1,2})-(\d{1,2})$/);
-  if (isoDateMatch) {
-    const namePart = isoDateMatch[1].trim();
-    const year = isoDateMatch[2] ? parseInt(isoDateMatch[2].replace('-', '')) : undefined;
-    const month = parseInt(isoDateMatch[3]);
-    const day = parseInt(isoDateMatch[4]);
-    
-    const nameParts = namePart.split(/\s+/);
-    const firstName = nameParts[0];
-    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : undefined;
-    
-    const birthday = new Date();
-    if (year) {
-      birthday.setFullYear(year, month - 1, day);
-    } else {
-      birthday.setMonth(month - 1, day);
-    }
-    
-    return { firstName, lastName, birthday, year };
-  }
-  
-  // Try date format: "Name Month DD, YYYY" or "Name Month DD"
-  const dateMatch = trimmed.match(/^(.+?)\s+([A-Za-z]+)\s+(\d{1,2})(?:,\s*(\d{4}))?$/);
-  if (dateMatch) {
-    const namePart = dateMatch[1].trim();
-    const monthName = dateMatch[2];
-    const day = parseInt(dateMatch[3]);
-    const year = dateMatch[4] ? parseInt(dateMatch[4]) : undefined;
-    
-    const nameParts = namePart.split(/\s+/);
-    const firstName = nameParts[0];
-    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : undefined;
-    
-    const monthNames = ['january', 'february', 'march', 'april', 'may', 'june',
-                        'july', 'august', 'september', 'october', 'november', 'december'];
-    const monthIndex = monthNames.findIndex(m => m.startsWith(monthName.toLowerCase()));
-    
-    if (monthIndex === -1) {
-      return null;
-    }
-    
-    const birthday = new Date();
-    if (year) {
-      birthday.setFullYear(year, monthIndex, day);
-    } else {
-      birthday.setMonth(monthIndex, day);
-    }
-    
-    return { firstName, lastName, birthday, year };
-  }
-  
-  return null;
-}
 
 
 async function checkForDuplicates(
@@ -90,9 +25,9 @@ async function checkForDuplicates(
     });
     
     return events.filter(event => {
-      const summary = (event.summary || '').toLowerCase();
+      const summary = (event.summary ?? '').toLowerCase();
       return summary.includes('birthday') && 
-             eventNameMatches(event.summary || '', birthday.firstName, birthday.lastName);
+             eventNameMatches(event.summary ?? '', birthday.firstName, birthday.lastName);
     });
   } catch (error) {
     console.error('Error checking for duplicates:', error);
@@ -157,10 +92,10 @@ async function main(): Promise<void> {
   const forceFlag = args.includes('--force') || args.includes('-f');
   const filteredArgs = args.filter(arg => arg !== '--force' && arg !== '-f');
   
-  if (filteredArgs.length > 0) {
-    // Command line mode: parse arguments
-    const input = filteredArgs.join(' ');
-    const birthday = parseInputLocal(input);
+        if (filteredArgs.length > 0) {
+          // Command line mode: parse arguments
+          const input = filteredArgs.join(' ');
+          const birthday = parseInput(input);
     
     if (!birthday) {
       console.error('❌ Could not parse input. Please use format:');
@@ -207,7 +142,7 @@ async function main(): Promise<void> {
       const lastName = lastNameInput || undefined;
       
       const birthdayInput = await askQuestion(rl, 'Birthday (YYYY-MM-DD, MM-DD, or "Month DD, YYYY"): ');
-      const birthday = parseInputLocal(`${firstName} ${lastName || ''} ${birthdayInput}`.trim());
+      const birthday = parseInput(`${firstName} ${lastName ?? ''} ${birthdayInput}`.trim());
       
       if (!birthday) {
         console.error('\n❌ Could not parse birthday. Please use format:');
