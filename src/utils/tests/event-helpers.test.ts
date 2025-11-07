@@ -22,6 +22,15 @@ describe('event-helpers', () => {
       };
       expect(isRecurring(event)).toBe(false);
     });
+
+    it('should return true for recurring event instances (with recurringEventId)', () => {
+      const event: CalendarEvent = {
+        id: '8k4c9bgel6kjkvk759e0e23gco_20250129',
+        recurringEventId: '8k4c9bgel6kjkvk759e0e23gco',
+        summary: "Alejandro Villero's Birthday",
+      };
+      expect(isRecurring(event)).toBe(true);
+    });
   });
 
   describe('isAllDay', () => {

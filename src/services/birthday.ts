@@ -1,7 +1,7 @@
 import { config } from '../config.js';
 import calendarService from './calendar.js';
 import { createReadWriteCalendarClient } from '../utils/event/calendar-auth.js';
-import { formatDateISO, fromDate, today, formatDateShort, formatDateMonthYear, parseDateFromString, startOfDay } from '../utils/date.js';
+import { formatDateISO, fromDate, today, formatDateShort, formatDateMonthYear, parseDateFromString, startOfDay, isFirstDayOfMonth } from '../utils/date.js';
 import { getFullName, extractNameFromEvent } from '../utils/name/name-helpers.js';
 import type { BirthdayInput } from '../utils/name/birthday-parser.js';
 import type { CalendarEvent, CalendarClient } from '../types/index.js';
@@ -58,11 +58,40 @@ class BirthdayService {
   }
 
   /**
-   * Get both today's birthdays and monthly digest from a single month fetch
+   * Get birthdays for today with optional monthly digest
+   * Automatically checks if it's the first day of month
+   * On first day of month, returns monthly digest as well
+   * On regular days, returns only today's birthdays
+   * @returns Object with today's birthdays and optional monthly digest
+   */
+  async getTodaysBirthdaysWithOptionalDigest(): Promise<{
+    todaysBirthdays: CalendarEvent[];
+    monthlyDigest?: string;
+  }> {
+    const todayDate = today();
+    const isFirstDay = isFirstDayOfMonth(todayDate);
+
+    if (isFirstDay) {
+      const result = await this.getTodaysBirthdaysWithMonthlyDigest();
+      return {
+        todaysBirthdays: result.todaysBirthdays,
+        monthlyDigest: result.monthlyDigest,
+      };
+    }
+
+    const todaysBirthdays = await this.getTodaysBirthdays();
+    return {
+      todaysBirthdays,
+    };
+  }
+
+  /**
+   * Get today's birthdays and monthly digest from a single optimized month fetch
+   * Always returns both today's birthdays and monthly digest
    * Optimized for first day of month when both are needed
    * @returns Object with today's birthdays and monthly digest message
    */
-  async getTodaysBirthdaysAndMonthlyDigest(): Promise<{
+  async getTodaysBirthdaysWithMonthlyDigest(): Promise<{
     todaysBirthdays: CalendarEvent[];
     monthlyDigest: string;
   }> {

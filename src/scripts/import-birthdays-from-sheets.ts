@@ -1,3 +1,4 @@
+import { config } from '../config.js';
 import sheetsService from '../services/sheets.js';
 import birthdayService from '../services/birthday.js';
 import { createReadWriteCalendarClient } from '../utils/event/calendar-auth.js';
@@ -7,10 +8,10 @@ import { fromDate } from '../utils/date.js';
 /**
  * Script to import birthdays from Google Sheets spreadsheet
  * 
- * Usage: yarn import-birthdays-from-sheets <SPREADSHEET_ID>
- * Example: yarn import-birthdays-from-sheets "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"
+ * Usage: yarn import-birthdays-from-sheets
  * 
  * Reads from the entire first sheet.
+ * Spreadsheet ID is read from GOOGLE_SPREADSHEET_ID environment variable.
  * 
  * Expected spreadsheet format:
  * - Column A: Name (e.g., "John Doe" or "John")
@@ -32,9 +33,7 @@ interface ImportResult {
 /**
  * Import birthdays from spreadsheet to calendar
  */
-async function importBirthdays(
-  spreadsheetId: string
-): Promise<ImportResult> {
+async function importBirthdays(): Promise<ImportResult> {
   const result: ImportResult = {
     total: 0,
     added: 0,
@@ -43,17 +42,18 @@ async function importBirthdays(
     duplicates: 0,
   };
 
+  if (!config.google.spreadsheetId) {
+    throw new Error('Spreadsheet ID not configured. Please set GOOGLE_SPREADSHEET_ID in .env');
+  }
+
   console.log('\n═══════════════════════════════════════════════════════');
   console.log('📊 Importing Birthdays from Google Sheets');
   console.log('═══════════════════════════════════════════════════════\n');
-  console.log(`Spreadsheet ID: ${spreadsheetId}`);
+  console.log(`Spreadsheet ID: ${config.google.spreadsheetId}`);
   console.log('Reading from entire first sheet...\n');
 
   try {
-    // Set spreadsheet ID for the service
-    sheetsService.setSpreadsheetId(spreadsheetId);
-    
-    // Read birthdays from spreadsheet
+    // Read birthdays from spreadsheet (spreadsheetId is read from config in initialize)
     console.log('Reading birthdays from spreadsheet...');
     const birthdays = await sheetsService.readBirthdays();
     result.total = birthdays.length;
@@ -126,26 +126,8 @@ function displaySummary(result: ImportResult): void {
 }
 
 async function main(): Promise<void> {
-  const args = process.argv.slice(2);
-
-  if (args.length < 1) {
-    console.error('❌ Missing required arguments');
-    console.error('\nUsage: yarn import-birthdays-from-sheets <SPREADSHEET_ID>');
-    console.error('\nExample:');
-    console.error('  yarn import-birthdays-from-sheets "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"');
-    console.error('\nReads from entire first sheet.');
-    console.error('\nSpreadsheet format:');
-    console.error('  Column A: Name (e.g., "John Doe")');
-    console.error('  Column B: Birthday (e.g., "1990-05-15", "05-15", "May 15, 1990", or "May 15")');
-    console.error('  Column C (optional): Year (if not in birthday column)');
-    console.error('\nNote: First row is assumed to be headers and will be skipped.');
-    process.exit(1);
-  }
-
-  const [spreadsheetId] = args;
-
   try {
-    const result = await importBirthdays(spreadsheetId);
+    const result = await importBirthdays();
     displaySummary(result);
     
     if (result.errors > 0) {

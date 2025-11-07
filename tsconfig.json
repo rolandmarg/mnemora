@@ -18,10 +18,7 @@
     "noUnusedParameters": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
-    "incremental": true,
-    "tsBuildInfoFile": "./.tsbuildinfo",
-    "isolatedModules": true,
-    "assumeChangesOnlyAffectDirectDependencies": true
+    "isolatedModules": true
   },
   "include": [
     "src/**/*.ts",

@@ -6,9 +6,22 @@ import type { CalendarEvent } from '../../types/index.js';
 
 /**
  * Check if event is recurring
+ * Returns true if:
+ * - Event has a recurrence rule (master recurring event)
+ * - Event has a recurringEventId (instance of a recurring event)
  */
 export function isRecurring(event: CalendarEvent): boolean {
-  return !!event.recurrence && event.recurrence.length > 0;
+  // Check if it's a master recurring event (has recurrence rules)
+  if (event.recurrence && event.recurrence.length > 0) {
+    return true;
+  }
+  
+  // Check if it's an instance of a recurring event (has recurringEventId)
+  if (event.recurringEventId) {
+    return true;
+  }
+  
+  return false;
 }
 
 /**

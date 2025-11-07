@@ -68,6 +68,7 @@ export default [
       '.env',
       '.env.*',
       'src/types/**',
+      '*.json',
     ],
     linterOptions: {
       noInlineConfig: false,

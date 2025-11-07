@@ -39,9 +39,29 @@ export function createDateFromMonthName(monthName: string, day: number, year?: n
 
 /**
  * Parse a date from a string (ISO format or other common formats)
+ * For date-only strings (YYYY-MM-DD), parses as local date to avoid timezone conversion issues
+ * For datetime strings, uses standard parsing
  * @throws Error if the date string cannot be parsed
  */
 export function parseDateFromString(dateString: string): Date {
+  // Check if it's a date-only string (YYYY-MM-DD format, no time component)
+  // This is common for all-day events from Google Calendar
+  const dateOnlyMatch = dateString.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (dateOnlyMatch) {
+    // Parse as local date to avoid timezone conversion issues
+    // new Date("2024-11-08") interprets as UTC midnight, which can become Nov 7 in PST/PDT
+    // new Date(2024, 10, 8) creates a local date, preserving the intended day
+    const year = parseInt(dateOnlyMatch[1], 10);
+    const month = parseInt(dateOnlyMatch[2], 10) - 1; // Month is 0-indexed
+    const day = parseInt(dateOnlyMatch[3], 10);
+    const date = new Date(year, month, day);
+    if (isNaN(date.getTime())) {
+      throw new Error(`Invalid date string: "${dateString}"`);
+    }
+    return date;
+  }
+
+  // For datetime strings (with time component), use standard parsing
   const date = new Date(dateString);
   if (isNaN(date.getTime())) {
     throw new Error(`Invalid date string: "${dateString}"`);

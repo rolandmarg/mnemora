@@ -53,44 +53,56 @@ class SheetsService {
   }
 
   /**
-   * Parse a row from the spreadsheet into BirthdayInput
+   * Parse a row from the spreadsheet into BirthdayInput array
    * 
    * Expected format:
    * - Name in one cell, date in adjacent cell
+   * - A single row can contain multiple name-date pairs
+   * - Empty cells are skipped
    * - Date formats: "Dec 9", "Nov 8", "Mar 16", "Feb 7" (abbreviated month + day)
    * - Also supports: "December 9", "May 15", "05-15", "1990-05-15"
    * 
+   * Example row: ["", "", "Roland D", "Dec 2", "", "", "Tyler L", "June 1"]
+   * Will parse: ["Roland D", "Dec 2"] and ["Tyler L", "June 1"]
+   * 
    * @param row - Array of cell values from the spreadsheet row
-   * @returns BirthdayInput if parsing succeeds, null otherwise
+   * @returns Array of BirthdayInput objects found in the row
    */
-  private parseRowToBirthday(row: string[]): BirthdayInput | null {
-    if (row.length < 2) {
-      return null;
+  private parseRowToBirthdays(row: string[]): BirthdayInput[] {
+    const birthdays: BirthdayInput[] = [];
+
+    // Iterate through the row looking for name-date pairs
+    for (let i = 0; i < row.length - 1; i++) {
+      const name = row[i]?.trim();
+      const dateStr = row[i + 1]?.trim();
+
+      // Skip if name or date is empty
+      if (!name || !dateStr) {
+        continue;
+      }
+
+      // Try to parse date in various formats
+      const birthday = parseDateString(dateStr);
+      if (!birthday) {
+        // If date parsing fails, skip this pair
+        continue;
+      }
+
+      // Parse and sanitize name
+      const nameParts = extractNameParts(name);
+      const { firstName, lastName } = sanitizeNames(nameParts.firstName, nameParts.lastName);
+
+      birthdays.push({
+        firstName,
+        lastName,
+        birthday,
+      });
+
+      // Skip the next cell since we've already used it as the date
+      i++;
     }
 
-    const name = row[0]?.trim();
-    const dateStr = row[1]?.trim();
-
-    if (!name || !dateStr) {
-      return null;
-    }
-
-    // Parse and sanitize name
-    const nameParts = extractNameParts(name);
-    const { firstName, lastName } = sanitizeNames(nameParts.firstName, nameParts.lastName);
-
-    // Try to parse date in various formats
-    const birthday = parseDateString(dateStr);
-
-    if (!birthday) {
-      return null;
-    }
-
-    return {
-      firstName,
-      lastName,
-      birthday,
-    };
+    return birthdays;
   }
 
   /**
@@ -154,10 +166,8 @@ class SheetsService {
       const birthdays: BirthdayInput[] = [];
       
       for (const row of dataRows) {
-        const birthday = this.parseRowToBirthday(row);
-        if (birthday) {
-          birthdays.push(birthday);
-        }
+        const rowBirthdays = this.parseRowToBirthdays(row);
+        birthdays.push(...rowBirthdays);
       }
 
       return birthdays;
