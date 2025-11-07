@@ -1,10 +1,10 @@
-import { calendar_v3 } from 'googleapis';
 import { config } from '../config.js';
 import { createReadWriteCalendarClient } from '../utils/calendar/calendar-auth.js';
 import { formatDateISO, fromDate } from '../utils/date.js';
 import { fetchEvents, eventNameMatches, formatDuplicateEvent } from '../utils/calendar/calendar-helpers.js';
 import { getFullName } from '../utils/name/name-helpers.js';
 import type { BirthdayInput } from '../utils/name/birthday-parser.js';
+import type { CalendarEvent, CalendarClient } from '../utils/calendar/types.js';
 
 /**
  * Birthday service for managing birthday events in Google Calendar
@@ -15,9 +15,9 @@ class BirthdayService {
    * Check for duplicate birthday events
    */
   async checkForDuplicates(
-    calendar: calendar_v3.Calendar,
+    calendar: CalendarClient,
     birthday: BirthdayInput
-  ): Promise<calendar_v3.Schema$Event[]> {
+  ): Promise<CalendarEvent[]> {
     try {
       const eventDate = fromDate(birthday.birthday);
       const events = await fetchEvents(calendar, {
@@ -39,7 +39,7 @@ class BirthdayService {
   /**
    * Display duplicate events to the user
    */
-  displayDuplicates(duplicates: calendar_v3.Schema$Event[], fullName: string, date: Date): void {
+  displayDuplicates(duplicates: CalendarEvent[], fullName: string, date: Date): void {
     console.log('\n⚠️  Potential duplicate(s) found:');
     duplicates.forEach((dup, index) => console.log(formatDuplicateEvent(dup, index + 1)));
     console.log(`\n   Trying to add: ${fullName}'s Birthday`);
@@ -62,7 +62,7 @@ class BirthdayService {
     }
 
     const dateString = formatDateISO(fromDate(birthday.birthday));
-    const event: calendar_v3.Schema$Event = {
+    const event: CalendarEvent = {
       summary: `${fullName}'s Birthday`,
       description: `Birthday of ${fullName}${birthday.year ? ` (born ${birthday.year})` : ''}`,
       start: { date: dateString, timeZone: 'UTC' },

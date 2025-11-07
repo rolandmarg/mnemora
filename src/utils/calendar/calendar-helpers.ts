@@ -1,7 +1,7 @@
-import { calendar_v3 } from 'googleapis';
 import { config } from '../../config.js';
 import { startOfDay, endOfDay } from '../date.js';
 import { getFullName } from '../name/name-helpers.js';
+import type { CalendarEvent, CalendarClient } from './types.js';
 
 /**
  * Calendar helper utilities
@@ -18,9 +18,9 @@ export interface EventListOptions {
  * Fetch events from calendar with common options
  */
 export async function fetchEvents(
-  calendar: calendar_v3.Calendar,
+  calendar: CalendarClient,
   options: EventListOptions
-): Promise<calendar_v3.Schema$Event[]> {
+): Promise<CalendarEvent[]> {
   const { startDate, endDate, calendarId, maxResults } = options;
   const start = startOfDay(startDate);
   const end = endOfDay(endDate);
@@ -62,7 +62,7 @@ export function eventNameMatches(
  * Format duplicate event for display
  */
 export function formatDuplicateEvent(
-  event: calendar_v3.Schema$Event,
+  event: CalendarEvent,
   index: number
 ): string {
   return `   ${index + 1}. ${event.summary ?? '(No title)'}\n      Event ID: ${event.id}\n      Date: ${event.start?.date ?? event.start?.dateTime ?? '(No date)'}`;

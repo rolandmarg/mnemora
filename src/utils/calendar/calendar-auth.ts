@@ -1,5 +1,6 @@
-import { google, calendar_v3 } from 'googleapis';
+import { google } from 'googleapis';
 import { config } from '../../config.js';
+import type { CalendarClient } from './types.js';
 
 /**
  * Calendar authentication utilities
@@ -8,7 +9,7 @@ import { config } from '../../config.js';
 /**
  * Create a calendar client with read-only permissions
  */
-export function createReadOnlyCalendarClient(): calendar_v3.Calendar {
+export function createReadOnlyCalendarClient(): CalendarClient {
   if (!config.google.clientEmail || !config.google.privateKey) {
     throw new Error('Google Calendar credentials not configured. Please set GOOGLE_CLIENT_EMAIL and GOOGLE_PRIVATE_KEY in .env');
   }
@@ -26,7 +27,7 @@ export function createReadOnlyCalendarClient(): calendar_v3.Calendar {
 /**
  * Create a calendar client with read-write permissions
  */
-export function createReadWriteCalendarClient(): calendar_v3.Calendar {
+export function createReadWriteCalendarClient(): CalendarClient {
   if (!config.google.clientEmail || !config.google.privateKey) {
     throw new Error('Google Calendar credentials not configured. Please set GOOGLE_CLIENT_EMAIL and GOOGLE_PRIVATE_KEY in .env');
   }

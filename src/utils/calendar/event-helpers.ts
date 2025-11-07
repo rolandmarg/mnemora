@@ -1,4 +1,4 @@
-import { calendar_v3 } from 'googleapis';
+import type { CalendarEvent } from './types.js';
 
 /**
  * Event helper utilities
@@ -7,21 +7,21 @@ import { calendar_v3 } from 'googleapis';
 /**
  * Check if event is recurring
  */
-export function isRecurring(event: calendar_v3.Schema$Event): boolean {
+export function isRecurring(event: CalendarEvent): boolean {
   return !!event.recurrence && event.recurrence.length > 0;
 }
 
 /**
  * Check if event is all-day
  */
-export function isAllDay(event: calendar_v3.Schema$Event): boolean {
+export function isAllDay(event: CalendarEvent): boolean {
   return !!event.start?.date && !event.start?.dateTime;
 }
 
 /**
  * Get event start date string
  */
-export function getEventStartDate(event: calendar_v3.Schema$Event): string {
+export function getEventStartDate(event: CalendarEvent): string {
   return event.start?.date ?? event.start?.dateTime ?? '(No date)';
 }
 
@@ -29,10 +29,10 @@ export function getEventStartDate(event: calendar_v3.Schema$Event): string {
  * Group events by predicate
  */
 export function groupEvents(
-  events: calendar_v3.Schema$Event[],
-  predicates: Array<{ name: string; test: (event: calendar_v3.Schema$Event) => boolean }>
-): Record<string, calendar_v3.Schema$Event[]> {
-  const groups: Record<string, calendar_v3.Schema$Event[]> = {};
+  events: CalendarEvent[],
+  predicates: Array<{ name: string; test: (event: CalendarEvent) => boolean }>
+): Record<string, CalendarEvent[]> {
+  const groups: Record<string, CalendarEvent[]> = {};
   
   predicates.forEach(({ name }) => {
     groups[name] = [];

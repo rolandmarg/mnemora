@@ -1,6 +1,6 @@
-import { calendar_v3 } from 'googleapis';
 import { fetchEvents } from './calendar-helpers.js';
 import { today, startOfYear, endOfYear, formatDateRange } from '../date.js';
+import type { CalendarEvent, CalendarClient } from './types.js';
 
 /**
  * Event deletion utilities
@@ -22,9 +22,9 @@ export interface DeletionResult {
  * Get events for deletion based on options
  */
 export async function getEventsForDeletion(
-  calendar: calendar_v3.Calendar,
+  calendar: CalendarClient,
   options: DeleteOptions
-): Promise<calendar_v3.Schema$Event[]> {
+): Promise<CalendarEvent[]> {
   const todayDate = today();
   const startDate = options.startDate ?? startOfYear(todayDate);
   const endDate = options.endDate ?? endOfYear(todayDate);
@@ -42,7 +42,7 @@ export async function getEventsForDeletion(
  * Delete a single event from the calendar
  */
 export async function deleteEvent(
-  calendar: calendar_v3.Calendar,
+  calendar: CalendarClient,
   eventId: string,
   calendarId: string
 ): Promise<boolean> {
@@ -62,8 +62,8 @@ export async function deleteEvent(
  * Delete all events in bulk mode
  */
 export async function deleteAllEvents(
-  calendar: calendar_v3.Calendar,
-  events: calendar_v3.Schema$Event[],
+  calendar: CalendarClient,
+  events: CalendarEvent[],
   calendarId: string
 ): Promise<DeletionResult> {
   const result: DeletionResult = {
@@ -101,11 +101,11 @@ export async function deleteAllEvents(
  * Delete events interactively (one by one with confirmation)
  */
 export async function deleteEventsInteractively(
-  calendar: calendar_v3.Calendar,
-  events: calendar_v3.Schema$Event[],
+  calendar: CalendarClient,
+  events: CalendarEvent[],
   calendarId: string,
   askConfirmation: (question: string) => Promise<boolean>,
-  formatEvent: (event: calendar_v3.Schema$Event) => string
+  formatEvent: (event: CalendarEvent) => string
 ): Promise<DeletionResult> {
   const result: DeletionResult = {
     deletedCount: 0,

@@ -1,12 +1,11 @@
-import { google, calendar_v3 } from 'googleapis';
+import { google } from 'googleapis';
 import { config } from '../config.js';
 import { fetchEvents, type EventListOptions } from '../utils/calendar/calendar-helpers.js';
 import { startOfMonth, endOfMonth } from '../utils/date.js';
-
-type CalendarEvent = calendar_v3.Schema$Event;
+import type { CalendarEvent, CalendarClient, CalendarListEntry } from '../utils/calendar/types.js';
 
 class CalendarService {
-  private calendar: calendar_v3.Calendar | null = null;
+  private calendar: CalendarClient | null = null;
   private initialized: boolean = false;
 
   async initialize(): Promise<void> {
@@ -69,7 +68,7 @@ class CalendarService {
    * Get all calendars available to the service account
    * @returns Array of calendar list entries
    */
-  async getCalendars(): Promise<calendar_v3.Schema$CalendarListEntry[]> {
+  async getCalendars(): Promise<CalendarListEntry[]> {
     await this.initialize();
     if (!this.calendar) {
       throw new Error('Calendar client not initialized');

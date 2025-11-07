@@ -1,4 +1,4 @@
-import { calendar_v3 } from 'googleapis';
+import type { CalendarEvent } from './types.js';
 
 /**
  * Event formatting utilities
@@ -7,7 +7,7 @@ import { calendar_v3 } from 'googleapis';
 /**
  * Format an event for display
  */
-export function formatEvent(event: calendar_v3.Schema$Event): string {
+export function formatEvent(event: CalendarEvent): string {
   const summary = event.summary ?? '(No title)';
   const start = event.start?.date ?? event.start?.dateTime ?? '(No date)';
   const location = event.location ?? '';
@@ -33,7 +33,7 @@ export function formatEvent(event: calendar_v3.Schema$Event): string {
 /**
  * Format event details for duplicate checking
  */
-export function formatEventForDuplicate(event: calendar_v3.Schema$Event): string {
+export function formatEventForDuplicate(event: CalendarEvent): string {
   return `${event.summary ?? '(No title)'} - ${event.start?.date ?? event.start?.dateTime ?? '(No date)'}`;
 }
 
