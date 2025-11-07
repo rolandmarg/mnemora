@@ -1,4 +1,4 @@
-import { fetchEvents } from './calendar-helpers.js';
+import calendarService from '../../services/calendar.js';
 import { today, startOfYear, endOfYear, formatDateRange } from '../date.js';
 import type { CalendarEvent, CalendarClient } from './types.js';
 
@@ -30,10 +30,9 @@ export async function getEventsForDeletion(
   const endDate = options.endDate ?? endOfYear(todayDate);
   
   console.log(`\nFetching events from ${formatDateRange(startDate, endDate)}...`);
-  return fetchEvents(calendar, {
+  return calendarService.fetchEventsWithClient(calendar, {
     startDate,
     endDate,
-    calendarId: options.calendarId,
     maxResults: 2500,
   });
 }

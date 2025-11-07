@@ -1,3 +1,5 @@
+import type { CalendarEvent } from '../calendar/types.js';
+
 /**
  * Name helper utilities for sanitization and string manipulation
  */
@@ -143,5 +145,26 @@ export function isValidName(str: string): boolean {
     return false;
   }
   return /^[a-zA-Z\s'-]+$/.test(str);
+}
+
+/**
+ * Extract person name from birthday event
+ */
+export function extractNameFromEvent(event: CalendarEvent): string {
+  const summary = event.summary ?? '';
+  const patterns = [
+    /^(.+?)(?:'s)?\s*(?:birthday|birth)/i,
+    /birthday[:\s]+(.+)/i,
+    /(.+?)\s+birthday/i,
+  ];
+  
+  for (const pattern of patterns) {
+    const match = summary.match(pattern);
+    if (match) {
+      return match[1].trim();
+    }
+  }
+  
+  return summary.trim();
 }
 

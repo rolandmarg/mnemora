@@ -1,4 +1,6 @@
 import calendarService from '../services/calendar.js';
+import birthdayService from '../services/birthday.js';
+import { extractNameFromEvent } from '../utils/name/name-helpers.js';
 import { isRecurring, isAllDay, getEventStartDate, groupEvents } from '../utils/calendar/event-helpers.js';
 import { today, startOfYear, endOfYear, formatDateRange } from '../utils/date.js';
 
@@ -31,7 +33,7 @@ async function checkAllEvents(): Promise<void> {
     
     // Group events by type
     const groups = groupEvents(events, [
-      { name: 'birthday', test: (e) => calendarService.isBirthdayEvent(e) },
+      { name: 'birthday', test: (e) => birthdayService.isBirthdayEvent(e) },
       { name: 'recurring', test: isRecurring },
       { name: 'allDay', test: isAllDay },
     ]);
@@ -50,7 +52,7 @@ async function checkAllEvents(): Promise<void> {
         console.log(`${index + 1}. ${event.summary ?? '(No title)'}`);
         console.log(`   Date: ${getEventStartDate(event)}`);
         console.log(`   Type: ${isRecurring(event) ? 'Recurring' : 'One-time'}`);
-        console.log(`   Extracted Name: ${calendarService.extractName(event)}`);
+        console.log(`   Extracted Name: ${extractNameFromEvent(event)}`);
         console.log('');
       });
     } else {
@@ -67,7 +69,7 @@ async function checkAllEvents(): Promise<void> {
         console.log(`   Date: ${getEventStartDate(event)}`);
         console.log(`   Recurrence: ${event.recurrence?.[0]?.substring(0, 50) ?? 'Unknown'}...`);
         console.log(`   All-day: ${isAllDay(event) ? 'Yes' : 'No'}`);
-        console.log(`   Detected as birthday: ${calendarService.isBirthdayEvent(event) ? '✅ Yes' : '❌ No'}`);
+        console.log(`   Detected as birthday: ${birthdayService.isBirthdayEvent(event) ? '✅ Yes' : '❌ No'}`);
         console.log('');
       });
       if (recurringEvents.length > 10) {
@@ -84,7 +86,7 @@ async function checkAllEvents(): Promise<void> {
         console.log(`${index + 1}. ${event.summary ?? '(No title)'}`);
         console.log(`   Date: ${getEventStartDate(event)}`);
         console.log(`   Recurring: ${isRecurring(event) ? 'Yes' : 'No'}`);
-        console.log(`   Detected as birthday: ${calendarService.isBirthdayEvent(event) ? '✅ Yes' : '❌ No'}`);
+        console.log(`   Detected as birthday: ${birthdayService.isBirthdayEvent(event) ? '✅ Yes' : '❌ No'}`);
         console.log('');
       });
       if (allDayEvents.length > 10) {

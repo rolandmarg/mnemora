@@ -1,5 +1,6 @@
 import birthdayService from './services/birthday.js';
-import whatsappService from './services/whatsapp.js';
+import { extractNameFromEvent } from './utils/name/name-helpers.js';
+import { isFirstDayOfMonth, today } from './utils/date.js';
 
 /**
  * Manual execution mode - runs once and exits
@@ -8,22 +9,42 @@ import whatsappService from './services/whatsapp.js';
 
 async function runBirthdayCheck(): Promise<void> {
   try {
-    console.log('Initializing WhatsApp service...');
-    await whatsappService.initialize();
-    await whatsappService.waitForReady(60000); // 60 second timeout
-    
     console.log('\n═══════════════════════════════════════════════════════');
     console.log('Running birthday check...');
     console.log('═══════════════════════════════════════════════════════\n');
     
-    // Check if it's the first day of the month
-    if (birthdayService.isFirstDayOfMonth()) {
-      console.log('📅 First day of month detected - sending monthly digest');
-      await birthdayService.sendMonthlyDigest();
-    }
+    const todayDate = today();
+    const isFirstDay = isFirstDayOfMonth(todayDate);
     
-    // Always check for today's birthdays
-    await birthdayService.checkTodaysBirthdays();
+    // Optimize: On first day of month, fetch month data once and use for both digest and today's birthdays
+    if (isFirstDay) {
+      console.log('📅 First day of month detected - generating monthly digest');
+      const { todaysBirthdays, monthlyDigest } = await birthdayService.getTodaysBirthdaysAndMonthlyDigest();
+      console.log(monthlyDigest);
+      
+      if (todaysBirthdays.length === 0) {
+        console.log('\nNo birthdays today!');
+      } else {
+        console.log(`\n🎉 Found ${todaysBirthdays.length} birthday(s) today:\n`);
+        todaysBirthdays.forEach(event => {
+          const name = extractNameFromEvent(event);
+          console.log(`   🎂 ${name}`);
+        });
+      }
+    } else {
+      // Regular day: just fetch today's birthdays
+      const todaysBirthdays = await birthdayService.getTodaysBirthdays();
+      
+      if (todaysBirthdays.length === 0) {
+        console.log('No birthdays today!');
+      } else {
+        console.log(`\n🎉 Found ${todaysBirthdays.length} birthday(s) today:\n`);
+        todaysBirthdays.forEach(event => {
+          const name = extractNameFromEvent(event);
+          console.log(`   🎂 ${name}`);
+        });
+      }
+    }
     
     console.log('\n✅ Birthday check completed successfully!');
   } catch (error) {

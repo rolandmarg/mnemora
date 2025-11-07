@@ -1,42 +1,9 @@
-import { config } from '../../config.js';
-import { startOfDay, endOfDay } from '../date.js';
 import { getFullName } from '../name/name-helpers.js';
-import type { CalendarEvent, CalendarClient } from './types.js';
+import type { CalendarEvent } from './types.js';
 
 /**
  * Calendar helper utilities
  */
-
-export interface EventListOptions {
-  calendarId?: string;
-  startDate: Date;
-  endDate: Date;
-  maxResults?: number;
-}
-
-/**
- * Fetch events from calendar with common options
- */
-export async function fetchEvents(
-  calendar: CalendarClient,
-  options: EventListOptions
-): Promise<CalendarEvent[]> {
-  const { startDate, endDate, calendarId, maxResults } = options;
-  const start = startOfDay(startDate);
-  const end = endOfDay(endDate);
-  const targetCalendarId = calendarId ?? config.google.calendarId;
-
-  const response = await calendar.events.list({
-    calendarId: targetCalendarId,
-    timeMin: start.toISOString(),
-    timeMax: end.toISOString(),
-    singleEvents: true,
-    orderBy: 'startTime',
-    ...(maxResults && { maxResults }),
-  });
-
-  return response.data.items ?? [];
-}
 
 /**
  * Check if event name matches birthday input

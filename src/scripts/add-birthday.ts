@@ -45,23 +45,16 @@ async function handleCommandLineMode(args: string[]): Promise<void> {
   }
 
   try {
-    const calendar = createReadWriteCalendarClient();
-    const duplicates = await birthdayService.checkForDuplicates(calendar, birthday);
-
-    if (duplicates.length > 0 && !forceFlag) {
-      birthdayService.displayDuplicates(
-        duplicates,
-        getFullName(birthday.firstName, birthday.lastName),
-        fromDate(birthday.birthday)
-      );
-      console.log('❌ Duplicate detected. Use --force flag to add anyway:');
-      console.log(`   yarn add-birthday "${input}" --force\n`);
-      process.exit(1);
-    }
-
+    // Let addBirthday() handle duplicate checking internally
+    // Pass skipDuplicateCheck: true only if --force flag is set
     await birthdayService.addBirthday(birthday, forceFlag);
     process.exit(0);
-  } catch {
+  } catch (error) {
+    // addBirthday() will display duplicates and throw error if found
+    if (error instanceof Error && error.message === 'Duplicate birthday found') {
+      console.log('❌ Duplicate detected. Use --force flag to add anyway:');
+      console.log(`   yarn add-birthday "${input}" --force\n`);
+    }
     process.exit(1);
   }
 }
@@ -97,7 +90,7 @@ async function handleInteractiveMode(): Promise<void> {
     birthday.firstName = firstName;
     birthday.lastName = lastName;
 
-    // Check for duplicates
+    // Check for duplicates to show user before asking for confirmation
     const calendar = createReadWriteCalendarClient();
     const duplicates = await birthdayService.checkForDuplicates(calendar, birthday);
 
@@ -113,11 +106,13 @@ async function handleInteractiveMode(): Promise<void> {
         console.log('❌ Cancelled. Birthday not added.');
         process.exit(0);
       }
+      // Skip duplicate check in addBirthday() since we already checked and user confirmed
+      await birthdayService.addBirthday(birthday, true);
     } else {
       rl.close();
+      // No duplicates found, let addBirthday() handle the check (will be fast)
+      await birthdayService.addBirthday(birthday, false);
     }
-
-    await birthdayService.addBirthday(birthday, duplicates.length > 0);
     process.exit(0);
   } catch {
     rl.close();

@@ -1,10 +1,9 @@
 import { config } from '../config.js';
 import calendarService from './calendar.js';
-import whatsappService from './whatsapp.js';
 import { createReadWriteCalendarClient } from '../utils/calendar/calendar-auth.js';
-import { formatDateISO, fromDate, today, formatDateShort, formatDateMonthYear, isFirstDayOfMonth as checkIsFirstDayOfMonth, parseDateFromString } from '../utils/date.js';
-import { fetchEvents, eventNameMatches, formatDuplicateEvent } from '../utils/calendar/calendar-helpers.js';
-import { getFullName } from '../utils/name/name-helpers.js';
+import { formatDateISO, fromDate, today, formatDateShort, formatDateMonthYear, parseDateFromString, startOfDay } from '../utils/date.js';
+import { eventNameMatches, formatDuplicateEvent } from '../utils/calendar/calendar-helpers.js';
+import { getFullName, extractNameFromEvent } from '../utils/name/name-helpers.js';
 import type { BirthdayInput } from '../utils/name/birthday-parser.js';
 import type { CalendarEvent, CalendarClient } from '../utils/calendar/types.js';
 
@@ -13,52 +12,95 @@ interface BirthdaysByDate {
 }
 
 /**
- * Birthday service for managing birthday events and notifications
+ * Birthday service for managing birthday events
  */
 class BirthdayService {
   /**
-   * Check for birthdays today and send congratulations
+   * Check if an event is a birthday
    */
-  async checkTodaysBirthdays(): Promise<void> {
+  isBirthdayEvent(event: CalendarEvent): boolean {
+    const summary = (event.summary ?? '').toLowerCase();
+    const description = (event.description ?? '').toLowerCase();
+    const hasBirthdayKeyword = summary.includes('birthday') || description.includes('birthday');
+    
+    if (hasBirthdayKeyword) {
+      return true;
+    }
+    
+    const hasYearlyRecurrence = event.recurrence?.some(r => r.includes('YEARLY') || r.includes('FREQ=YEARLY'));
+    if (!hasYearlyRecurrence) {
+      return false;
+    }
+    
+    const isAllDay = event.start?.date && !event.start?.dateTime;
+    if (isAllDay) {
+      return true;
+    }
+    
+    const excludedKeywords = ['meeting', 'reminder', 'appointment'];
+    return summary.length > 0 && !excludedKeywords.some(keyword => summary.includes(keyword));
+  }
+
+  /**
+   * Get birthdays for today
+   * @returns Array of birthday events for today
+   */
+  async getTodaysBirthdays(): Promise<CalendarEvent[]> {
     try {
       const todayDate = today();
       const birthdays = (await calendarService.getEventsForDate(todayDate))
-        .filter(event => calendarService.isBirthdayEvent(event));
+        .filter(event => this.isBirthdayEvent(event));
       
-      if (birthdays.length === 0) {
-        console.log('No birthdays today!');
-        return;
-      }
-
-      const message = birthdays
-        .map(event => `🎉 Happy Birthday ${calendarService.extractName(event)}! 🎂🎈`)
-        .join('\n\n');
-      
-      await whatsappService.sendMessage(message);
-      console.log(`Sent birthday wishes for ${birthdays.length} person(s)`);
+      return birthdays;
     } catch (error) {
-      console.error('Error checking today\'s birthdays:', error);
+      console.error('Error getting today\'s birthdays:', error);
       throw error;
     }
   }
 
   /**
-   * Generate and send monthly birthday digest
+   * Get both today's birthdays and monthly digest from a single month fetch
+   * Optimized for first day of month when both are needed
+   * @returns Object with today's birthdays and monthly digest message
    */
-  async sendMonthlyDigest(): Promise<void> {
+  async getTodaysBirthdaysAndMonthlyDigest(): Promise<{
+    todaysBirthdays: CalendarEvent[];
+    monthlyDigest: string;
+  }> {
     try {
       const todayDate = today();
-      const birthdays = (await calendarService.getEventsForMonth(todayDate))
-        .filter(event => calendarService.isBirthdayEvent(event));
+      // Fetch entire month once
+      const monthBirthdays = (await calendarService.getEventsForMonth(todayDate))
+        .filter(event => this.isBirthdayEvent(event));
       
-      if (birthdays.length === 0) {
-        const monthName = formatDateMonthYear(todayDate);
-        await whatsappService.sendMessage(`📅 No birthdays scheduled for ${monthName}.`);
-        return;
+      // Filter for today's birthdays from the month data
+      const todayStart = startOfDay(todayDate);
+      const todaysBirthdays = monthBirthdays.filter(event => {
+        const startDate = event.start?.date ?? event.start?.dateTime;
+        if (!startDate) {
+          return false;
+        }
+        try {
+          const parsedDate = parseDateFromString(startDate);
+          const eventStart = startOfDay(parsedDate);
+          return eventStart.getTime() === todayStart.getTime();
+        } catch {
+          return false;
+        }
+      });
+
+      // Generate monthly digest from month data
+      const monthName = formatDateMonthYear(todayDate);
+      
+      if (monthBirthdays.length === 0) {
+        return {
+          todaysBirthdays: [],
+          monthlyDigest: `📅 No birthdays scheduled for ${monthName}.`,
+        };
       }
 
       // Group birthdays by date
-      const birthdaysByDate = birthdays.reduce((acc, event) => {
+      const birthdaysByDate = monthBirthdays.reduce((acc, event) => {
         const startDate = event.start?.date ?? event.start?.dateTime;
         if (!startDate) {
           return acc;
@@ -70,7 +112,7 @@ class BirthdayService {
           if (!acc[dateKey]) {
             acc[dateKey] = [];
           }
-          acc[dateKey].push(calendarService.extractName(event));
+          acc[dateKey].push(extractNameFromEvent(event));
         } catch {
           // Skip events with invalid dates
           return acc;
@@ -79,7 +121,6 @@ class BirthdayService {
       }, {} as BirthdaysByDate);
 
       // Build message
-      const monthName = formatDateMonthYear(todayDate);
       const sortedDates = Object.keys(birthdaysByDate).sort((a, b) => {
         try {
           const dateA = parseDateFromString(`${a}, ${todayDate.getFullYear()}`);
@@ -91,23 +132,17 @@ class BirthdayService {
         }
       });
 
-      const message = `📅 Upcoming Birthdays in ${monthName}:\n\n${ 
+      const monthlyDigest = `📅 Upcoming Birthdays in ${monthName}:\n\n${ 
         sortedDates.map(date => `🎂 ${date}: ${birthdaysByDate[date].join(', ')}`).join('\n')}`;
 
-      await whatsappService.sendMessage(message);
-      console.log(`Sent monthly digest with ${birthdays.length} birthday(s)`);
+      return {
+        todaysBirthdays,
+        monthlyDigest,
+      };
     } catch (error) {
-      console.error('Error sending monthly digest:', error);
+      console.error('Error getting today\'s birthdays and monthly digest:', error);
       throw error;
     }
-  }
-
-  /**
-   * Check if today is the first day of the month
-   * @returns true if today is the first day of the month
-   */
-  isFirstDayOfMonth(): boolean {
-    return checkIsFirstDayOfMonth(today());
   }
 
   /**
@@ -119,7 +154,7 @@ class BirthdayService {
   ): Promise<CalendarEvent[]> {
     try {
       const eventDate = fromDate(birthday.birthday);
-      const events = await fetchEvents(calendar, {
+      const events = await calendarService.fetchEventsWithClient(calendar, {
         startDate: eventDate,
         endDate: eventDate,
       });
