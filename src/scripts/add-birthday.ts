@@ -4,7 +4,7 @@ import { getFullName } from '../utils/name/name-helpers.js';
 import { parseInput } from '../utils/name/birthday-parser.js';
 import { filterFlags } from '../utils/cli/script-helpers.js';
 import { fromDate } from '../utils/date.js';
-import birthdayService from '../services/birthday-service.js';
+import birthdayService from '../services/birthday.js';
 
 /**
  * Script to add birthday events to Google Calendar
