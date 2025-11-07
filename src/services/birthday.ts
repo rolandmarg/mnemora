@@ -1,5 +1,6 @@
 import calendarService from './calendar.js';
 import whatsappService from './whatsapp.js';
+import { today, formatDateShort, formatDateMonthYear, isFirstDayOfMonth as checkIsFirstDayOfMonth, parseDateFromString } from '../utils/date.js';
 
 interface BirthdaysByDate {
   [dateKey: string]: string[];
@@ -11,8 +12,8 @@ class BirthdayService {
    */
   async checkTodaysBirthdays(): Promise<void> {
     try {
-      const today = new Date();
-      const birthdays = (await calendarService.getEventsForDate(today))
+      const todayDate = today();
+      const birthdays = (await calendarService.getEventsForDate(todayDate))
         .filter(event => calendarService.isBirthdayEvent(event));
       
       if (birthdays.length === 0) {
@@ -37,12 +38,12 @@ class BirthdayService {
    */
   async sendMonthlyDigest(): Promise<void> {
     try {
-      const today = new Date();
-      const birthdays = (await calendarService.getEventsForMonth(today))
+      const todayDate = today();
+      const birthdays = (await calendarService.getEventsForMonth(todayDate))
         .filter(event => calendarService.isBirthdayEvent(event));
       
       if (birthdays.length === 0) {
-        const monthName = today.toLocaleString('default', { month: 'long', year: 'numeric' });
+        const monthName = formatDateMonthYear(todayDate);
         await whatsappService.sendMessage(`📅 No birthdays scheduled for ${monthName}.`);
         return;
       }
@@ -54,20 +55,31 @@ class BirthdayService {
           return acc;
         }
         
-        const dateKey = new Date(startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        if (!acc[dateKey]) {
-          acc[dateKey] = [];
+        try {
+          const parsedDate = parseDateFromString(startDate);
+          const dateKey = formatDateShort(parsedDate);
+          if (!acc[dateKey]) {
+            acc[dateKey] = [];
+          }
+          acc[dateKey].push(calendarService.extractName(event));
+        } catch {
+          // Skip events with invalid dates
+          return acc;
         }
-        acc[dateKey].push(calendarService.extractName(event));
         return acc;
       }, {} as BirthdaysByDate);
 
       // Build message
-      const monthName = today.toLocaleString('default', { month: 'long', year: 'numeric' });
+      const monthName = formatDateMonthYear(todayDate);
       const sortedDates = Object.keys(birthdaysByDate).sort((a, b) => {
-        const dateA = new Date(`${a}, ${today.getFullYear()}`);
-        const dateB = new Date(`${b}, ${today.getFullYear()}`);
-        return dateA.getTime() - dateB.getTime();
+        try {
+          const dateA = parseDateFromString(`${a}, ${todayDate.getFullYear()}`);
+          const dateB = parseDateFromString(`${b}, ${todayDate.getFullYear()}`);
+          return dateA.getTime() - dateB.getTime();
+        } catch {
+          // If date parsing fails, maintain original order
+          return 0;
+        }
       });
 
       const message = `📅 Upcoming Birthdays in ${monthName}:\n\n${ 
@@ -86,8 +98,7 @@ class BirthdayService {
    * @returns true if today is the first day of the month
    */
   isFirstDayOfMonth(): boolean {
-    const today = new Date();
-    return today.getDate() === 1;
+    return checkIsFirstDayOfMonth(today());
   }
 }
 

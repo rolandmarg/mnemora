@@ -38,3 +38,9 @@ build/
 .wwebjs_auth/
 .wwebjs_cache/
 
+# Test coverage
+coverage/
+.nyc_output/
+*.test.ts.snap
+vitest.config.ts.timestamp-*
+

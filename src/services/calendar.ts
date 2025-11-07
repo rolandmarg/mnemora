@@ -1,6 +1,7 @@
 import { google, calendar_v3 } from 'googleapis';
 import { config } from '../config.js';
 import { fetchEvents, type EventListOptions } from '../utils/calendar-helpers.js';
+import { startOfMonth, endOfMonth } from '../utils/date.js';
 
 type CalendarEvent = calendar_v3.Schema$Event;
 
@@ -52,9 +53,9 @@ class CalendarService {
    * Get all events for a month
    */
   async getEventsForMonth(date: Date): Promise<CalendarEvent[]> {
-    const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
-    const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-    return this.fetchEventsInternal({ startDate: startOfMonth, endDate: endOfMonth });
+    const monthStart = startOfMonth(date);
+    const monthEnd = endOfMonth(date);
+    return this.fetchEventsInternal({ startDate: monthStart, endDate: monthEnd });
   }
 
   /**

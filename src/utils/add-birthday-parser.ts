@@ -1,4 +1,5 @@
-import { sanitizeNames } from '../utils/name-sanitizer.js';
+import { sanitizeNames } from './name-sanitizer.js';
+import { createDate, createDateFromMonthName } from './date.js';
 
 /**
  * Shared birthday input parser
@@ -35,12 +36,7 @@ export function parseInput(input: string): BirthdayInput | null {
     
     const { firstName, lastName } = sanitizeNames(rawFirstName, rawLastName);
     
-    const birthday = new Date();
-    if (year) {
-      birthday.setFullYear(year, month - 1, day);
-    } else {
-      birthday.setMonth(month - 1, day);
-    }
+    const birthday = createDate(month, day, year);
     
     return { firstName, lastName, birthday, year };
   }
@@ -59,19 +55,10 @@ export function parseInput(input: string): BirthdayInput | null {
     
     const { firstName, lastName } = sanitizeNames(rawFirstName, rawLastName);
     
-    const monthNames = ['january', 'february', 'march', 'april', 'may', 'june',
-                        'july', 'august', 'september', 'october', 'november', 'december'];
-    const monthIndex = monthNames.findIndex(m => m.startsWith(monthName.toLowerCase()));
+    const birthday = createDateFromMonthName(monthName, day, year);
     
-    if (monthIndex === -1) {
+    if (!birthday) {
       return null;
-    }
-    
-    const birthday = new Date();
-    if (year) {
-      birthday.setFullYear(year, monthIndex, day);
-    } else {
-      birthday.setMonth(monthIndex, day);
     }
     
     return { firstName, lastName, birthday, year };

@@ -1,0 +1,112 @@
+import { describe, it, expect } from 'vitest';
+import { calendar_v3 } from 'googleapis';
+import { isRecurring, isAllDay, getEventStartDate, groupEvents } from '../event-helpers.js';
+
+describe('event-helpers', () => {
+  describe('isRecurring', () => {
+    it('should return true for recurring events', () => {
+      const event: calendar_v3.Schema$Event = {
+        recurrence: ['RRULE:FREQ=YEARLY;INTERVAL=1'],
+      };
+      expect(isRecurring(event)).toBe(true);
+    });
+
+    it('should return false for non-recurring events', () => {
+      const event: calendar_v3.Schema$Event = {};
+      expect(isRecurring(event)).toBe(false);
+    });
+
+    it('should return false for events with empty recurrence', () => {
+      const event: calendar_v3.Schema$Event = {
+        recurrence: [],
+      };
+      expect(isRecurring(event)).toBe(false);
+    });
+  });
+
+  describe('isAllDay', () => {
+    it('should return true for all-day events', () => {
+      const event: calendar_v3.Schema$Event = {
+        start: { date: '2024-05-15' },
+      };
+      expect(isAllDay(event)).toBe(true);
+    });
+
+    it('should return false for events with dateTime', () => {
+      const event: calendar_v3.Schema$Event = {
+        start: { dateTime: '2024-05-15T10:00:00Z' },
+      };
+      expect(isAllDay(event)).toBe(false);
+    });
+
+    it('should return false for events with no start', () => {
+      const event: calendar_v3.Schema$Event = {};
+      expect(isAllDay(event)).toBe(false);
+    });
+  });
+
+  describe('getEventStartDate', () => {
+    it('should return date for all-day events', () => {
+      const event: calendar_v3.Schema$Event = {
+        start: { date: '2024-05-15' },
+      };
+      expect(getEventStartDate(event)).toBe('2024-05-15');
+    });
+
+    it('should return dateTime for timed events', () => {
+      const event: calendar_v3.Schema$Event = {
+        start: { dateTime: '2024-05-15T10:00:00Z' },
+      };
+      expect(getEventStartDate(event)).toBe('2024-05-15T10:00:00Z');
+    });
+
+    it('should return "(No date)" for events with no start', () => {
+      const event: calendar_v3.Schema$Event = {};
+      expect(getEventStartDate(event)).toBe('(No date)');
+    });
+  });
+
+  describe('groupEvents', () => {
+    it('should group events by predicates', () => {
+      const events: calendar_v3.Schema$Event[] = [
+        { summary: 'Event 1', recurrence: ['RRULE:FREQ=YEARLY'] },
+        { summary: 'Event 2', start: { date: '2024-05-15' } },
+        { summary: 'Event 3' },
+      ];
+
+      const groups = groupEvents(events, [
+        { name: 'recurring', test: isRecurring },
+        { name: 'allDay', test: isAllDay },
+      ]);
+
+      expect(groups.recurring).toHaveLength(1);
+      expect(groups.allDay).toHaveLength(1);
+      expect(groups.other).toHaveLength(1);
+    });
+
+    it('should handle empty events array', () => {
+      const groups = groupEvents([], [
+        { name: 'recurring', test: isRecurring },
+      ]);
+      expect(groups.recurring).toHaveLength(0);
+      expect(groups.other ?? []).toHaveLength(0);
+    });
+
+    it('should handle events matching multiple predicates (first match wins)', () => {
+      const event: calendar_v3.Schema$Event = {
+        summary: 'Event',
+        recurrence: ['RRULE:FREQ=YEARLY'],
+        start: { date: '2024-05-15' },
+      };
+
+      const groups = groupEvents([event], [
+        { name: 'recurring', test: isRecurring },
+        { name: 'allDay', test: isAllDay },
+      ]);
+
+      expect(groups.recurring).toHaveLength(1);
+      expect(groups.allDay).toHaveLength(0);
+    });
+  });
+});
+

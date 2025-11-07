@@ -1,5 +1,6 @@
 import calendarService from '../services/calendar.js';
 import { isRecurring, isAllDay, getEventStartDate, groupEvents } from '../utils/event-helpers.js';
+import { today, startOfYear, endOfYear, formatDateRange } from '../utils/date.js';
 
 /**
  * Script to check all events in the calendar to see what's there
@@ -10,13 +11,13 @@ async function checkAllEvents(): Promise<void> {
   try {
     console.log('Checking all events in your calendar...\n');
     
-    const today = new Date();
-    const startOfYear = new Date(today.getFullYear(), 0, 1);
-    const endOfYear = new Date(today.getFullYear(), 11, 31, 23, 59, 59);
+    const todayDate = today();
+    const yearStart = startOfYear(todayDate);
+    const yearEnd = endOfYear(todayDate);
     
-    console.log(`Fetching events from ${startOfYear.toLocaleDateString()} to ${endOfYear.toLocaleDateString()}...\n`);
+    console.log(`Fetching events from ${formatDateRange(yearStart, yearEnd)}...\n`);
     
-    const events = await calendarService.getEventsForDateRange(startOfYear, endOfYear);
+    const events = await calendarService.getEventsForDateRange(yearStart, yearEnd);
     
     console.log(`✅ Found ${events.length} total event(s) in your calendar\n`);
     
