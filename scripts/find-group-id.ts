@@ -1,0 +1,45 @@
+import whatsappService from '../services/whatsapp.js';
+
+/**
+ * Helper script to find WhatsApp group IDs
+ * Usage: npm run find-group
+ */
+
+async function findGroupIds(): Promise<void> {
+  try {
+    console.log('Initializing WhatsApp...');
+    await whatsappService.initialize();
+    await whatsappService.waitForReady();
+
+    const client = whatsappService.clientInstance;
+    if (!client) {
+      throw new Error('WhatsApp client not initialized');
+    }
+
+    console.log('\nFetching all groups...');
+    const chats = await client.getChats();
+    const groups = chats.filter(chat => chat.isGroup);
+
+    if (groups.length === 0) {
+      console.log('No groups found.');
+      return;
+    }
+
+    console.log(`\nFound ${groups.length} group(s):\n`);
+    groups.forEach((group, index) => {
+      const groupId = group.id._serialized.replace('@g.us', '');
+      console.log(`${index + 1}. ${group.name}`);
+      console.log(`   ID: ${groupId}`);
+      console.log(`   Full ID: ${group.id._serialized}\n`);
+    });
+
+    console.log('\nCopy the ID (without @g.us) to your .env file as WHATSAPP_GROUP_ID');
+  } catch (error) {
+    console.error('Error:', error);
+  } finally {
+    process.exit(0);
+  }
+}
+
+findGroupIds();
+
