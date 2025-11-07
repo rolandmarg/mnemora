@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { calendar_v3 } from 'googleapis';
-import { formatEvent, formatEventForDuplicate } from '../event-formatter.js';
+import { formatEvent, formatEventForDuplicate } from '../calendar/event-formatter.js';
 
 describe('event-formatter', () => {
   describe('formatEvent', () => {

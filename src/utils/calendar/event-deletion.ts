@@ -1,6 +1,6 @@
 import { calendar_v3 } from 'googleapis';
 import { fetchEvents } from './calendar-helpers.js';
-import { today, startOfYear, endOfYear, formatDateRange } from './date.js';
+import { today, startOfYear, endOfYear, formatDateRange } from '../date.js';
 
 /**
  * Event deletion utilities

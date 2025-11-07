@@ -1,5 +1,5 @@
 import { google, calendar_v3 } from 'googleapis';
-import { config } from '../config.js';
+import { config } from '../../config.js';
 
 /**
  * Calendar authentication utilities

@@ -1,8 +1,8 @@
-import { createQuestionInterface, askQuestion, askConfirmation } from '../utils/cli.js';
-import { createReadWriteCalendarClient } from '../utils/calendar-auth.js';
-import { getFullName } from '../utils/calendar-helpers.js';
-import { parseInput } from '../utils/add-birthday-parser.js';
-import { filterFlags } from '../utils/script-helpers.js';
+import { createQuestionInterface, askQuestion, askConfirmation } from '../utils/cli/cli.js';
+import { createReadWriteCalendarClient } from '../utils/calendar/calendar-auth.js';
+import { getFullName } from '../utils/name/name-helpers.js';
+import { parseInput } from '../utils/name/birthday-parser.js';
+import { filterFlags } from '../utils/cli/script-helpers.js';
 import { fromDate } from '../utils/date.js';
 import birthdayService from '../services/birthday-service.js';
 

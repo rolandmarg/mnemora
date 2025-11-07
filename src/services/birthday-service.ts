@@ -1,9 +1,10 @@
 import { calendar_v3 } from 'googleapis';
 import { config } from '../config.js';
-import { createReadWriteCalendarClient } from '../utils/calendar-auth.js';
+import { createReadWriteCalendarClient } from '../utils/calendar/calendar-auth.js';
 import { formatDateISO, fromDate } from '../utils/date.js';
-import { fetchEvents, getFullName, eventNameMatches, formatDuplicateEvent } from '../utils/calendar-helpers.js';
-import type { BirthdayInput } from '../utils/add-birthday-parser.js';
+import { fetchEvents, eventNameMatches, formatDuplicateEvent } from '../utils/calendar/calendar-helpers.js';
+import { getFullName } from '../utils/name/name-helpers.js';
+import type { BirthdayInput } from '../utils/name/birthday-parser.js';
 
 /**
  * Birthday service for managing birthday events in Google Calendar

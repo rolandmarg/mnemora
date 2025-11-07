@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { parseInput } from '../add-birthday-parser.js';
+import { parseInput } from '../name/birthday-parser.js';
 
-describe('add-birthday-parser', () => {
+describe('birthday-parser', () => {
   describe('parseInput', () => {
     describe('ISO date format (YYYY-MM-DD)', () => {
       it('should parse "John Doe 1990-05-15"', () => {

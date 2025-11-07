@@ -1,6 +1,7 @@
 import { calendar_v3 } from 'googleapis';
-import { config } from '../config.js';
-import { startOfDay, endOfDay } from './date.js';
+import { config } from '../../config.js';
+import { startOfDay, endOfDay } from '../date.js';
+import { getFullName } from '../name/name-helpers.js';
 
 /**
  * Calendar helper utilities
@@ -35,13 +36,6 @@ export async function fetchEvents(
   });
 
   return response.data.items ?? [];
-}
-
-/**
- * Get full name from first and last name
- */
-export function getFullName(firstName: string, lastName?: string): string {
-  return lastName ? `${firstName} ${lastName}` : firstName;
 }
 
 /**

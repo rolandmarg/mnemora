@@ -1,6 +1,6 @@
 import { google, calendar_v3 } from 'googleapis';
 import { config } from '../config.js';
-import { fetchEvents, type EventListOptions } from '../utils/calendar-helpers.js';
+import { fetchEvents, type EventListOptions } from '../utils/calendar/calendar-helpers.js';
 import { startOfMonth, endOfMonth } from '../utils/date.js';
 
 type CalendarEvent = calendar_v3.Schema$Event;

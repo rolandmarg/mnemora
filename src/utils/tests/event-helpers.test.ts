@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { calendar_v3 } from 'googleapis';
-import { isRecurring, isAllDay, getEventStartDate, groupEvents } from '../event-helpers.js';
+import { isRecurring, isAllDay, getEventStartDate, groupEvents } from '../calendar/event-helpers.js';
 
 describe('event-helpers', () => {
   describe('isRecurring', () => {
@@ -89,7 +89,7 @@ describe('event-helpers', () => {
         { name: 'recurring', test: isRecurring },
       ]);
       expect(groups.recurring).toHaveLength(0);
-      expect(groups.other ?? []).toHaveLength(0);
+      expect(groups.other).toBeUndefined();
     });
 
     it('should handle events matching multiple predicates (first match wins)', () => {

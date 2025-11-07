@@ -1,5 +1,5 @@
 import calendarService from '../services/calendar.js';
-import { isRecurring, isAllDay, getEventStartDate, groupEvents } from '../utils/event-helpers.js';
+import { isRecurring, isAllDay, getEventStartDate, groupEvents } from '../utils/calendar/event-helpers.js';
 import { today, startOfYear, endOfYear, formatDateRange } from '../utils/date.js';
 
 /**
