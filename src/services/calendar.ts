@@ -1,5 +1,6 @@
 import { google, calendar_v3 } from 'googleapis';
 import { config } from '../config.js';
+import { startOfDay, endOfDay } from '../utils/date.js';
 
 type CalendarEvent = calendar_v3.Schema$Event;
 
@@ -33,17 +34,14 @@ class CalendarService {
   async getEventsForDate(date: Date): Promise<CalendarEvent[]> {
     await this.initialize();
 
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
+    const start = startOfDay(date);
+    const end = endOfDay(date);
 
     try {
       const response = await this.calendar!.events.list({
         calendarId: config.google.calendarId,
-        timeMin: startOfDay.toISOString(),
-        timeMax: endOfDay.toISOString(),
+        timeMin: start.toISOString(),
+        timeMax: end.toISOString(),
         singleEvents: true,
         orderBy: 'startTime',
       });
@@ -63,11 +61,10 @@ class CalendarService {
   async getEventsForMonth(date: Date): Promise<CalendarEvent[]> {
     await this.initialize();
 
-    const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
-    startOfMonth.setHours(0, 0, 0, 0);
-
-    const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-    endOfMonth.setHours(23, 59, 59, 999);
+    const startOfMonthDate = new Date(date.getFullYear(), date.getMonth(), 1);
+    const endOfMonthDate = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+    const startOfMonth = startOfDay(startOfMonthDate);
+    const endOfMonth = endOfDay(endOfMonthDate);
 
     try {
       const response = await this.calendar!.events.list({
@@ -95,12 +92,7 @@ class CalendarService {
   async getEventsForDateRange(startDate: Date, endDate: Date, calendarId?: string): Promise<CalendarEvent[]> {
     await this.initialize();
 
-    const start = new Date(startDate);
-    start.setHours(0, 0, 0, 0);
-
-    const end = new Date(endDate);
-    end.setHours(23, 59, 59, 999);
-
+    const { start, end } = { start: startOfDay(startDate), end: endOfDay(endDate) };
     const targetCalendarId = calendarId || config.google.calendarId;
 
     try {

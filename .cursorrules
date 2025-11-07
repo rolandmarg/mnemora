@@ -1,0 +1,161 @@
+# Cursor Rules for Mnemora
+
+## Project Overview
+Mnemora is a TypeScript bot that fetches Google Calendar birthdays and sends WhatsApp notifications. The project uses:
+- **TypeScript** with strict type checking
+- **ES Modules** (ESM) - all imports use `.js` extension
+- **Yarn** as package manager
+- **Google Calendar API** for calendar operations
+- **WhatsApp Web.js** for WhatsApp messaging
+
+## Project Structure
+```
+src/
+├── services/          # Core business logic services
+│   ├── calendar.ts    # Google Calendar integration (read-only)
+│   ├── whatsapp.ts    # WhatsApp messaging service
+│   └── birthday.ts    # Birthday checking and digest logic
+├── scripts/           # CLI scripts for manual operations
+│   ├── add-birthday.ts
+│   ├── delete-events.ts
+│   └── check-all-events.ts
+├── utils/             # Shared utility functions
+│   ├── cli.ts         # CLI interaction utilities
+│   ├── date.ts        # Date manipulation utilities
+│   ├── calendar-auth.ts # Calendar authentication
+│   └── event-formatter.ts # Event formatting utilities
+├── types/             # TypeScript type definitions
+│   └── qrcode-terminal.d.ts
+├── config.ts          # Configuration loader
+└── index.ts           # Main entry point
+```
+
+You are an expert in TypeScript, Node.js.
+  
+  Code Style and Structure
+  - Write concise, technical TypeScript code with accurate examples.
+  - Write unit test suites for every file and execute them for sanity check
+  - Use functional and declarative programming patterns; avoid classes.
+  - Prefer iteration and modularization over code duplication.
+  - Use descriptive variable names with auxiliary verbs (e.g., isLoading, hasError).
+  - Prefer compact, easy to understand code.
+
+## Code Style & Conventions
+
+### TypeScript
+- Use strict TypeScript with all strict checks enabled
+- Always use explicit types, avoid `any`
+- Use interfaces for object shapes
+- Prefer `type` for unions and intersections
+- Use ES module syntax (`import`/`export`)
+
+### Imports
+- Always use `.js` extension in import paths (TypeScript requirement for ESM)
+- Example: `import { config } from '../config.js';`
+- Group imports: external packages, then internal modules
+
+### Naming Conventions
+- **Files**: kebab-case (e.g., `add-birthday.ts`)
+- **Classes**: PascalCase (e.g., `CalendarService`)
+- **Functions/Variables**: camelCase (e.g., `getEventsForDate`)
+- **Constants**: UPPER_SNAKE_CASE (e.g., `MAX_RESULTS`)
+- **Interfaces**: PascalCase (e.g., `BirthdayInput`)
+
+### Code Organization
+- Services should be singleton classes exported as default instances
+- Scripts should be standalone executable files
+- Utilities should be pure functions when possible
+- Always handle errors with try/catch and meaningful error messages
+
+## Utilities Available
+
+### CLI Utilities (`src/utils/cli.ts`)
+- `createQuestionInterface()` - Creates readline interface
+- `askQuestion(rl, question)` - Prompts for user input
+- `askConfirmation(rl, question)` - Prompts for yes/no confirmation
+
+### Date Utilities (`src/utils/date.ts`)
+- `startOfDay(date)` - Normalize to start of day (00:00:00)
+- `endOfDay(date)` - Normalize to end of day (23:59:59.999)
+- `formatDateISO(date)` - Format as YYYY-MM-DD
+- `getDateRange(startDate, endDate)` - Get normalized date range
+
+### Calendar Auth (`src/utils/calendar-auth.ts`)
+- `createReadOnlyCalendarClient()` - Calendar client with read-only permissions
+- `createReadWriteCalendarClient()` - Calendar client with read-write permissions
+
+### Event Formatter (`src/utils/event-formatter.ts`)
+- `formatEvent(event)` - Format event for display
+- `formatEventForDuplicate(event)` - Format event for duplicate checking
+
+## Common Patterns
+
+### Adding New Scripts
+1. Create script in `src/scripts/`
+2. Use utilities from `src/utils/` when possible
+3. Add script to `package.json` scripts section
+4. Add debug configuration to `.vscode/launch.json`
+5. Use `createReadWriteCalendarClient()` for write operations
+6. Use `createQuestionInterface()` for interactive prompts
+
+### Calendar Operations
+- **Read operations**: Use `calendarService` from `src/services/calendar.ts`
+- **Write operations**: Use `createReadWriteCalendarClient()` from utils
+- Always use `startOfDay()` and `endOfDay()` for date ranges
+- Use `config.google.calendarId` for calendar ID (defaults to 'primary')
+
+### Error Handling
+- Always wrap async operations in try/catch
+- Provide meaningful error messages
+- Log errors with `console.error()`
+- Use `process.exit()` appropriately in scripts
+
+### Date Handling
+- Always normalize dates using utilities (`startOfDay`, `endOfDay`)
+- Use `formatDateISO()` for ISO date strings
+- Be aware of timezone issues (use UTC for all-day events)
+
+## Best Practices
+
+1. **Reuse Code**: Always check `src/utils/` before writing new utility functions
+2. **Type Safety**: Never use `any`, always provide proper types
+3. **Error Messages**: Make error messages helpful and actionable
+4. **Documentation**: Add JSDoc comments for public functions
+5. **Consistency**: Follow existing patterns in the codebase
+6. **Testing**: Run `yarn type-check` before committing
+7. **Scripts**: Always add new scripts to `package.json` and `launch.json`
+
+## Environment Variables
+- `GOOGLE_CALENDAR_ID` - Calendar ID (defaults to 'primary')
+- `GOOGLE_CLIENT_EMAIL` - Service account email
+- `GOOGLE_PRIVATE_KEY` - Service account private key
+- `GOOGLE_PROJECT_ID` - Google Cloud project ID
+- `WHATSAPP_GROUP_ID` - WhatsApp group ID
+- `SCHEDULE_TIME` - Schedule time in 24-hour format (defaults to '09:00')
+
+## Commands
+- `yarn build` - Build TypeScript
+- `yarn start` - Run compiled JavaScript
+- `yarn dev` - Development mode with auto-reload
+- `yarn type-check` - Type check without building
+- `yarn add-birthday` - Add birthday to calendar
+- `yarn delete-events` - Delete events interactively
+- `yarn check-all-events` - Check all calendar events
+
+## When Adding New Features
+
+1. **Check utilities first** - Don't duplicate existing functionality
+2. **Follow existing patterns** - Match the style of similar code
+3. **Update documentation** - Add to README if needed
+4. **Add to launch.json** - Include debug configuration for scripts
+5. **Type check** - Always run `yarn type-check` before committing
+6. **Use shared utilities** - Leverage existing CLI, date, and auth utilities
+
+## Important Notes
+
+- All imports must use `.js` extension (TypeScript ESM requirement)
+- Calendar service uses read-only permissions by default
+- Use `createReadWriteCalendarClient()` for write operations
+- Always normalize dates with `startOfDay()` and `endOfDay()`
+- Scripts should handle their own process.exit() calls
+- Use `askConfirmation()` for yes/no prompts in interactive scripts

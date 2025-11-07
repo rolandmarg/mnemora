@@ -1,6 +1,8 @@
-import { google, calendar_v3 } from 'googleapis';
+import { calendar_v3 } from 'googleapis';
 import { config } from '../config.js';
-import readline from 'readline';
+import { createQuestionInterface, askQuestion, askConfirmation } from '../utils/cli.js';
+import { startOfDay, endOfDay, formatDateISO } from '../utils/date.js';
+import { createReadWriteCalendarClient } from '../utils/calendar-auth.js';
 
 /**
  * Script to add birthday events to Google Calendar
@@ -80,20 +82,6 @@ function parseInput(input: string): BirthdayInput | null {
   return null;
 }
 
-function createQuestionInterface(): readline.Interface {
-  return readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-}
-
-async function askQuestion(rl: readline.Interface, question: string): Promise<string> {
-  return new Promise((resolve) => {
-    rl.question(question, (answer) => {
-      resolve(answer.trim());
-    });
-  });
-}
 
 async function checkForDuplicates(
   calendar: calendar_v3.Calendar,
@@ -105,18 +93,14 @@ async function checkForDuplicates(
   
   // Check for events on the same date
   const eventDate = new Date(birthday.birthday);
-  
-  const startOfDay = new Date(eventDate);
-  startOfDay.setHours(0, 0, 0, 0);
-  
-  const endOfDay = new Date(eventDate);
-  endOfDay.setHours(23, 59, 59, 999);
+  const start = startOfDay(eventDate);
+  const end = endOfDay(eventDate);
   
   try {
     const response = await calendar.events.list({
       calendarId: config.google.calendarId,
-      timeMin: startOfDay.toISOString(),
-      timeMax: endOfDay.toISOString(),
+      timeMin: start.toISOString(),
+      timeMax: end.toISOString(),
       singleEvents: true,
       orderBy: 'startTime',
     });
@@ -148,18 +132,7 @@ async function checkForDuplicates(
 }
 
 async function addBirthdayToCalendar(birthday: BirthdayInput, skipDuplicateCheck: boolean = false): Promise<void> {
-  if (!config.google.clientEmail || !config.google.privateKey) {
-    throw new Error('Google Calendar credentials not configured. Please set GOOGLE_CLIENT_EMAIL and GOOGLE_PRIVATE_KEY in .env');
-  }
-
-  const auth = new google.auth.JWT(
-    config.google.clientEmail,
-    undefined,
-    config.google.privateKey,
-    ['https://www.googleapis.com/auth/calendar']
-  );
-
-  const calendar = google.calendar({ version: 'v3', auth });
+  const calendar = createReadWriteCalendarClient();
   
   // Check for duplicates before adding
   if (!skipDuplicateCheck) {
@@ -191,11 +164,7 @@ async function addBirthdayToCalendar(birthday: BirthdayInput, skipDuplicateCheck
   const eventTitle = `${fullName}'s Birthday`;
 
   // Create event date (all-day event)
-  const eventDate = new Date(birthday.birthday);
-  const year = eventDate.getFullYear();
-  const month = String(eventDate.getMonth() + 1).padStart(2, '0');
-  const day = String(eventDate.getDate()).padStart(2, '0');
-  const dateString = `${year}-${month}-${day}`;
+  const dateString = formatDateISO(new Date(birthday.birthday));
 
   // Create recurring event (yearly)
   const recurrence = ['RRULE:FREQ=YEARLY;INTERVAL=1'];
@@ -240,10 +209,6 @@ async function addBirthdayToCalendar(birthday: BirthdayInput, skipDuplicateCheck
   }
 }
 
-async function askConfirmation(rl: readline.Interface, question: string): Promise<boolean> {
-  const answer = await askQuestion(rl, question);
-  return answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes';
-}
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -267,18 +232,8 @@ async function main(): Promise<void> {
     }
     
     try {
-      const duplicates = await checkForDuplicates(
-        google.calendar({ 
-          version: 'v3', 
-          auth: new google.auth.JWT(
-            config.google.clientEmail!,
-            undefined,
-            config.google.privateKey!,
-            ['https://www.googleapis.com/auth/calendar']
-          )
-        }),
-        birthday
-      );
+      const calendar = createReadWriteCalendarClient();
+      const duplicates = await checkForDuplicates(calendar, birthday);
       
       if (duplicates.length > 0 && !forceFlag) {
         const fullName = birthday.lastName 
@@ -341,14 +296,7 @@ async function main(): Promise<void> {
       birthday.lastName = lastName;
       
       // Check for duplicates
-      const auth = new google.auth.JWT(
-        config.google.clientEmail!,
-        undefined,
-        config.google.privateKey!,
-        ['https://www.googleapis.com/auth/calendar']
-      );
-      
-      const calendar = google.calendar({ version: 'v3', auth });
+      const calendar = createReadWriteCalendarClient();
       const duplicates = await checkForDuplicates(calendar, birthday);
       
       if (duplicates.length > 0) {

@@ -16,6 +16,7 @@
     "check-permissions": "tsx src/scripts/check-calendar-permissions.ts",
     "sanity-check": "tsx src/scripts/sanity-check.ts",
     "add-birthday": "tsx src/scripts/add-birthday.ts",
+    "delete-events": "tsx src/scripts/delete-events.ts",
     "type-check": "tsc --noEmit",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
