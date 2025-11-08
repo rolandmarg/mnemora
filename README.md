@@ -44,7 +44,7 @@ Edit `.env`:
 
 ```env
 # Google Calendar
-GOOGLE_CALENDAR_ID=primary
+GOOGLE_CALENDAR_ID=example@gmail.com
 GOOGLE_CLIENT_EMAIL=your-service-account@project.iam.gserviceaccount.com
 GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
 GOOGLE_PROJECT_ID=your-project-id
