@@ -32,13 +32,6 @@ class SheetsService {
   }
 
   /**
-   * Set the spreadsheet ID for all operations
-   */
-  setSpreadsheetId(spreadsheetId: string): void {
-    this.spreadsheetId = spreadsheetId;
-  }
-
-  /**
    * Initialize the sheets client
    */
   private async initialize(): Promise<void> {
@@ -143,7 +136,7 @@ class SheetsService {
       }
 
       if (!this.spreadsheetId) {
-        throw new Error('Spreadsheet ID not set. Call setSpreadsheetId() first or set GOOGLE_SPREADSHEET_ID in .env');
+        throw new Error('Spreadsheet ID not found. Please set GOOGLE_SPREADSHEET_ID in .env');
       }
 
       // Read from entire first sheet
