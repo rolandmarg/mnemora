@@ -8,9 +8,9 @@
 import pino from 'pino';
 
 /**
- * Log levels
+ * Log levels (internal use only)
  */
-export enum LogLevel {
+enum LogLevel {
   TRACE = 10,
   DEBUG = 20,
   INFO = 30,
@@ -88,12 +88,12 @@ class PinoLogger implements Logger {
 }
 
 /**
- * Create a logger instance
+ * Create a logger instance (internal use only)
  * 
  * @param options - Logger configuration options
  * @returns Logger instance
  */
-export function createLogger(options?: {
+function createLogger(options?: {
   level?: LogLevel | string;
   pretty?: boolean;
   context?: Record<string, unknown>;

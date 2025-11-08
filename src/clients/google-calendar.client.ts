@@ -5,9 +5,9 @@ import { type Event, type DeletionResult } from '../utils/event-helpers.js';
 import { logger } from '../utils/logger.js';
 
 /**
- * Calendar client type
+ * Calendar client type (internal use only)
  */
-export type CalendarClient = calendar_v3.Calendar;
+type CalendarClient = calendar_v3.Calendar;
 
 /**
  * Calendar event type - internal to calendar implementation
@@ -39,7 +39,7 @@ function calendarEventToEvent(calendarEvent: CalendarEvent): Event {
   };
 }
 
-export interface EventListOptions {
+interface EventListOptions {
   startDate: Date;
   endDate: Date;
   maxResults?: number;
