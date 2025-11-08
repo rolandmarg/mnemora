@@ -94,12 +94,12 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
       return existingBirthdays.filter(existing => {
         const firstNameMatch = existing.firstName.toLowerCase() === birthday.firstName.toLowerCase();
         const lastNameMatch = (existing.lastName ?? '').toLowerCase() === (birthday.lastName ?? '').toLowerCase();
-      return firstNameMatch && lastNameMatch;
-    });
-  } catch (error) {
-    logger.error('Error checking for duplicates', error);
-    return [];
-  }
+        return firstNameMatch && lastNameMatch;
+      });
+    } catch (error) {
+      logger.error('Error checking for duplicates', error);
+      return [];
+    }
   }
 
   /**
@@ -177,7 +177,7 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
         added++;
       } catch (error) {
         errors++;
-        console.error(`Error writing birthday for ${birthday.firstName} ${birthday.lastName ?? ''}`, error);
+        logger.error(`Error writing birthday for ${birthday.firstName} ${birthday.lastName ?? ''}`, error);
       }
     }
     

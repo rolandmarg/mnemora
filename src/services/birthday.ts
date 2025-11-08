@@ -1,6 +1,7 @@
 import { DataSourceFactory } from '../factories/data-source.factory.js';
 import { formatDateISO, fromDate, today, formatDateShort, formatDateMonthYear, startOfDay, isFirstDayOfMonth, startOfMonth, endOfMonth } from '../utils/date-helpers.js';
 import { getFullName } from '../utils/name-helpers.js';
+import { logger } from '../utils/logger.js';
 import type { BirthdayRecord } from '../utils/birthday-helpers.js';
 
 /**
@@ -20,7 +21,7 @@ class BirthdayService {
       
       return records;
     } catch (error) {
-      console.error('Error getting today\'s birthdays:', error);
+      logger.error('Error getting today\'s birthdays', error);
       throw error;
     }
   }
@@ -111,7 +112,7 @@ class BirthdayService {
         monthlyDigest,
       };
     } catch (error) {
-      console.error('Error getting today\'s birthdays and monthly digest:', error);
+      logger.error('Error getting today\'s birthdays and monthly digest', error);
       throw error;
     }
   }
@@ -141,7 +142,7 @@ class BirthdayService {
     try {
       return await this.calendarSource.read({ startDate, endDate });
     } catch (error) {
-      console.error('Error getting birthdays:', error);
+      logger.error('Error getting birthdays', error);
       throw error;
     }
   }
@@ -159,7 +160,7 @@ class BirthdayService {
     try {
       return await this.calendarSource.deleteAll({ startDate, endDate });
     } catch (error) {
-      console.error('Error deleting birthdays:', error);
+      logger.error('Error deleting birthdays', error);
       throw error;
     }
   }

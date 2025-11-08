@@ -18,9 +18,13 @@ export interface BirthdayRecord {
 /**
  * Parse a row to extract multiple birthday records
  * A row can contain multiple name-date pairs (e.g., ["Name1", "Date1", "Name2", "Date2"])
+ * 
+ * Loop processes pairs: (0,1), (2,3), (4,5), etc.
+ * After processing each pair, increments i to skip the date cell we just processed
  */
 export function parseRowToBirthdays(row: string[]): BirthdayRecord[] {
   const birthdays: BirthdayRecord[] = [];
+  // Process name-date pairs: check pairs at (i, i+1), then skip to next pair
   for (let i = 0; i < row.length - 1; i++) {
     const name = row[i]?.trim();
     const dateStr = row[i + 1]?.trim();
@@ -34,7 +38,7 @@ export function parseRowToBirthdays(row: string[]): BirthdayRecord[] {
     const nameParts = extractNameParts(name);
     const { firstName, lastName } = sanitizeNames(nameParts.firstName, nameParts.lastName);
     birthdays.push({ firstName, lastName, birthday });
-    i++; // Skip the next cell
+    i++; // Skip the date cell we just processed, so next iteration is at i+2
   }
   return birthdays;
 }
