@@ -3,15 +3,9 @@ import {
   sanitizeName,
   sanitizeNames,
   getFullName,
-  capitalize,
-  capitalizeWords,
   extractFirstName,
   extractLastName,
   extractNameParts,
-  normalizeWhitespace,
-  removePunctuation,
-  isAlphaSpace,
-  isValidName,
 } from '../utils/name-helpers.js';
 
 describe('name-helpers', () => {
@@ -123,42 +117,6 @@ describe('name-helpers', () => {
     });
   });
 
-  describe('capitalize', () => {
-    it('should capitalize first letter and lowercase rest', () => {
-      expect(capitalize('john')).toBe('John');
-      expect(capitalize('JOHN')).toBe('John');
-      expect(capitalize('jOhN')).toBe('John');
-    });
-
-    it('should handle empty string', () => {
-      expect(capitalize('')).toBe('');
-    });
-
-    it('should handle single character', () => {
-      expect(capitalize('j')).toBe('J');
-    });
-  });
-
-  describe('capitalizeWords', () => {
-    it('should capitalize first letter of each word', () => {
-      expect(capitalizeWords('john doe')).toBe('John Doe');
-      expect(capitalizeWords('JOHN DOE')).toBe('John Doe');
-      expect(capitalizeWords('jOhN dOe')).toBe('John Doe');
-    });
-
-    it('should handle multiple spaces', () => {
-      expect(capitalizeWords('john   doe')).toBe('John Doe');
-    });
-
-    it('should handle empty string', () => {
-      expect(capitalizeWords('')).toBe('');
-    });
-
-    it('should handle single word', () => {
-      expect(capitalizeWords('john')).toBe('John');
-    });
-  });
-
   describe('extractFirstName', () => {
     it('should extract first name from full name', () => {
       expect(extractFirstName('John Doe')).toBe('John');
@@ -223,92 +181,5 @@ describe('name-helpers', () => {
     });
   });
 
-  describe('normalizeWhitespace', () => {
-    it('should collapse multiple spaces to single space', () => {
-      expect(normalizeWhitespace('John    Doe')).toBe('John Doe');
-      expect(normalizeWhitespace('John   Middle   Doe')).toBe('John Middle Doe');
-    });
-
-    it('should trim leading and trailing whitespace', () => {
-      expect(normalizeWhitespace('  John Doe  ')).toBe('John Doe');
-    });
-
-    it('should handle tabs and newlines', () => {
-      expect(normalizeWhitespace('John\tDoe\nSmith')).toBe('John Doe Smith');
-    });
-
-    it('should handle empty string', () => {
-      expect(normalizeWhitespace('')).toBe('');
-    });
-  });
-
-  describe('removePunctuation', () => {
-    it('should remove all punctuation', () => {
-      expect(removePunctuation('John, Doe!')).toBe('John Doe');
-      expect(removePunctuation('O\'Brien-Smith')).toBe('OBrien-Smith');
-    });
-
-    it('should preserve letters, numbers, and spaces', () => {
-      expect(removePunctuation('John Doe 123')).toBe('John Doe 123');
-    });
-
-    it('should handle empty string', () => {
-      expect(removePunctuation('')).toBe('');
-    });
-
-    it('should remove various punctuation marks', () => {
-      expect(removePunctuation('a.b,c;d:e!f?g\'h"i(j)k[l]m{n}o')).toBe('abcdefghijklmno');
-    });
-  });
-
-  describe('isAlphaSpace', () => {
-    it('should return true for strings with only letters and spaces', () => {
-      expect(isAlphaSpace('John Doe')).toBe(true);
-      expect(isAlphaSpace('John')).toBe(true);
-      expect(isAlphaSpace('John Middle Doe')).toBe(true);
-    });
-
-    it('should return false for strings with numbers', () => {
-      expect(isAlphaSpace('John123')).toBe(false);
-      expect(isAlphaSpace('John Doe 123')).toBe(false);
-    });
-
-    it('should return false for strings with punctuation', () => {
-      expect(isAlphaSpace('John-Doe')).toBe(false);
-      expect(isAlphaSpace('John\'Doe')).toBe(false);
-    });
-
-    it('should return false for empty string', () => {
-      expect(isAlphaSpace('')).toBe(false);
-    });
-  });
-
-  describe('isValidName', () => {
-    it('should return true for valid names', () => {
-      expect(isValidName('John Doe')).toBe(true);
-      expect(isValidName('Mary-Jane')).toBe(true);
-      expect(isValidName('O\'Brien')).toBe(true);
-      expect(isValidName('John Middle Doe')).toBe(true);
-    });
-
-    it('should return false for names with numbers', () => {
-      expect(isValidName('John123')).toBe(false);
-      expect(isValidName('John Doe 123')).toBe(false);
-    });
-
-    it('should return false for names with invalid punctuation', () => {
-      expect(isValidName('John.Doe')).toBe(false);
-      expect(isValidName('John, Doe')).toBe(false);
-    });
-
-    it('should return false for empty string', () => {
-      expect(isValidName('')).toBe(false);
-    });
-
-    it('should allow hyphens and apostrophes', () => {
-      expect(isValidName('Mary-Jane Watson')).toBe(true);
-      expect(isValidName('O\'Brien Smith')).toBe(true);
-    });
-  });
 });
 

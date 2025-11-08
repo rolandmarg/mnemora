@@ -234,16 +234,6 @@ export function formatDateRange(startDate: Date, endDate: Date): string {
 }
 
 /**
- * Get start and end of a date range
- */
-export function getDateRange(startDate: Date, endDate: Date): { start: Date; end: Date } {
-  return {
-    start: startOfDay(startDate),
-    end: endOfDay(endDate),
-  };
-}
-
-/**
  * Check if a date is the first day of the month
  */
 export function isFirstDayOfMonth(date: Date): boolean {

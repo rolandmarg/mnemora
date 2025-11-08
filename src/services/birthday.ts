@@ -1,5 +1,5 @@
 import { DataSourceFactory } from '../factories/data-source.factory.js';
-import { formatDateISO, fromDate, today, formatDateShort, formatDateMonthYear, startOfDay, isFirstDayOfMonth, startOfMonth, endOfMonth } from '../utils/date-helpers.js';
+import { today, formatDateShort, formatDateMonthYear, startOfDay, isFirstDayOfMonth, startOfMonth, endOfMonth } from '../utils/date-helpers.js';
 import { getFullName } from '../utils/name-helpers.js';
 import { logger } from '../utils/logger.js';
 import type { BirthdayRecord } from '../utils/birthday-helpers.js';
@@ -115,22 +115,6 @@ class BirthdayService {
       logger.error('Error getting today\'s birthdays and monthly digest', error);
       throw error;
     }
-  }
-
-  /**
-   * Display duplicate events to the user
-   */
-  displayDuplicates(duplicates: BirthdayRecord[], fullName: string, date: Date): void {
-    logger.warn('Potential duplicate(s) found', {
-      duplicates: duplicates.map(dup => ({
-        name: getFullName(dup.firstName, dup.lastName),
-        date: formatDateISO(fromDate(dup.birthday)),
-      })),
-      tryingToAdd: {
-        name: fullName,
-        date: date.toLocaleDateString(),
-      },
-    });
   }
 
   /**

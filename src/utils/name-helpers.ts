@@ -46,29 +46,6 @@ export function getFullName(firstName: string, lastName?: string): string {
 }
 
 /**
- * Capitalize first letter of a string
- */
-export function capitalize(str: string): string {
-  if (!str) {
-    return '';
-  }
-  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
-}
-
-/**
- * Capitalize first letter of each word in a string
- */
-export function capitalizeWords(str: string): string {
-  if (!str) {
-    return '';
-  }
-  return str
-    .split(/\s+/)
-    .map(word => capitalize(word))
-    .join(' ');
-}
-
-/**
  * Extract first name from a full name string
  */
 export function extractFirstName(fullName: string): string {
@@ -113,45 +90,4 @@ export function parseNameFromString(nameString: string): { firstName: string; la
   const { firstName: rawFirstName, lastName: rawLastName } = extractNameParts(nameString);
   return sanitizeNames(rawFirstName, rawLastName);
 }
-
-/**
- * Normalize whitespace in a string (collapse multiple spaces to single space)
- */
-export function normalizeWhitespace(str: string): string {
-  if (!str) {
-    return '';
-  }
-  return str.replace(/\s+/g, ' ').trim();
-}
-
-/**
- * Remove all punctuation from a string
- */
-export function removePunctuation(str: string): string {
-  if (!str) {
-    return '';
-  }
-  return str.replace(/[.,;:!?'"()[\]{}]/g, '');
-}
-
-/**
- * Check if a string contains only letters and spaces
- */
-export function isAlphaSpace(str: string): boolean {
-  if (!str) {
-    return false;
-  }
-  return /^[a-zA-Z\s]+$/.test(str);
-}
-
-/**
- * Check if a string is a valid name (contains letters, spaces, hyphens, apostrophes)
- */
-export function isValidName(str: string): boolean {
-  if (!str) {
-    return false;
-  }
-  return /^[a-zA-Z\s'-]+$/.test(str);
-}
-
 

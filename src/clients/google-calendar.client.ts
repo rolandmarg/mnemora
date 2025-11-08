@@ -10,11 +10,6 @@ import { logger } from '../utils/logger.js';
 export type CalendarClient = calendar_v3.Calendar;
 
 /**
- * Calendar list entry type
- */
-export type CalendarListEntry = calendar_v3.Schema$CalendarListEntry;
-
-/**
  * Calendar event type - internal to calendar implementation
  * Only used within this client file
  */

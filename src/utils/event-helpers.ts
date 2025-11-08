@@ -1,4 +1,3 @@
-import { getFullName } from './name-helpers.js';
 import { logger } from './logger.js';
 
 /**
@@ -29,123 +28,10 @@ export interface Event {
  */
 
 /**
- * Check if event is recurring
- * Returns true if:
- * - Event has a recurrence rule (master recurring event)
- * - Event has a recurringEventId (instance of a recurring event)
- */
-export function isRecurring(event: Event): boolean {
-  // Check if it's a master recurring event (has recurrence rules)
-  if (event.recurrence && event.recurrence.length > 0) {
-    return true;
-  }
-  
-  // Check if it's an instance of a recurring event (has recurringEventId)
-  if (event.recurringEventId) {
-    return true;
-  }
-  
-  return false;
-}
-
-/**
  * Check if event is all-day
  */
 export function isAllDay(event: Event): boolean {
   return !!event.start?.date && !event.start?.dateTime;
-}
-
-/**
- * Get event start date string
- */
-export function getEventStartDate(event: Event): string {
-  return event.start?.date ?? event.start?.dateTime ?? '(No date)';
-}
-
-/**
- * Group events by predicate
- */
-export function groupEvents(
-  events: Event[],
-  predicates: Array<{ name: string; test: (event: Event) => boolean }>
-): Record<string, Event[]> {
-  const groups: Record<string, Event[]> = {};
-  
-  predicates.forEach(({ name }) => {
-    groups[name] = [];
-  });
-
-  events.forEach(event => {
-    const matched = predicates.find(({ test }) => test(event));
-    if (matched) {
-      groups[matched.name].push(event);
-    } else {
-      groups.other = groups.other ?? [];
-      groups.other.push(event);
-    }
-  });
-
-  return groups;
-}
-
-/**
- * Format an event for display
- */
-export function formatEvent(event: Event): string {
-  const summary = event.summary ?? '(No title)';
-  const start = event.start?.date ?? event.start?.dateTime ?? '(No date)';
-  const location = event.location ?? '';
-  const description = event.description ? 
-    (event.description.length > 100 ? `${event.description.substring(0, 100)}...` : event.description) 
-    : '';
-  
-  let formatted = `  Title: ${summary}`;
-  formatted += `\n  Date: ${start}`;
-  if (location) {
-    formatted += `\n  Location: ${location}`;
-  }
-  if (description) {
-    formatted += `\n  Description: ${description}`;
-  }
-  if (event.recurrence && event.recurrence.length > 0) {
-    formatted += '\n  Recurring: Yes';
-  }
-  
-  return formatted;
-}
-
-/**
- * Format event details for duplicate checking
- */
-export function formatEventForDuplicate(event: Event): string {
-  return `${event.summary ?? '(No title)'} - ${event.start?.date ?? event.start?.dateTime ?? '(No date)'}`;
-}
-
-/**
- * Format duplicate event for display
- */
-export function formatDuplicateEvent(event: Event, index: number): string {
-  return `   ${index + 1}. ${event.summary ?? '(No title)'}\n      Event ID: ${event.id}\n      Date: ${event.start?.date ?? event.start?.dateTime ?? '(No date)'}`;
-}
-
-/**
- * Check if event name matches birthday input
- */
-export function eventNameMatches(
-  eventSummary: string,
-  firstName: string,
-  lastName?: string
-): boolean {
-  const summary = eventSummary.toLowerCase();
-  const firstNameLower = firstName.toLowerCase();
-  const lastNameLower = lastName?.toLowerCase() ?? '';
-  const fullNameLower = getFullName(firstName, lastName).toLowerCase();
-
-  return !!(
-    summary.includes(firstNameLower) ||
-    summary.includes(fullNameLower) ||
-    (lastNameLower && summary.includes(lastNameLower))
-  );
 }
 
 /**

@@ -14,7 +14,6 @@ import {
   formatDateShort,
   formatDateMonthYear,
   formatDateRange,
-  getDateRange,
   isFirstDayOfMonth,
   fromDate,
 } from '../utils/date-helpers.js';
@@ -236,17 +235,6 @@ describe('date utilities', () => {
       const end = new Date(2024, 11, 31);
       const result = formatDateRange(start, end);
       expect(result).toContain('to');
-    });
-  });
-
-  describe('getDateRange', () => {
-    it('should return normalized date range', () => {
-      const start = new Date(2024, 4, 15, 14, 30);
-      const end = new Date(2024, 4, 20, 10, 15);
-      const result = getDateRange(start, end);
-      expect(result.start.getHours()).toBe(0);
-      expect(result.end.getHours()).toBe(23);
-      expect(result.end.getMinutes()).toBe(59);
     });
   });
 
