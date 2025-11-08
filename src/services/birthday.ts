@@ -1,30 +1,24 @@
-import { config } from '../config.js';
-import calendarClient, { isBirthdayEvent, extractNameFromEvent } from '../clients/google-calendar.client.js';
-import { formatDateISO, fromDate, today, formatDateShort, formatDateMonthYear, parseDateFromString, startOfDay, isFirstDayOfMonth, startOfMonth, endOfMonth } from '../utils/date.js';
+import { DataSourceFactory } from '../factories/data-source.factory.js';
+import { formatDateISO, fromDate, today, formatDateShort, formatDateMonthYear, startOfDay, isFirstDayOfMonth, startOfMonth, endOfMonth } from '../utils/date-helpers.js';
 import { getFullName } from '../utils/name-helpers.js';
 import type { BirthdayRecord } from '../utils/birthday-helpers.js';
-import type { Event } from '../utils/event-helpers.js';
-
-interface BirthdaysByDate {
-  [dateKey: string]: string[];
-}
 
 /**
  * Birthday service for managing birthday events
  */
 class BirthdayService {
+  private readonly calendarSource = DataSourceFactory.create('calendar');
 
   /**
    * Get birthdays for today
-   * @returns Array of birthday events for today
+   * @returns Array of birthday records for today
    */
-  async getTodaysBirthdays(): Promise<Event[]> {
+  async getTodaysBirthdays(): Promise<BirthdayRecord[]> {
     try {
       const todayDate = today();
-      const birthdays = (await calendarClient.fetchEvents({ startDate: todayDate, endDate: todayDate }))
-        .filter(event => isBirthdayEvent(event));
+      const records = await this.calendarSource.read({ startDate: todayDate, endDate: todayDate });
       
-      return birthdays;
+      return records;
     } catch (error) {
       console.error('Error getting today\'s birthdays:', error);
       throw error;
@@ -39,7 +33,7 @@ class BirthdayService {
    * @returns Object with today's birthdays and optional monthly digest
    */
   async getTodaysBirthdaysWithOptionalDigest(): Promise<{
-    todaysBirthdays: Event[];
+    todaysBirthdays: BirthdayRecord[];
     monthlyDigest?: string;
   }> {
     const todayDate = today();
@@ -66,7 +60,7 @@ class BirthdayService {
    * @returns Object with today's birthdays and monthly digest message
    */
   async getTodaysBirthdaysWithMonthlyDigest(): Promise<{
-    todaysBirthdays: Event[];
+    todaysBirthdays: BirthdayRecord[];
     monthlyDigest: string;
   }> {
     try {
@@ -74,29 +68,19 @@ class BirthdayService {
       // Fetch entire month once
       const monthStart = startOfMonth(todayDate);
       const monthEnd = endOfMonth(todayDate);
-      const monthBirthdays = (await calendarClient.fetchEvents({ startDate: monthStart, endDate: monthEnd }))
-        .filter(event => isBirthdayEvent(event));
+      const monthRecords = await this.calendarSource.read({ startDate: monthStart, endDate: monthEnd });
       
       // Filter for today's birthdays from the month data
       const todayStart = startOfDay(todayDate);
-      const todaysBirthdays = monthBirthdays.filter(event => {
-        const startDate = event.start?.date ?? event.start?.dateTime;
-        if (!startDate) {
-          return false;
-        }
-        try {
-          const parsedDate = parseDateFromString(startDate);
-          const eventStart = startOfDay(parsedDate);
-          return eventStart.getTime() === todayStart.getTime();
-        } catch {
-          return false;
-        }
+      const todaysBirthdays = monthRecords.filter(record => {
+        const recordStart = startOfDay(record.birthday);
+        return recordStart.getTime() === todayStart.getTime();
       });
 
       // Generate monthly digest from month data
       const monthName = formatDateMonthYear(todayDate);
       
-      if (monthBirthdays.length === 0) {
+      if (monthRecords.length === 0) {
         return {
           todaysBirthdays: [],
           monthlyDigest: `📅 No birthdays scheduled for ${monthName}.`,
@@ -104,31 +88,18 @@ class BirthdayService {
       }
 
       // Group birthdays by date
-      const birthdaysByDate = monthBirthdays.reduce((acc, event) => {
-        const startDate = event.start?.date ?? event.start?.dateTime;
-        if (!startDate) {
-          return acc;
-        }
-        
-        try {
-          const parsedDate = parseDateFromString(startDate);
-          const dateKey = formatDateShort(parsedDate);
-          if (!acc[dateKey]) {
-            acc[dateKey] = [];
-          }
-          acc[dateKey].push(extractNameFromEvent(event));
-        } catch {
-          // Skip events with invalid dates
-          return acc;
-        }
+      const birthdaysByDate = monthRecords.reduce<Record<string, string[]>>((acc, record) => {
+        const dateKey = formatDateShort(record.birthday);
+        const fullName = getFullName(record.firstName, record.lastName);
+        (acc[dateKey] ??= []).push(fullName);
         return acc;
-      }, {} as BirthdaysByDate);
+      }, {});
 
       // Build message
       const sortedDates = Object.keys(birthdaysByDate).sort((a, b) => {
         try {
-          const dateA = parseDateFromString(`${a}, ${todayDate.getFullYear()}`);
-          const dateB = parseDateFromString(`${b}, ${todayDate.getFullYear()}`);
+          const dateA = new Date(`${a}, ${todayDate.getFullYear()}`);
+          const dateB = new Date(`${b}, ${todayDate.getFullYear()}`);
           return dateA.getTime() - dateB.getTime();
         } catch {
           // If date parsing fails, maintain original order
@@ -150,75 +121,49 @@ class BirthdayService {
   }
 
   /**
-   * Check for duplicate birthday events
-   */
-  async checkForDuplicates(birthday: BirthdayRecord): Promise<Event[]> {
-    try {
-      const eventDate = fromDate(birthday.birthday);
-      const events = await calendarClient.fetchEvents({
-        startDate: eventDate,
-        endDate: eventDate,
-      });
-      
-      return events.filter(event => {
-        const summary = (event.summary ?? '').toLowerCase();
-        return summary.includes('birthday') && 
-               calendarClient.eventNameMatches(event.summary ?? '', birthday.firstName, birthday.lastName);
-      });
-    } catch (error) {
-      console.error('Error checking for duplicates:', error);
-      return [];
-    }
-  }
-
-  /**
    * Display duplicate events to the user
    */
-  displayDuplicates(duplicates: Event[], fullName: string, date: Date): void {
+  displayDuplicates(duplicates: BirthdayRecord[], fullName: string, date: Date): void {
     console.log('\n⚠️  Potential duplicate(s) found:');
-    duplicates.forEach((dup, index) => console.log(calendarClient.formatDuplicateEvent(dup, index + 1)));
+    duplicates.forEach((dup, index) => {
+      const duplicateName = getFullName(dup.firstName, dup.lastName);
+      const duplicateDate = formatDateISO(fromDate(dup.birthday));
+      console.log(`   ${index + 1}. ${duplicateName}'s Birthday`);
+      console.log(`      Date: ${duplicateDate}`);
+    });
     console.log(`\n   Trying to add: ${fullName}'s Birthday`);
     console.log(`   Date: ${date.toLocaleDateString()}\n`);
   }
 
   /**
-   * Add a birthday event to the calendar
-   * Always checks for duplicates and skips them if found
-   * @returns true if birthday was added, false if skipped due to duplicate
+   * Get birthdays for a date range
+   * @param startDate - Start date of the range
+   * @param endDate - End date of the range
+   * @returns Array of birthday records in the date range
    */
-  async addBirthday(birthday: BirthdayRecord): Promise<boolean> {
-    const fullName = getFullName(birthday.firstName, birthday.lastName);
-    
-    const duplicates = await this.checkForDuplicates(birthday);
-    if (duplicates.length > 0) {
-      this.displayDuplicates(duplicates, fullName, fromDate(birthday.birthday));
-      console.log(`⏭️  Skipping duplicate birthday for ${fullName}`);
-      return false;
-    }
-
-    const dateString = formatDateISO(fromDate(birthday.birthday));
-    const event: Event = {
-      summary: `${fullName}'s Birthday`,
-      description: `Birthday of ${fullName}${birthday.year ? ` (born ${birthday.year})` : ''}`,
-      start: { date: dateString, timeZone: 'UTC' },
-      end: { date: dateString, timeZone: 'UTC' },
-      recurrence: ['RRULE:FREQ=YEARLY;INTERVAL=1'],
-    };
-
+  async getBirthdays(startDate: Date, endDate: Date): Promise<BirthdayRecord[]> {
     try {
-      const response = await calendarClient.insertEvent(event);
-
-      console.log('\n✅ Birthday event created successfully!');
-      console.log(`   Title: ${event.summary}`);
-      console.log(`   Date: ${dateString}`);
-      console.log(`   Event ID: ${response.id}`);
-      console.log(`   Calendar: ${config.google.calendarId}`);
-      return true;
+      return await this.calendarSource.read({ startDate, endDate });
     } catch (error) {
-      console.error('\n❌ Error creating birthday event:', error);
-      if (error instanceof Error) {
-        console.error(`   Error: ${error.message}`);
-      }
+      console.error('Error getting birthdays:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete all birthdays in bulk mode
+   * @param startDate - Start date of the range
+   * @param endDate - End date of the range
+   * @returns Deletion result with counts
+   */
+  async deleteAllBirthdays(
+    startDate: Date,
+    endDate: Date
+  ): Promise<{ deletedCount: number; skippedCount: number; errorCount: number }> {
+    try {
+      return await this.calendarSource.deleteAll({ startDate, endDate });
+    } catch (error) {
+      console.error('Error deleting birthdays:', error);
       throw error;
     }
   }

@@ -1,5 +1,5 @@
-import { extractNameParts, sanitizeNames } from './name-helpers.js';
-import { createDate, createDateFromMonthName, parseDateString } from './date.js';
+import { extractNameParts, sanitizeNames, parseNameFromString } from './name-helpers.js';
+import { createDate, createDateFromMonthName, parseDateString } from './date-helpers.js';
 
 /**
  * Birthday record type
@@ -40,19 +40,11 @@ export function parseRowToBirthdays(row: string[]): BirthdayRecord[] {
 }
 
 /**
- * Parse and sanitize name parts from a string
- * Extracts first name and optional last name, then sanitizes them
- */
-function parseNameFromString(nameString: string): { firstName: string; lastName?: string } {
-  const { firstName: rawFirstName, lastName: rawLastName } = extractNameParts(nameString);
-  return sanitizeNames(rawFirstName, rawLastName);
-}
-
-/**
- * Parse ISO date format: "YYYY-MM-DD" or "MM-DD"
+ * Extract name and ISO date components from a combined string
+ * Parses formats like "John Doe 1990-05-15" or "John Doe 05-15"
  * Returns match result with name part and date components, or null if format doesn't match
  */
-function parseISODateFormat(input: string): { namePart: string; month: number; day: number; year?: number } | null {
+function extractNameAndISODateComponents(input: string): { namePart: string; month: number; day: number; year?: number } | null {
   const isoDateMatch = input.match(/^(.+?)\s+(\d{4}-)?(\d{1,2})-(\d{1,2})$/);
   
   if (!isoDateMatch) {
@@ -68,10 +60,11 @@ function parseISODateFormat(input: string): { namePart: string; month: number; d
 }
 
 /**
- * Parse month name date format: "Month DD, YYYY" or "Month DD"
+ * Extract name and month name date components from a combined string
+ * Parses formats like "John Doe May 15, 1990" or "John Doe May 15"
  * Returns match result with name part and date components, or null if format doesn't match
  */
-function parseMonthNameDateFormat(input: string): { namePart: string; monthName: string; day: number; year?: number } | null {
+function extractNameAndMonthNameDateComponents(input: string): { namePart: string; monthName: string; day: number; year?: number } | null {
   const dateMatch = input.match(/^(.+?)\s+([A-Za-z]+)\s+(\d{1,2})(?:,\s*(\d{4}))?$/);
   
   if (!dateMatch) {
@@ -91,7 +84,7 @@ function parseMonthNameDateFormat(input: string): { namePart: string; monthName:
  * Returns BirthdayRecord if successful, null otherwise
  */
 function tryParseISODateFormat(input: string): BirthdayRecord | null {
-  const matchResult = parseISODateFormat(input);
+  const matchResult = extractNameAndISODateComponents(input);
   
   if (!matchResult) {
     return null;
@@ -113,7 +106,7 @@ function tryParseISODateFormat(input: string): BirthdayRecord | null {
  * Returns BirthdayRecord if successful, null otherwise
  */
 function tryParseMonthNameDateFormat(input: string): BirthdayRecord | null {
-  const matchResult = parseMonthNameDateFormat(input);
+  const matchResult = extractNameAndMonthNameDateComponents(input);
   
   if (!matchResult) {
     return null;

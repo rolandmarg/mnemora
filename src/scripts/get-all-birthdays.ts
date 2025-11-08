@@ -1,6 +1,6 @@
 import { DataSourceFactory } from '../factories/data-source.factory.js';
 import { OutputChannelFactory } from '../factories/output-channel.factory.js';
-import { today, startOfYear, endOfYear, formatDateShort } from '../utils/date.js';
+import { today, startOfYear, endOfYear, formatDateShort } from '../utils/date-helpers.js';
 import { logger } from '../utils/logger.js';
 import type { BirthdayRecord } from '../utils/birthday-helpers.js';
 

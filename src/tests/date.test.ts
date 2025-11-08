@@ -17,7 +17,7 @@ import {
   getDateRange,
   isFirstDayOfMonth,
   fromDate,
-} from '../utils/date.js';
+} from '../utils/date-helpers.js';
 
 describe('date utilities', () => {
   describe('today', () => {

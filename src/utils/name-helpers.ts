@@ -106,6 +106,15 @@ export function extractNameParts(fullName: string): { firstName: string; lastNam
 }
 
 /**
+ * Parse and sanitize name parts from a string
+ * Extracts first name and optional last name, then sanitizes them
+ */
+export function parseNameFromString(nameString: string): { firstName: string; lastName?: string } {
+  const { firstName: rawFirstName, lastName: rawLastName } = extractNameParts(nameString);
+  return sanitizeNames(rawFirstName, rawLastName);
+}
+
+/**
  * Normalize whitespace in a string (collapse multiple spaces to single space)
  */
 export function normalizeWhitespace(str: string): string {

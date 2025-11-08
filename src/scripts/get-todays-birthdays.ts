@@ -1,5 +1,5 @@
 import birthdayService from '../services/birthday.js';
-import { extractNameFromEvent } from '../clients/google-calendar.client.js';
+import { getFullName } from '../utils/name-helpers.js';
 
 /**
  * Script to get today's birthdays
@@ -17,8 +17,8 @@ async function getTodaysBirthdays(): Promise<void> {
       console.log('No birthdays today!');
     } else {
       console.log(`🎉 Found ${birthdays.length} birthday(s) today:\n`);
-      birthdays.forEach(event => {
-        const name = extractNameFromEvent(event);
+      birthdays.forEach(record => {
+        const name = getFullName(record.firstName, record.lastName);
         console.log(`   🎂 ${name}`);
       });
     }

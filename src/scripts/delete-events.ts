@@ -1,8 +1,9 @@
 import { config } from '../config.js';
 import { createQuestionInterface, askConfirmation } from '../utils/cli-helpers.js';
-import calendarClient from '../clients/google-calendar.client.js';
+import birthdayService from '../services/birthday.js';
 import { displayDeletionSummary } from '../utils/event-helpers.js';
-import { parseDateFromString, today, startOfYear, endOfYear, formatDateRange } from '../utils/date.js';
+import { parseDateFromString, today, startOfYear, endOfYear, formatDateRange } from '../utils/date-helpers.js';
+import type { BirthdayRecord } from '../utils/birthday-helpers.js';
 
 /**
  * Script to delete events from Google Calendar
@@ -37,7 +38,9 @@ function parseCommandLineArgs(args: string[]): {
 }
 
 async function handleBulkDeletion(
-  events: Awaited<ReturnType<typeof calendarClient.fetchEvents>>
+  birthdays: BirthdayRecord[],
+  startDate: Date,
+  endDate: Date
 ): Promise<{ deletedCount: number; skippedCount: number; errorCount: number }> {
   console.log('\n═══════════════════════════════════════════════════════');
   console.log('⚠️  DELETE ALL MODE - Deleting all events without review');
@@ -45,7 +48,7 @@ async function handleBulkDeletion(
 
   const rl = createQuestionInterface();
   try {
-    const confirm = await askConfirmation(rl, `⚠️  WARNING: This will delete ALL ${events.length} event(s). Continue? (y/n): `);
+    const confirm = await askConfirmation(rl, `⚠️  WARNING: This will delete ALL ${birthdays.length} birthday event(s). Continue? (y/n): `);
     if (!confirm) {
       console.log('❌ Cancelled. No events deleted.');
       rl.close();
@@ -57,7 +60,7 @@ async function handleBulkDeletion(
     process.exit(1);
   }
 
-  return calendarClient.deleteAllEvents(events);
+  return birthdayService.deleteAllBirthdays(startDate, endDate);
 }
 
 
@@ -82,28 +85,27 @@ async function main(): Promise<void> {
     const finalStartDate = startDate ?? startOfYear(todayDate);
     const finalEndDate = endDate ?? endOfYear(todayDate);
     
-    console.log(`\nFetching events from ${formatDateRange(finalStartDate, finalEndDate)}...`);
-    const events = await calendarClient.fetchEvents({
-      startDate: finalStartDate,
-      endDate: finalEndDate,
-      maxResults: 2500,
-    });
+    console.log(`\nFetching birthdays from ${formatDateRange(finalStartDate, finalEndDate)}...`);
+    
+    // Get birthdays
+    const birthdays = await birthdayService.getBirthdays(finalStartDate, finalEndDate);
 
-    if (events.length === 0) {
-      console.log('✅ No events found in the specified date range.');
+    // Validate that we found birthdays
+    if (birthdays.length === 0) {
+      console.log('✅ No birthdays found in the specified date range.');
       process.exit(0);
     }
 
-    console.log(`\n📅 Found ${events.length} event(s)\n`);
+    console.log(`\n📅 Found ${birthdays.length} event(s) to delete\n`);
 
     if (!deleteAll) {
       console.error('❌ Interactive deletion is not supported. Use --all flag to delete all events.');
       process.exit(1);
     }
 
-    const result = await handleBulkDeletion(events);
+    const result = await handleBulkDeletion(birthdays, finalStartDate, finalEndDate);
 
-    displayDeletionSummary(result, events.length);
+    displayDeletionSummary(result, birthdays.length);
   } catch (error) {
     console.error('\n❌ Error:', error);
     if (error instanceof Error) {

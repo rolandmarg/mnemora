@@ -24,6 +24,12 @@ export interface WriteResult {
   errors: number;
 }
 
+export interface DeleteResult {
+  deletedCount: number;
+  skippedCount: number;
+  errorCount: number;
+}
+
 export interface DataSourceMetadata {
   name: string;
   type: string;
@@ -54,6 +60,22 @@ export interface IDataSource<T> {
    * @throws Error if source doesn't support writing
    */
   write?(data: T[], options?: WriteOptions): Promise<WriteResult>;
+
+  /**
+   * Delete a single item from the source (optional - not all sources support deletion)
+   * @param id - Identifier of the item to delete
+   * @returns Promise resolving to true if deleted, false otherwise
+   * @throws Error if source doesn't support deletion
+   */
+  delete?(id: string): Promise<boolean>;
+
+  /**
+   * Delete all items matching the given options (optional - not all sources support deletion)
+   * @param options - Options for filtering what to delete (e.g., date range)
+   * @returns Promise resolving to deletion result with counts
+   * @throws Error if source doesn't support deletion
+   */
+  deleteAll?(options: ReadOptions): Promise<DeleteResult>;
 
   /**
    * Check if the data source is available and properly configured

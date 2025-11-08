@@ -1,14 +1,7 @@
 import { google, type calendar_v3 } from 'googleapis';
 import { config } from '../config.js';
-import { startOfDay, endOfDay } from '../utils/date.js';
-import { 
-  isBirthdayEvent, 
-  extractNameFromEvent, 
-  eventNameMatches as eventNameMatchesHelper, 
-  formatDuplicateEvent as formatDuplicateEventHelper, 
-  type Event, 
-  type DeletionResult 
-} from '../utils/event-helpers.js';
+import { startOfDay, endOfDay } from '../utils/date-helpers.js';
+import { type Event, type DeletionResult } from '../utils/event-helpers.js';
 
 /**
  * Calendar client type
@@ -143,34 +136,6 @@ class GoogleCalendarClient {
 
 
   // ============================================================================
-  // UTILITY METHODS
-  // These methods don't interact with the calendar API directly
-  // ============================================================================
-
-  /**
-   * Check if event name matches birthday input
-   * Delegates to event-helpers utility function
-   */
-  eventNameMatches(
-    eventSummary: string,
-    firstName: string,
-    lastName?: string
-  ): boolean {
-    return eventNameMatchesHelper(eventSummary, firstName, lastName);
-  }
-
-  /**
-   * Format duplicate event for display
-   * Delegates to event-helpers utility function
-   */
-  formatDuplicateEvent(
-    event: Event,
-    index: number
-  ): string {
-    return formatDuplicateEventHelper(event, index);
-  }
-
-  // ============================================================================
   // READ-WRITE OPERATIONS
   // ============================================================================
 
@@ -255,9 +220,6 @@ class GoogleCalendarClient {
     return { id: response.data.id };
   }
 }
-
-// Re-export event helper functions for convenience
-export { isBirthdayEvent, extractNameFromEvent, eventNameMatchesHelper as eventNameMatches, formatDuplicateEventHelper as formatDuplicateEvent };
 
 const calendarClient = new GoogleCalendarClient();
 export default calendarClient;

@@ -5,7 +5,7 @@
  * Provides common functionality and enforces interface implementation
  */
 
-import type { IDataSource, ReadOptions, WriteOptions, WriteResult, DataSourceMetadata } from '../interfaces/data-source.interface.js';
+import type { IDataSource, ReadOptions, WriteOptions, WriteResult, DeleteResult, DataSourceMetadata } from '../interfaces/data-source.interface.js';
 import type { AppConfig } from '../config.js';
 
 /**
@@ -36,6 +36,24 @@ export abstract class BaseDataSource<T> implements IDataSource<T> {
    */
   async write(_data: T[], _options?: WriteOptions): Promise<WriteResult> {
     throw new Error(`Write operation not supported for ${this.getMetadata().type} data source`);
+  }
+
+  /**
+   * Delete a single item from the source (optional - not all sources support deletion)
+   * Default implementation throws error
+   * Override in subclasses that support deletion
+   */
+  async delete(_id: string): Promise<boolean> {
+    throw new Error(`Delete operation not supported for ${this.getMetadata().type} data source`);
+  }
+
+  /**
+   * Delete all items matching the given options (optional - not all sources support deletion)
+   * Default implementation throws error
+   * Override in subclasses that support deletion
+   */
+  async deleteAll(_options: ReadOptions): Promise<DeleteResult> {
+    throw new Error(`DeleteAll operation not supported for ${this.getMetadata().type} data source`);
   }
 
   /**

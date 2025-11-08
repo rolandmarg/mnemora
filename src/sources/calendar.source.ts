@@ -5,15 +5,17 @@
  * Converts Event to BirthdayRecord at the boundary
  */
 
-import calendarClient, { extractNameFromEvent, isBirthdayEvent } from '../clients/google-calendar.client.js';
-import birthdayService from '../services/birthday.js';
+import calendarClient from '../clients/google-calendar.client.js';
+import { extractNameFromEvent, isBirthdayEvent } from '../utils/event-helpers.js';
 import { extractNameParts } from '../utils/name-helpers.js';
-import { parseDateFromString } from '../utils/date.js';
+import { parseDateFromString, fromDate, formatDateISO } from '../utils/date-helpers.js';
+import { getFullName } from '../utils/name-helpers.js';
 import { BaseDataSource } from '../base/base-data-source.js';
 import type { BirthdayRecord } from '../utils/birthday-helpers.js';
-import type { ReadOptions, WriteOptions, WriteResult, DataSourceMetadata } from '../interfaces/data-source.interface.js';
+import type { ReadOptions, WriteOptions, WriteResult, DeleteResult, DataSourceMetadata } from '../interfaces/data-source.interface.js';
 import type { AppConfig } from '../config.js';
 import type { Event } from '../utils/event-helpers.js';
+import { config } from '../config.js';
 
 /**
  * Convert Event to BirthdayRecord
@@ -55,40 +57,108 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
   async read(options?: ReadOptions): Promise<BirthdayRecord[]> {
     const { startDate, endDate } = options ?? {};
 
-          let events: Event[];
-          
-          if (startDate && endDate) {
-            events = await calendarClient.fetchEvents({ startDate, endDate });
-          } else if (startDate) {
-            events = await calendarClient.fetchEvents({ startDate, endDate: startDate });
-          } else {
-            // Default: get today's events
-            const todayDate = new Date();
-            events = await calendarClient.fetchEvents({ startDate: todayDate, endDate: todayDate });
-          }
+    let events: Event[];
+    
+    if (startDate && endDate) {
+      events = await calendarClient.fetchEvents({ startDate, endDate });
+    } else if (startDate) {
+      events = await calendarClient.fetchEvents({ startDate, endDate: startDate });
+    } else {
+      // Default: get today's events
+      const todayDate = new Date();
+      events = await calendarClient.fetchEvents({ startDate: todayDate, endDate: todayDate });
+    }
 
-    // Filter for birthday events and convert to BirthdayRecord
-    return events
-      .filter(event => isBirthdayEvent(event))
+    // Filter for birthday events
+    const birthdayEvents = events.filter(event => isBirthdayEvent(event));
+    
+    // Convert to BirthdayRecord
+    return birthdayEvents
       .map(eventToBirthdayRecord)
       .filter((record): record is BirthdayRecord => record !== null);
   }
 
+  /**
+   * Check for duplicate birthday events
+   */
+  async checkForDuplicates(birthday: BirthdayRecord): Promise<BirthdayRecord[]> {
+    try {
+      const eventDate = fromDate(birthday.birthday);
+      const existingBirthdays = await this.read({
+        startDate: eventDate,
+        endDate: eventDate,
+      });
+      
+      // Filter for matching birthdays by name
+      return existingBirthdays.filter(existing => {
+        const firstNameMatch = existing.firstName.toLowerCase() === birthday.firstName.toLowerCase();
+        const lastNameMatch = (existing.lastName ?? '').toLowerCase() === (birthday.lastName ?? '').toLowerCase();
+        return firstNameMatch && lastNameMatch;
+      });
+    } catch (error) {
+      console.error('Error checking for duplicates:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Delete a single event from the calendar
+   */
+  async delete(id: string): Promise<boolean> {
+    return calendarClient.deleteEvent(id);
+  }
+
+  /**
+   * Delete all birthdays in bulk mode by date range
+   */
+  async deleteAll(options: ReadOptions): Promise<DeleteResult> {
+    const { startDate, endDate } = options;
+    
+    if (!startDate || !endDate) {
+      return { deletedCount: 0, skippedCount: 0, errorCount: 0 };
+    }
+    
+    // Fetch events with IDs for deletion
+    const events = await calendarClient.fetchEvents({ startDate, endDate });
+    const birthdayEvents = events.filter(event => isBirthdayEvent(event));
+    
+    // Delete all birthday events
+    return calendarClient.deleteAllEvents(birthdayEvents);
+  }
+
   async write(data: BirthdayRecord[], _options?: WriteOptions): Promise<WriteResult> {
     // Write each birthday record to the calendar
-    // birthdayService.addBirthday() handles duplicate checking internally
+    // Check for duplicates and skip them
     let added = 0;
     let skipped = 0;
     let errors = 0;
     
     for (const birthday of data) {
       try {
-        const wasAdded = await birthdayService.addBirthday(birthday);
-        if (wasAdded) {
-          added++;
-        } else {
+        const fullName = getFullName(birthday.firstName, birthday.lastName);
+        const duplicates = await this.checkForDuplicates(birthday);
+        
+        if (duplicates.length > 0) {
+          console.log(`⏭️  Skipping duplicate birthday for ${fullName}`);
           skipped++;
+          continue;
         }
+
+        const dateString = formatDateISO(fromDate(birthday.birthday));
+        const event: Event = {
+          summary: `${fullName}'s Birthday`,
+          description: `Birthday of ${fullName}${birthday.year ? ` (born ${birthday.year})` : ''}`,
+          start: { date: dateString, timeZone: 'UTC' },
+          end: { date: dateString, timeZone: 'UTC' },
+          recurrence: ['RRULE:FREQ=YEARLY;INTERVAL=1'],
+        };
+        
+        await calendarClient.insertEvent(event);
+        console.log(`\n✅ Birthday event created successfully!`);
+        console.log(`   Title: ${fullName}'s Birthday`);
+        console.log(`   Date: ${dateString}`);
+        console.log(`   Calendar: ${config.google.calendarId}`);
+        added++;
       } catch (error) {
         errors++;
         console.error(

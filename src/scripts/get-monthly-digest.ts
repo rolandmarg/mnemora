@@ -1,5 +1,5 @@
 import birthdayService from '../services/birthday.js';
-import { extractNameFromEvent } from '../clients/google-calendar.client.js';
+import { getFullName } from '../utils/name-helpers.js';
 
 /**
  * Script to get monthly digest of upcoming birthdays
@@ -15,8 +15,8 @@ async function getMonthlyDigest(): Promise<void> {
     
     if (todaysBirthdays.length > 0) {
       console.log('🎉 Today\'s birthdays:\n');
-      todaysBirthdays.forEach(event => {
-        const name = extractNameFromEvent(event);
+      todaysBirthdays.forEach(record => {
+        const name = getFullName(record.firstName, record.lastName);
         console.log(`   🎂 ${name}`);
       });
       console.log('');
