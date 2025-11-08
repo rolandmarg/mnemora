@@ -11,7 +11,7 @@ import { extractNameParts } from '../utils/name-helpers.js';
 import { parseDateFromString, fromDate, formatDateISO } from '../utils/date-helpers.js';
 import { getFullName } from '../utils/name-helpers.js';
 import { BaseDataSource } from '../base/base-data-source.js';
-import type { BirthdayRecord } from '../utils/birthday-helpers.js';
+import { getDateRangeForBirthdays, type BirthdayRecord } from '../utils/birthday-helpers.js';
 import type { ReadOptions, WriteOptions, WriteResult, DeleteResult, DataSourceMetadata } from '../interfaces/data-source.interface.js';
 import type { AppConfig } from '../config.js';
 import type { Event } from '../utils/event-helpers.js';
@@ -127,8 +127,22 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
   }
 
   async write(data: BirthdayRecord[], _options?: WriteOptions): Promise<WriteResult> {
-    // Write each birthday record to the calendar
-    // Check for duplicates and skip them
+    // Optimization: Batch fetch all existing birthdays for the date range upfront
+    // This reduces API calls from 2N (N for duplicate checks + N for inserts) to N+1
+    const getLookupKey = (b: BirthdayRecord) => 
+      `${formatDateISO(fromDate(b.birthday))}|${b.firstName.toLowerCase()}|${(b.lastName ?? '').toLowerCase()}`;
+    
+    const dateRange = getDateRangeForBirthdays(data);
+    const existingBirthdays = dateRange 
+      ? await this.read({ startDate: dateRange.minDate, endDate: dateRange.maxDate }).catch(() => [])
+      : [];
+    
+    const existingBirthdaysMap = existingBirthdays.reduce((map, b) => {
+      const key = getLookupKey(b);
+      (map[key] ??= []).push(b);
+      return map;
+    }, {} as Record<string, BirthdayRecord[]>);
+    
     let added = 0;
     let skipped = 0;
     let errors = 0;
@@ -136,35 +150,33 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
     for (const birthday of data) {
       try {
         const fullName = getFullName(birthday.firstName, birthday.lastName);
-        const duplicates = await this.checkForDuplicates(birthday);
+        const lookupKey = getLookupKey(birthday);
         
-        if (duplicates.length > 0) {
+        if (existingBirthdaysMap[lookupKey]?.length) {
           console.log(`⏭️  Skipping duplicate birthday for ${fullName}`);
           skipped++;
           continue;
         }
 
         const dateString = formatDateISO(fromDate(birthday.birthday));
-        const event: Event = {
+        await calendarClient.insertEvent({
           summary: `${fullName}'s Birthday`,
           description: `Birthday of ${fullName}${birthday.year ? ` (born ${birthday.year})` : ''}`,
           start: { date: dateString, timeZone: 'UTC' },
           end: { date: dateString, timeZone: 'UTC' },
           recurrence: ['RRULE:FREQ=YEARLY;INTERVAL=1'],
-        };
+        });
         
-        await calendarClient.insertEvent(event);
         console.log(`\n✅ Birthday event created successfully!`);
         console.log(`   Title: ${fullName}'s Birthday`);
         console.log(`   Date: ${dateString}`);
         console.log(`   Calendar: ${config.google.calendarId}`);
+        
+        existingBirthdaysMap[lookupKey] = [birthday]; // Cache to prevent duplicates in same batch
         added++;
       } catch (error) {
         errors++;
-        console.error(
-          `Error writing birthday for ${birthday.firstName} ${birthday.lastName ?? ''}`,
-          error
-        );
+        console.error(`Error writing birthday for ${birthday.firstName} ${birthday.lastName ?? ''}`, error);
       }
     }
     

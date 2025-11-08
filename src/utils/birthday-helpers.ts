@@ -157,3 +157,30 @@ export function parseInput(input: string): BirthdayRecord | null {
   return null;
 }
 
+/**
+ * Get the date range for a batch of birthdays
+ * Returns min and max dates, or null if no birthdays provided
+ * 
+ * @param birthdays - Array of birthday records
+ * @returns Object with minDate and maxDate, or null if empty array
+ */
+export function getDateRangeForBirthdays(birthdays: BirthdayRecord[]): { minDate: Date; maxDate: Date } | null {
+  if (birthdays.length === 0) {
+    return null;
+  }
+  
+  let minDate = birthdays[0].birthday;
+  let maxDate = birthdays[0].birthday;
+  
+  for (const birthday of birthdays) {
+    if (birthday.birthday < minDate) {
+      minDate = birthday.birthday;
+    }
+    if (birthday.birthday > maxDate) {
+      maxDate = birthday.birthday;
+    }
+  }
+  
+  return { minDate, maxDate };
+}
+
