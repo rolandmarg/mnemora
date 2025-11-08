@@ -87,25 +87,21 @@ class BirthdayService {
         };
       }
 
-      // Group birthdays by date
-      const birthdaysByDate = monthRecords.reduce<Record<string, string[]>>((acc, record) => {
+      // Sort records by birthday date first, then group by formatted date
+      const sortedRecords = [...monthRecords].sort((a, b) => 
+        a.birthday.getTime() - b.birthday.getTime()
+      );
+      
+      // Group sorted records by formatted date
+      const birthdaysByDate = sortedRecords.reduce<Record<string, string[]>>((acc, record) => {
         const dateKey = formatDateShort(record.birthday);
         const fullName = getFullName(record.firstName, record.lastName);
         (acc[dateKey] ??= []).push(fullName);
         return acc;
       }, {});
 
-      // Build message
-      const sortedDates = Object.keys(birthdaysByDate).sort((a, b) => {
-        try {
-          const dateA = new Date(`${a}, ${todayDate.getFullYear()}`);
-          const dateB = new Date(`${b}, ${todayDate.getFullYear()}`);
-          return dateA.getTime() - dateB.getTime();
-        } catch {
-          // If date parsing fails, maintain original order
-          return 0;
-        }
-      });
+      // Extract sorted dates (already sorted since records were sorted)
+      const sortedDates = Object.keys(birthdaysByDate);
 
       const monthlyDigest = `📅 Upcoming Birthdays in ${monthName}:\n\n${ 
         sortedDates.map(date => `🎂 ${date}: ${birthdaysByDate[date].join(', ')}`).join('\n')}`;

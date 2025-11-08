@@ -8,7 +8,7 @@
 import calendarClient from '../clients/google-calendar.client.js';
 import { extractNameFromEvent, isBirthdayEvent } from '../utils/event-helpers.js';
 import { extractNameParts } from '../utils/name-helpers.js';
-import { parseDateFromString, fromDate, formatDateISO } from '../utils/date-helpers.js';
+import { parseDateFromString, fromDate, formatDateISO, today } from '../utils/date-helpers.js';
 import { getFullName } from '../utils/name-helpers.js';
 import { BaseDataSource } from '../base/base-data-source.js';
 import { getDateRangeForBirthdays, type BirthdayRecord } from '../utils/birthday-helpers.js';
@@ -16,6 +16,7 @@ import type { ReadOptions, WriteOptions, WriteResult, DeleteResult, DataSourceMe
 import type { AppConfig } from '../config.js';
 import type { Event } from '../utils/event-helpers.js';
 import { config } from '../config.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * Convert Event to BirthdayRecord
@@ -65,7 +66,7 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
       events = await calendarClient.fetchEvents({ startDate, endDate: startDate });
     } else {
       // Default: get today's events
-      const todayDate = new Date();
+      const todayDate = today();
       events = await calendarClient.fetchEvents({ startDate: todayDate, endDate: todayDate });
     }
 
@@ -93,12 +94,12 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
       return existingBirthdays.filter(existing => {
         const firstNameMatch = existing.firstName.toLowerCase() === birthday.firstName.toLowerCase();
         const lastNameMatch = (existing.lastName ?? '').toLowerCase() === (birthday.lastName ?? '').toLowerCase();
-        return firstNameMatch && lastNameMatch;
-      });
-    } catch (error) {
-      console.error('Error checking for duplicates:', error);
-      return [];
-    }
+      return firstNameMatch && lastNameMatch;
+    });
+  } catch (error) {
+    logger.error('Error checking for duplicates', error);
+    return [];
+  }
   }
 
   /**

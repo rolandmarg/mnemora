@@ -73,7 +73,7 @@ async function getAllBirthdays(): Promise<void> {
     if (birthdayRecords.length === 0) {
       await ctx.outputChannel.send(`\n📅 No birthdays found for ${year}.\n`);
       ctx.log.info('Completed successfully - no birthdays found');
-      return process.exit(0);
+      process.exit(0);
     }
     
     // Step 4: Format and display birthdays
@@ -125,11 +125,10 @@ async function getAllBirthdays(): Promise<void> {
     
     await ctx.outputChannel.send('\n✅ Completed successfully!');
     ctx.log.info('Completed successfully');
+    process.exit(0);
   } catch (error) {
     ctx.log.error('Error getting all birthdays', error);
     process.exit(1);
-  } finally {
-    process.exit(0);
   }
 }
 

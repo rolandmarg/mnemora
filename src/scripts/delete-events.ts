@@ -106,14 +106,13 @@ async function main(): Promise<void> {
     const result = await handleBulkDeletion(birthdays, finalStartDate, finalEndDate);
 
     displayDeletionSummary(result, birthdays.length);
+    process.exit(0);
   } catch (error) {
     console.error('\n❌ Error:', error);
     if (error instanceof Error) {
       console.error(`Error: ${error.message}`);
     }
     process.exit(1);
-  } finally {
-    process.exit(0);
   }
 }
 
