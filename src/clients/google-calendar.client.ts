@@ -5,7 +5,7 @@ import { type Event, type DeletionResult } from '../utils/event-helpers.js';
 import { logger } from '../utils/logger.js';
 
 /**
- * Calendar client type (internal use only)
+ * Calendar client type
  */
 type CalendarClient = calendar_v3.Calendar;
 

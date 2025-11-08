@@ -15,7 +15,7 @@ export function createQuestionInterface(): readline.Interface {
 }
 
 /**
- * Ask a question and return the user's answer (internal use only)
+ * Ask a question and return the user's answer
  */
 async function askQuestion(rl: readline.Interface, question: string): Promise<string> {
   return new Promise((resolve) => {

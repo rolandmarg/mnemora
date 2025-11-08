@@ -48,7 +48,7 @@ export function getFullName(firstName: string, lastName?: string): string {
 /**
  * Extract first name from a full name string
  */
-export function extractFirstName(fullName: string): string {
+function extractFirstName(fullName: string): string {
   if (!fullName) {
     return '';
   }
@@ -59,7 +59,7 @@ export function extractFirstName(fullName: string): string {
 /**
  * Extract last name from a full name string
  */
-export function extractLastName(fullName: string): string {
+function extractLastName(fullName: string): string {
   if (!fullName) {
     return '';
   }
@@ -82,12 +82,4 @@ export function extractNameParts(fullName: string): { firstName: string; lastNam
   };
 }
 
-/**
- * Parse and sanitize name parts from a string
- * Extracts first name and optional last name, then sanitizes them
- */
-export function parseNameFromString(nameString: string): { firstName: string; lastName?: string } {
-  const { firstName: rawFirstName, lastName: rawLastName } = extractNameParts(nameString);
-  return sanitizeNames(rawFirstName, rawLastName);
-}
 

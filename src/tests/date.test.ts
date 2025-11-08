@@ -1,8 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   today,
-  createDate,
-  createDateFromMonthName,
   parseDateFromString,
   startOfDay,
   endOfDay,
@@ -23,69 +21,6 @@ describe('date utilities', () => {
     it('should return a Date object', () => {
       const result = today();
       expect(result).toBeInstanceOf(Date);
-    });
-  });
-
-  describe('createDate', () => {
-    it('should create a date with year, month, and day', () => {
-      const date = createDate(5, 15, 2024);
-      expect(date.getFullYear()).toBe(2024);
-      expect(date.getMonth()).toBe(4); // May is month 4 (0-indexed)
-      expect(date.getDate()).toBe(15);
-    });
-
-    it('should create a date without year (uses current year)', () => {
-      const now = new Date();
-      const date = createDate(5, 15);
-      expect(date.getMonth()).toBe(4); // May is month 4
-      expect(date.getDate()).toBe(15);
-      expect(date.getFullYear()).toBe(now.getFullYear());
-    });
-
-    it('should handle month 12 (December)', () => {
-      const date = createDate(12, 31, 2024);
-      expect(date.getMonth()).toBe(11); // December is month 11
-      expect(date.getDate()).toBe(31);
-    });
-  });
-
-  describe('createDateFromMonthName', () => {
-    it('should create a date from month name with year', () => {
-      const date = createDateFromMonthName('May', 15, 2024);
-      expect(date).not.toBeNull();
-      expect(date?.getFullYear()).toBe(2024);
-      expect(date?.getMonth()).toBe(4); // May is month 4
-      expect(date?.getDate()).toBe(15);
-    });
-
-    it('should create a date from month name without year', () => {
-      const now = new Date();
-      const date = createDateFromMonthName('June', 1);
-      expect(date).not.toBeNull();
-      expect(date?.getMonth()).toBe(5); // June is month 5
-      expect(date?.getFullYear()).toBe(now.getFullYear());
-    });
-
-    it('should handle abbreviated month names', () => {
-      const date = createDateFromMonthName('Jan', 1, 2024);
-      expect(date).not.toBeNull();
-      expect(date?.getMonth()).toBe(0); // January is month 0
-    });
-
-    it('should return null for invalid month name', () => {
-      const date = createDateFromMonthName('InvalidMonth', 1, 2024);
-      expect(date).toBeNull();
-    });
-
-    it('should be case-insensitive', () => {
-      const date1 = createDateFromMonthName('JANUARY', 1, 2024);
-      const date2 = createDateFromMonthName('january', 1, 2024);
-      const date3 = createDateFromMonthName('January', 1, 2024);
-      expect(date1).not.toBeNull();
-      expect(date2).not.toBeNull();
-      expect(date3).not.toBeNull();
-      expect(date1?.getTime()).toBe(date2?.getTime());
-      expect(date1?.getTime()).toBe(date3?.getTime());
     });
   });
 

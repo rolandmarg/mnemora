@@ -34,7 +34,7 @@ export function today(): Date {
  * If year is not provided, uses current year
  * Date is created in the configured timezone
  */
-export function createDate(month: number, day: number, year?: number): Date {
+function createDate(month: number, day: number, year?: number): Date {
   const tz = getTimezone();
   const currentYear = year ?? today().getFullYear();
   
@@ -47,8 +47,9 @@ export function createDate(month: number, day: number, year?: number): Date {
 
 /**
  * Create a date from month name, day, and optionally year
+
  */
-export function createDateFromMonthName(monthName: string, day: number, year?: number): Date | null {
+function createDateFromMonthName(monthName: string, day: number, year?: number): Date | null {
   const monthNames = ['january', 'february', 'march', 'april', 'may', 'june',
                       'july', 'august', 'september', 'october', 'november', 'december'];
   const monthIndex = monthNames.findIndex(m => m.startsWith(monthName.toLowerCase()));

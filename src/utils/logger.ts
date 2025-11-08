@@ -8,7 +8,7 @@
 import pino from 'pino';
 
 /**
- * Log levels (internal use only)
+ * Log levels
  */
 enum LogLevel {
   TRACE = 10,
@@ -88,7 +88,7 @@ class PinoLogger implements Logger {
 }
 
 /**
- * Create a logger instance (internal use only)
+ * Create a logger instance
  * 
  * @param options - Logger configuration options
  * @returns Logger instance

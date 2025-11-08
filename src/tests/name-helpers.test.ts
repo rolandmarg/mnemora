@@ -3,8 +3,6 @@ import {
   sanitizeName,
   sanitizeNames,
   getFullName,
-  extractFirstName,
-  extractLastName,
   extractNameParts,
 } from '../utils/name-helpers.js';
 
@@ -114,44 +112,6 @@ describe('name-helpers', () => {
       expect(getFullName('', '')).toBe('');
       expect(getFullName('John', '')).toBe('John');
       expect(getFullName('', 'Doe')).toBe(' Doe');
-    });
-  });
-
-  describe('extractFirstName', () => {
-    it('should extract first name from full name', () => {
-      expect(extractFirstName('John Doe')).toBe('John');
-      expect(extractFirstName('John Middle Doe')).toBe('John');
-    });
-
-    it('should handle single name', () => {
-      expect(extractFirstName('John')).toBe('John');
-    });
-
-    it('should handle empty string', () => {
-      expect(extractFirstName('')).toBe('');
-    });
-
-    it('should handle whitespace', () => {
-      expect(extractFirstName('  John  Doe  ')).toBe('John');
-    });
-  });
-
-  describe('extractLastName', () => {
-    it('should extract last name from full name', () => {
-      expect(extractLastName('John Doe')).toBe('Doe');
-      expect(extractLastName('John Middle Doe')).toBe('Middle Doe');
-    });
-
-    it('should return empty string for single name', () => {
-      expect(extractLastName('John')).toBe('');
-    });
-
-    it('should handle empty string', () => {
-      expect(extractLastName('')).toBe('');
-    });
-
-    it('should handle whitespace', () => {
-      expect(extractLastName('  John  Doe  ')).toBe('Doe');
     });
   });
 
