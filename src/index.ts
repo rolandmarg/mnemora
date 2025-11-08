@@ -1,5 +1,5 @@
 import birthdayService from './services/birthday.js';
-import { extractNameFromEvent } from './utils/name/name-helpers.js';
+import { extractNameFromEvent } from './clients/google-calendar.client.js';
 
 /**
  * Manual execution mode - runs once and exits

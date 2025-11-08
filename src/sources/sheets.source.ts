@@ -4,26 +4,25 @@
  * Adapter that wraps the existing SheetsService to implement IDataSource
  */
 
-import sheetsService from '../../services/sheets.js';
-import type { BirthdayInput } from '../../utils/name/birthday-parser.js';
-import type { IDataSource, ReadOptions, DataSourceMetadata } from '../interfaces/data-source.interface.js';
-import type { AppConfig } from '../../config.js';
+import sheetsClient from '../clients/google-sheets.client.js';
+import { BaseDataSource } from '../base/base-data-source.js';
+import type { BirthdayRecord } from '../utils/name/birthday-parser.js';
+import type { ReadOptions, DataSourceMetadata } from '../interfaces/data-source.interface.js';
+import type { AppConfig } from '../config.js';
 
 /**
  * Sheets data source implementation
  * 
  * Reads birthday data from Google Sheets
  */
-export class SheetsDataSource implements IDataSource<BirthdayInput> {
-  private readonly config: AppConfig;
-
+export class SheetsDataSource extends BaseDataSource<BirthdayRecord> {
   constructor(config: AppConfig) {
-    this.config = config;
+    super(config);
   }
 
-  async read(options?: ReadOptions): Promise<BirthdayInput[]> {
+  async read(options?: ReadOptions): Promise<BirthdayRecord[]> {
     const skipHeaderRow = (options?.skipHeaderRow as boolean) ?? true;
-    return sheetsService.readBirthdays(skipHeaderRow);
+    return sheetsClient.readBirthdays(skipHeaderRow);
   }
 
   isAvailable(): boolean {

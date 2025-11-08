@@ -1,7 +1,7 @@
 /**
  * Data Source Interface
  * 
- * Defines the contract for all data sources (Calendar, Sheets, CSV, Contacts, etc.)
+ * Defines the contract for all data sources (Calendar, Sheets, etc.)
  * Any new data source must implement this interface.
  */
 
@@ -16,6 +16,12 @@ export interface WriteOptions {
   overwrite?: boolean;
   append?: boolean;
   [key: string]: unknown;
+}
+
+export interface WriteResult {
+  added: number;
+  skipped: number;
+  errors: number;
 }
 
 export interface DataSourceMetadata {
@@ -44,10 +50,10 @@ export interface IDataSource<T> {
    * Write data to the source (optional - not all sources support writing)
    * @param data - Array of data items to write
    * @param options - Optional parameters for writing
-   * @returns Promise resolving when write is complete
+   * @returns Promise resolving to write result with counts
    * @throws Error if source doesn't support writing
    */
-  write?(data: T[], options?: WriteOptions): Promise<void>;
+  write?(data: T[], options?: WriteOptions): Promise<WriteResult>;
 
   /**
    * Check if the data source is available and properly configured

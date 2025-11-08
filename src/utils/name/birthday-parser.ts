@@ -5,7 +5,7 @@ import { createDate, createDateFromMonthName } from '../date.js';
  * Birthday input parser utilities
  */
 
-export interface BirthdayInput {
+export interface BirthdayRecord {
   firstName: string;
   lastName?: string;
   birthday: Date;
@@ -61,9 +61,9 @@ function parseMonthNameDateFormat(input: string): { namePart: string; monthName:
 
 /**
  * Try to parse input as ISO date format (YYYY-MM-DD or MM-DD)
- * Returns BirthdayInput if successful, null otherwise
+ * Returns BirthdayRecord if successful, null otherwise
  */
-function tryParseISODateFormat(input: string): BirthdayInput | null {
+function tryParseISODateFormat(input: string): BirthdayRecord | null {
   const matchResult = parseISODateFormat(input);
   
   if (!matchResult) {
@@ -83,9 +83,9 @@ function tryParseISODateFormat(input: string): BirthdayInput | null {
 
 /**
  * Try to parse input as month name date format (Month DD, YYYY or Month DD)
- * Returns BirthdayInput if successful, null otherwise
+ * Returns BirthdayRecord if successful, null otherwise
  */
-function tryParseMonthNameDateFormat(input: string): BirthdayInput | null {
+function tryParseMonthNameDateFormat(input: string): BirthdayRecord | null {
   const matchResult = parseMonthNameDateFormat(input);
   
   if (!matchResult) {
@@ -108,7 +108,7 @@ function tryParseMonthNameDateFormat(input: string): BirthdayInput | null {
 }
 
 /**
- * Parse birthday input string into structured BirthdayInput
+ * Parse birthday input string into structured BirthdayRecord
  * 
  * Supports multiple formats:
  * - "John Doe 1990-05-15" (ISO with year)
@@ -117,9 +117,9 @@ function tryParseMonthNameDateFormat(input: string): BirthdayInput | null {
  * - "John Doe May 15" (Month name without year)
  * 
  * @param input - Input string containing name and date
- * @returns BirthdayInput if parsing succeeds, null otherwise
+ * @returns BirthdayRecord if parsing succeeds, null otherwise
  */
-export function parseInput(input: string): BirthdayInput | null {
+export function parseInput(input: string): BirthdayRecord | null {
   const trimmed = input.trim();
   
   // Try ISO date format first (YYYY-MM-DD or MM-DD)

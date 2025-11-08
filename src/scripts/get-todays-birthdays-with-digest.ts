@@ -1,5 +1,5 @@
 import birthdayService from '../services/birthday.js';
-import { extractNameFromEvent } from '../utils/name/name-helpers.js';
+import { extractNameFromEvent } from '../clients/google-calendar.client.js';
 
 /**
  * Script to get today's birthdays and optionally monthly digest if it's first day of month

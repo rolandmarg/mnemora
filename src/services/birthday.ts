@@ -1,10 +1,9 @@
 import { config } from '../config.js';
-import calendarService from './calendar.js';
-import { createReadWriteCalendarClient } from '../utils/event/calendar-auth.js';
-import { formatDateISO, fromDate, today, formatDateShort, formatDateMonthYear, parseDateFromString, startOfDay, isFirstDayOfMonth } from '../utils/date.js';
-import { getFullName, extractNameFromEvent } from '../utils/name/name-helpers.js';
-import type { BirthdayInput } from '../utils/name/birthday-parser.js';
-import type { CalendarEvent, CalendarClient } from '../types/index.js';
+import calendarClient, { isBirthdayEvent, extractNameFromEvent } from '../clients/google-calendar.client.js';
+import { formatDateISO, fromDate, today, formatDateShort, formatDateMonthYear, parseDateFromString, startOfDay, isFirstDayOfMonth, startOfMonth, endOfMonth } from '../utils/date.js';
+import { getFullName } from '../utils/name/name-helpers.js';
+import type { BirthdayRecord } from '../utils/name/birthday-parser.js';
+import type { Event } from '../utils/event-helpers.js';
 
 interface BirthdaysByDate {
   [dateKey: string]: string[];
@@ -14,41 +13,16 @@ interface BirthdaysByDate {
  * Birthday service for managing birthday events
  */
 class BirthdayService {
-  /**
-   * Check if an event is a birthday
-   */
-  isBirthdayEvent(event: CalendarEvent): boolean {
-    const summary = (event.summary ?? '').toLowerCase();
-    const description = (event.description ?? '').toLowerCase();
-    const hasBirthdayKeyword = summary.includes('birthday') || description.includes('birthday');
-    
-    if (hasBirthdayKeyword) {
-      return true;
-    }
-    
-    const hasYearlyRecurrence = event.recurrence?.some(r => r.includes('YEARLY') || r.includes('FREQ=YEARLY'));
-    if (!hasYearlyRecurrence) {
-      return false;
-    }
-    
-    const isAllDay = event.start?.date && !event.start?.dateTime;
-    if (isAllDay) {
-      return true;
-    }
-    
-    const excludedKeywords = ['meeting', 'reminder', 'appointment'];
-    return summary.length > 0 && !excludedKeywords.some(keyword => summary.includes(keyword));
-  }
 
   /**
    * Get birthdays for today
    * @returns Array of birthday events for today
    */
-  async getTodaysBirthdays(): Promise<CalendarEvent[]> {
+  async getTodaysBirthdays(): Promise<Event[]> {
     try {
       const todayDate = today();
-      const birthdays = (await calendarService.getEventsForDate(todayDate))
-        .filter(event => this.isBirthdayEvent(event));
+      const birthdays = (await calendarClient.fetchEvents({ startDate: todayDate, endDate: todayDate }))
+        .filter(event => isBirthdayEvent(event));
       
       return birthdays;
     } catch (error) {
@@ -65,7 +39,7 @@ class BirthdayService {
    * @returns Object with today's birthdays and optional monthly digest
    */
   async getTodaysBirthdaysWithOptionalDigest(): Promise<{
-    todaysBirthdays: CalendarEvent[];
+    todaysBirthdays: Event[];
     monthlyDigest?: string;
   }> {
     const todayDate = today();
@@ -92,14 +66,16 @@ class BirthdayService {
    * @returns Object with today's birthdays and monthly digest message
    */
   async getTodaysBirthdaysWithMonthlyDigest(): Promise<{
-    todaysBirthdays: CalendarEvent[];
+    todaysBirthdays: Event[];
     monthlyDigest: string;
   }> {
     try {
       const todayDate = today();
       // Fetch entire month once
-      const monthBirthdays = (await calendarService.getEventsForMonth(todayDate))
-        .filter(event => this.isBirthdayEvent(event));
+      const monthStart = startOfMonth(todayDate);
+      const monthEnd = endOfMonth(todayDate);
+      const monthBirthdays = (await calendarClient.fetchEvents({ startDate: monthStart, endDate: monthEnd }))
+        .filter(event => isBirthdayEvent(event));
       
       // Filter for today's birthdays from the month data
       const todayStart = startOfDay(todayDate);
@@ -176,13 +152,10 @@ class BirthdayService {
   /**
    * Check for duplicate birthday events
    */
-  async checkForDuplicates(
-    calendar: CalendarClient,
-    birthday: BirthdayInput
-  ): Promise<CalendarEvent[]> {
+  async checkForDuplicates(birthday: BirthdayRecord): Promise<Event[]> {
     try {
       const eventDate = fromDate(birthday.birthday);
-      const events = await calendarService.fetchEventsWithClient(calendar, {
+      const events = await calendarClient.fetchEvents({
         startDate: eventDate,
         endDate: eventDate,
       });
@@ -190,7 +163,7 @@ class BirthdayService {
       return events.filter(event => {
         const summary = (event.summary ?? '').toLowerCase();
         return summary.includes('birthday') && 
-               calendarService.eventNameMatches(event.summary ?? '', birthday.firstName, birthday.lastName);
+               calendarClient.eventNameMatches(event.summary ?? '', birthday.firstName, birthday.lastName);
       });
     } catch (error) {
       console.error('Error checking for duplicates:', error);
@@ -201,49 +174,46 @@ class BirthdayService {
   /**
    * Display duplicate events to the user
    */
-  displayDuplicates(duplicates: CalendarEvent[], fullName: string, date: Date): void {
+  displayDuplicates(duplicates: Event[], fullName: string, date: Date): void {
     console.log('\n⚠️  Potential duplicate(s) found:');
-    duplicates.forEach((dup, index) => console.log(calendarService.formatDuplicateEvent(dup, index + 1)));
+    duplicates.forEach((dup, index) => console.log(calendarClient.formatDuplicateEvent(dup, index + 1)));
     console.log(`\n   Trying to add: ${fullName}'s Birthday`);
     console.log(`   Date: ${date.toLocaleDateString()}\n`);
   }
 
   /**
    * Add a birthday event to the calendar
+   * Always checks for duplicates and skips them if found
+   * @returns true if birthday was added, false if skipped due to duplicate
    */
-  async addBirthday(birthday: BirthdayInput, skipDuplicateCheck: boolean = false): Promise<void> {
-    const calendar = createReadWriteCalendarClient();
+  async addBirthday(birthday: BirthdayRecord): Promise<boolean> {
     const fullName = getFullName(birthday.firstName, birthday.lastName);
     
-    if (!skipDuplicateCheck) {
-      const duplicates = await this.checkForDuplicates(calendar, birthday);
-      if (duplicates.length > 0) {
-        this.displayDuplicates(duplicates, fullName, fromDate(birthday.birthday));
-        throw new Error('Duplicate birthday found');
-      }
+    const duplicates = await this.checkForDuplicates(birthday);
+    if (duplicates.length > 0) {
+      this.displayDuplicates(duplicates, fullName, fromDate(birthday.birthday));
+      console.log(`⏭️  Skipping duplicate birthday for ${fullName}`);
+      return false;
     }
 
     const dateString = formatDateISO(fromDate(birthday.birthday));
-    const event: CalendarEvent = {
+    const event: Event = {
       summary: `${fullName}'s Birthday`,
       description: `Birthday of ${fullName}${birthday.year ? ` (born ${birthday.year})` : ''}`,
       start: { date: dateString, timeZone: 'UTC' },
       end: { date: dateString, timeZone: 'UTC' },
       recurrence: ['RRULE:FREQ=YEARLY;INTERVAL=1'],
-      reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: 1440 }] },
     };
 
     try {
-      const response = await calendar.events.insert({
-        calendarId: config.google.calendarId,
-        requestBody: event,
-      });
+      const response = await calendarClient.insertEvent(event);
 
       console.log('\n✅ Birthday event created successfully!');
       console.log(`   Title: ${event.summary}`);
       console.log(`   Date: ${dateString}`);
-      console.log(`   Event ID: ${response.data.id}`);
+      console.log(`   Event ID: ${response.id}`);
       console.log(`   Calendar: ${config.google.calendarId}`);
+      return true;
     } catch (error) {
       console.error('\n❌ Error creating birthday event:', error);
       if (error instanceof Error) {

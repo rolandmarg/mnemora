@@ -1,11 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import type { CalendarEvent } from '../../types/index.js';
-import { formatEvent, formatEventForDuplicate } from '../event/event-formatter.js';
+import { formatEvent, formatEventForDuplicate, type Event } from '../event-helpers.js';
 
 describe('event-formatter', () => {
   describe('formatEvent', () => {
     it('should format event with all fields', () => {
-      const event: CalendarEvent = {
+      const event: Event = {
         summary: 'Test Event',
         start: { date: '2024-05-15' },
         location: 'Test Location',
@@ -22,7 +21,7 @@ describe('event-formatter', () => {
     });
 
     it('should format event with minimal fields', () => {
-      const event: CalendarEvent = {
+      const event: Event = {
         summary: 'Test Event',
         start: { date: '2024-05-15' },
       };
@@ -33,7 +32,7 @@ describe('event-formatter', () => {
     });
 
     it('should handle event with no title', () => {
-      const event: CalendarEvent = {
+      const event: Event = {
         start: { date: '2024-05-15' },
       };
 
@@ -43,7 +42,7 @@ describe('event-formatter', () => {
 
     it('should truncate long descriptions', () => {
       const longDescription = 'a'.repeat(150);
-      const event: CalendarEvent = {
+      const event: Event = {
         summary: 'Test Event',
         start: { date: '2024-05-15' },
         description: longDescription,
@@ -55,7 +54,7 @@ describe('event-formatter', () => {
     });
 
     it('should handle event with dateTime', () => {
-      const event: CalendarEvent = {
+      const event: Event = {
         summary: 'Test Event',
         start: { dateTime: '2024-05-15T10:00:00Z' },
       };
@@ -67,7 +66,7 @@ describe('event-formatter', () => {
 
   describe('formatEventForDuplicate', () => {
     it('should format event for duplicate checking', () => {
-      const event: CalendarEvent = {
+      const event: Event = {
         summary: 'Test Event',
         start: { date: '2024-05-15' },
       };
@@ -78,7 +77,7 @@ describe('event-formatter', () => {
     });
 
     it('should handle event with no title', () => {
-      const event: CalendarEvent = {
+      const event: Event = {
         start: { date: '2024-05-15' },
       };
 
@@ -87,7 +86,7 @@ describe('event-formatter', () => {
     });
 
     it('should handle event with dateTime', () => {
-      const event: CalendarEvent = {
+      const event: Event = {
         summary: 'Test Event',
         start: { dateTime: '2024-05-15T10:00:00Z' },
       };

@@ -4,14 +4,15 @@
  * Simple output channel that logs messages to the console
  */
 
-import type { IOutputChannel, SendOptions, SendResult, OutputChannelMetadata } from '../interfaces/output-channel.interface.js';
+import { BaseOutputChannel } from '../base/base-output-channel.js';
+import type { SendOptions, SendResult, OutputChannelMetadata } from '../interfaces/output-channel.interface.js';
 
 /**
  * Console output channel implementation
  * 
  * Logs messages to stdout/stderr
  */
-export class ConsoleOutputChannel implements IOutputChannel {
+export class ConsoleOutputChannel extends BaseOutputChannel {
   async send(message: string, _options?: SendOptions): Promise<SendResult> {
     try {
       console.log(message);
@@ -26,12 +27,6 @@ export class ConsoleOutputChannel implements IOutputChannel {
         error: error instanceof Error ? error : new Error(String(error)),
       };
     }
-  }
-
-  async sendToMultiple(recipients: string[], message: string, options?: SendOptions): Promise<SendResult[]> {
-    // Console doesn't have recipients, so we just log once
-    const result = await this.send(message, options);
-    return recipients.map(() => result);
   }
 
   isAvailable(): boolean {

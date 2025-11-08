@@ -7,16 +7,18 @@
  * the existing Twilio WhatsApp service when it's created.
  */
 
-import type { IOutputChannel, SendOptions, SendResult, OutputChannelMetadata } from '../interfaces/output-channel.interface.js';
-import type { AppConfig } from '../../config.js';
+import { BaseOutputChannel } from '../base/base-output-channel.js';
+import type { SendOptions, SendResult, OutputChannelMetadata } from '../interfaces/output-channel.interface.js';
+import type { AppConfig } from '../config.js';
 
 /**
  * WhatsApp output channel implementation using Twilio
  * 
  * Sends WhatsApp messages via Twilio
  */
-export class WhatsAppOutputChannel implements IOutputChannel {
+export class WhatsAppOutputChannel extends BaseOutputChannel {
   constructor(_config?: AppConfig) {
+    super();
     // TODO: Use config when WhatsApp implementation is added
   }
 
@@ -42,17 +44,6 @@ export class WhatsAppOutputChannel implements IOutputChannel {
       recipient,
       metadata: { timestamp: new Date().toISOString() },
     };
-  }
-
-  async sendToMultiple(recipients: string[], message: string, options?: SendOptions): Promise<SendResult[]> {
-    const results: SendResult[] = [];
-    
-    for (const recipient of recipients) {
-      const result = await this.send(message, { ...options, recipients: [recipient] });
-      results.push(result);
-    }
-    
-    return results;
   }
 
   isAvailable(): boolean {

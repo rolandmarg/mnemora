@@ -6,15 +6,17 @@
  * Note: This is a placeholder. Implement when email functionality is needed.
  */
 
-import type { IOutputChannel, SendOptions, SendResult, OutputChannelMetadata } from '../interfaces/output-channel.interface.js';
+import { BaseOutputChannel } from '../base/base-output-channel.js';
+import type { SendOptions, SendResult, OutputChannelMetadata } from '../interfaces/output-channel.interface.js';
 
 /**
  * Email output channel implementation
  * 
  * Sends email messages via SMTP or email service (SendGrid, etc.)
  */
-export class EmailOutputChannel implements IOutputChannel {
+export class EmailOutputChannel extends BaseOutputChannel {
   constructor(_config?: Record<string, unknown>) {
+    super();
     // Config will be used when email implementation is added
   }
 
@@ -40,17 +42,6 @@ export class EmailOutputChannel implements IOutputChannel {
       recipient,
       metadata: { timestamp: new Date().toISOString(), subject },
     };
-  }
-
-  async sendToMultiple(recipients: string[], message: string, options?: SendOptions): Promise<SendResult[]> {
-    const results: SendResult[] = [];
-    
-    for (const recipient of recipients) {
-      const result = await this.send(message, { ...options, recipients: [recipient] });
-      results.push(result);
-    }
-    
-    return results;
   }
 
   isAvailable(): boolean {
