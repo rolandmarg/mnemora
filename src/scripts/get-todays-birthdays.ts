@@ -1,5 +1,6 @@
 import birthdayService from '../services/birthday.js';
 import { getFullName } from '../utils/name-helpers.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * Script to get today's birthdays
@@ -7,25 +8,21 @@ import { getFullName } from '../utils/name-helpers.js';
 
 async function getTodaysBirthdays(): Promise<void> {
   try {
-    console.log('\n═══════════════════════════════════════════════════════');
-    console.log('Getting today\'s birthdays...');
-    console.log('═══════════════════════════════════════════════════════\n');
+    logger.info('Getting today\'s birthdays...');
     
     const birthdays = await birthdayService.getTodaysBirthdays();
     
     if (birthdays.length === 0) {
-      console.log('No birthdays today!');
+      logger.info('No birthdays today!');
     } else {
-      console.log(`🎉 Found ${birthdays.length} birthday(s) today:\n`);
-      birthdays.forEach(record => {
-        const name = getFullName(record.firstName, record.lastName);
-        console.log(`   🎂 ${name}`);
+      logger.info(`Found ${birthdays.length} birthday(s) today`, {
+        birthdays: birthdays.map(record => getFullName(record.firstName, record.lastName)),
       });
     }
     
-    console.log('\n✅ Completed successfully!');
+    logger.info('Completed successfully!');
   } catch (error) {
-    console.error('\n❌ Error getting today\'s birthdays:', error);
+    logger.error('Error getting today\'s birthdays', error);
     process.exit(1);
   } finally {
     process.exit(0);

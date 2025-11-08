@@ -1,5 +1,6 @@
 import birthdayService from './services/birthday.js';
 import { getFullName } from './utils/name-helpers.js';
+import { logger } from './utils/logger.js';
 
 /**
  * Manual execution mode - runs once and exits
@@ -8,30 +9,26 @@ import { getFullName } from './utils/name-helpers.js';
 
 async function runBirthdayCheck(): Promise<void> {
   try {
-    console.log('\n═══════════════════════════════════════════════════════');
-    console.log('Running birthday check...');
-    console.log('═══════════════════════════════════════════════════════\n');
+    logger.info('Running birthday check...');
     
     const { todaysBirthdays, monthlyDigest } = await birthdayService.getTodaysBirthdaysWithOptionalDigest();
     
     if (monthlyDigest) {
-      console.log('📅 First day of month detected - generating monthly digest');
-      console.log(monthlyDigest);
+      logger.info('First day of month detected - generating monthly digest');
+      logger.info('Monthly digest', { monthlyDigest });
     }
     
     if (todaysBirthdays.length === 0) {
-      console.log(monthlyDigest ? '\nNo birthdays today!' : 'No birthdays today!');
+      logger.info('No birthdays today!');
     } else {
-      console.log(`\n🎉 Found ${todaysBirthdays.length} birthday(s) today:\n`);
-      todaysBirthdays.forEach(record => {
-        const name = getFullName(record.firstName, record.lastName);
-        console.log(`   🎂 ${name}`);
+      logger.info(`Found ${todaysBirthdays.length} birthday(s) today`, {
+        birthdays: todaysBirthdays.map(record => getFullName(record.firstName, record.lastName)),
       });
     }
     
-    console.log('\n✅ Birthday check completed successfully!');
+    logger.info('Birthday check completed successfully!');
   } catch (error) {
-    console.error('\n❌ Error in birthday check:', error);
+    logger.error('Error in birthday check', error);
     process.exit(1);
   } finally {
     // Exit after completion

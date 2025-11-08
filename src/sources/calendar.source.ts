@@ -154,7 +154,7 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
         const lookupKey = getLookupKey(birthday);
         
         if (existingBirthdaysMap[lookupKey]?.length) {
-          console.log(`⏭️  Skipping duplicate birthday for ${fullName}`);
+          logger.info(`Skipping duplicate birthday for ${fullName}`);
           skipped++;
           continue;
         }
@@ -168,10 +168,11 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
           recurrence: ['RRULE:FREQ=YEARLY;INTERVAL=1'],
         });
         
-        console.log(`\n✅ Birthday event created successfully!`);
-        console.log(`   Title: ${fullName}'s Birthday`);
-        console.log(`   Date: ${dateString}`);
-        console.log(`   Calendar: ${config.google.calendarId}`);
+        logger.info(`Birthday event created successfully`, {
+          title: `${fullName}'s Birthday`,
+          date: dateString,
+          calendar: config.google.calendarId,
+        });
         
         existingBirthdaysMap[lookupKey] = [birthday]; // Cache to prevent duplicates in same batch
         added++;

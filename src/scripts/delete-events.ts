@@ -3,6 +3,7 @@ import { createQuestionInterface, askConfirmation } from '../utils/cli-helpers.j
 import birthdayService from '../services/birthday.js';
 import { displayDeletionSummary } from '../utils/event-helpers.js';
 import { parseDateFromString, today, startOfYear, endOfYear, formatDateRange } from '../utils/date-helpers.js';
+import { logger } from '../utils/logger.js';
 import type { BirthdayRecord } from '../utils/birthday-helpers.js';
 
 /**
@@ -28,7 +29,7 @@ function parseCommandLineArgs(args: string[]): {
         startDate = parseDateFromString(args[dateRangeIndex + 1]);
         endDate = parseDateFromString(args[dateRangeIndex + 2]);
       } catch (error) {
-        console.error('❌ Error parsing date range:', error instanceof Error ? error.message : error);
+        logger.error('Error parsing date range', error);
         process.exit(1);
       }
     }
@@ -42,15 +43,13 @@ async function handleBulkDeletion(
   startDate: Date,
   endDate: Date
 ): Promise<{ deletedCount: number; skippedCount: number; errorCount: number }> {
-  console.log('\n═══════════════════════════════════════════════════════');
-  console.log('⚠️  DELETE ALL MODE - Deleting all events without review');
-  console.log('═══════════════════════════════════════════════════════\n');
+  logger.warn('DELETE ALL MODE - Deleting all events without review', { count: birthdays.length });
 
   const rl = createQuestionInterface();
   try {
     const confirm = await askConfirmation(rl, `⚠️  WARNING: This will delete ALL ${birthdays.length} birthday event(s). Continue? (y/n): `);
     if (!confirm) {
-      console.log('❌ Cancelled. No events deleted.');
+      logger.info('Cancelled. No events deleted.');
       rl.close();
       process.exit(0);
     }
@@ -69,37 +68,35 @@ async function main(): Promise<void> {
   const { startDate, endDate, deleteAll } = parseCommandLineArgs(args);
 
   try {
-    console.log('═══════════════════════════════════════════════════════');
-    console.log('🗑️  Delete Events from Google Calendar');
-    console.log('═══════════════════════════════════════════════════════\n');
+    logger.info('Delete Events from Google Calendar');
 
     const targetCalendarId = config.google.calendarId;
     if (!targetCalendarId) {
-      console.error('❌ Calendar ID not configured. Please set GOOGLE_CALENDAR_ID in .env');
+      logger.error('Calendar ID not configured. Please set GOOGLE_CALENDAR_ID in .env');
       process.exit(1);
     }
-    console.log(`Calendar: ${targetCalendarId}\n`);
+    logger.info(`Calendar: ${targetCalendarId}`);
 
     // Fetch events
     const todayDate = today();
     const finalStartDate = startDate ?? startOfYear(todayDate);
     const finalEndDate = endDate ?? endOfYear(todayDate);
     
-    console.log(`\nFetching birthdays from ${formatDateRange(finalStartDate, finalEndDate)}...`);
+    logger.info(`Fetching birthdays from ${formatDateRange(finalStartDate, finalEndDate)}`);
     
     // Get birthdays
     const birthdays = await birthdayService.getBirthdays(finalStartDate, finalEndDate);
 
     // Validate that we found birthdays
     if (birthdays.length === 0) {
-      console.log('✅ No birthdays found in the specified date range.');
+      logger.info('No birthdays found in the specified date range.');
       process.exit(0);
     }
 
-    console.log(`\n📅 Found ${birthdays.length} event(s) to delete\n`);
+    logger.info(`Found ${birthdays.length} event(s) to delete`);
 
     if (!deleteAll) {
-      console.error('❌ Interactive deletion is not supported. Use --all flag to delete all events.');
+      logger.error('Interactive deletion is not supported. Use --all flag to delete all events.');
       process.exit(1);
     }
 
@@ -108,10 +105,7 @@ async function main(): Promise<void> {
     displayDeletionSummary(result, birthdays.length);
     process.exit(0);
   } catch (error) {
-    console.error('\n❌ Error:', error);
-    if (error instanceof Error) {
-      console.error(`Error: ${error.message}`);
-    }
+    logger.error('Error in delete-events script', error);
     process.exit(1);
   }
 }

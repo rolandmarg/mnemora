@@ -2,6 +2,7 @@ import { google, type calendar_v3 } from 'googleapis';
 import { config } from '../config.js';
 import { startOfDay, endOfDay } from '../utils/date-helpers.js';
 import { type Event, type DeletionResult } from '../utils/event-helpers.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * Calendar client type
@@ -129,7 +130,7 @@ class GoogleCalendarClient {
 
       return calendarEvents.map(calendarEventToEvent);
     } catch (error) {
-      console.error('Error fetching calendar events:', error);
+      logger.error('Error fetching calendar events', error);
       throw error;
     }
   }
@@ -151,7 +152,7 @@ class GoogleCalendarClient {
       });
       return true;
     } catch (error) {
-      console.error(`Error deleting event ${eventId}:`, error);
+      logger.error(`Error deleting event ${eventId}`, error);
       return false;
     }
   }
@@ -167,7 +168,7 @@ class GoogleCalendarClient {
       errorCount: 0,
     };
 
-    console.log('\nDeleting events...\n');
+    logger.info(`Deleting ${events.length} event(s)...`);
 
     for (let i = 0; i < events.length; i++) {
       const event = events[i];
@@ -177,14 +178,14 @@ class GoogleCalendarClient {
       if (event.id) {
         const success = await this.deleteEvent(event.id);
         if (success) {
-          console.log(`[${eventNumber}/${totalEvents}] ✅ Deleted: ${event.summary ?? 'Untitled Event'}`);
+          logger.info(`[${eventNumber}/${totalEvents}] Deleted: ${event.summary ?? 'Untitled Event'}`);
           result.deletedCount++;
         } else {
-          console.log(`[${eventNumber}/${totalEvents}] ❌ Failed to delete: ${event.summary ?? 'Untitled Event'}`);
+          logger.warn(`[${eventNumber}/${totalEvents}] Failed to delete: ${event.summary ?? 'Untitled Event'}`);
           result.errorCount++;
         }
       } else {
-        console.log(`[${eventNumber}/${totalEvents}] ⚠️  Event has no ID, cannot delete: ${event.summary ?? 'Untitled Event'}`);
+        logger.warn(`[${eventNumber}/${totalEvents}] Event has no ID, cannot delete: ${event.summary ?? 'Untitled Event'}`);
         result.errorCount++;
       }
     }

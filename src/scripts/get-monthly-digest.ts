@@ -1,5 +1,6 @@
 import birthdayService from '../services/birthday.js';
 import { getFullName } from '../utils/name-helpers.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * Script to get monthly digest of upcoming birthdays
@@ -7,28 +8,23 @@ import { getFullName } from '../utils/name-helpers.js';
 
 async function getMonthlyDigest(): Promise<void> {
   try {
-    console.log('\n═══════════════════════════════════════════════════════');
-    console.log('Getting monthly digest...');
-    console.log('═══════════════════════════════════════════════════════\n');
+    logger.info('Getting monthly digest...');
     
     const { todaysBirthdays, monthlyDigest } = await birthdayService.getTodaysBirthdaysWithMonthlyDigest();
     
     if (todaysBirthdays.length > 0) {
-      console.log('🎉 Today\'s birthdays:\n');
-      todaysBirthdays.forEach(record => {
-        const name = getFullName(record.firstName, record.lastName);
-        console.log(`   🎂 ${name}`);
+      logger.info('Today\'s birthdays', {
+        birthdays: todaysBirthdays.map(record => getFullName(record.firstName, record.lastName)),
       });
-      console.log('');
     }
     
     if (monthlyDigest) {
-      console.log(monthlyDigest);
+      logger.info('Monthly digest', { monthlyDigest });
     }
     
-    console.log('\n✅ Completed successfully!');
+    logger.info('Completed successfully!');
   } catch (error) {
-    console.error('\n❌ Error getting monthly digest:', error);
+    logger.error('Error getting monthly digest', error);
     process.exit(1);
   } finally {
     process.exit(0);

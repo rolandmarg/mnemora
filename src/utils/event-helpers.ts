@@ -1,4 +1,5 @@
 import { getFullName } from './name-helpers.js';
+import { logger } from './logger.js';
 
 /**
  * Event type - application-level event representation
@@ -206,12 +207,10 @@ export function displayDeletionSummary(
   result: DeletionResult,
   totalEvents: number
 ): void {
-  console.log('\n═══════════════════════════════════════════════════════');
-  console.log('📊 SUMMARY:');
-  console.log('═══════════════════════════════════════════════════════');
-  console.log(`Total events reviewed: ${Math.min(result.deletedCount + result.skippedCount + result.errorCount, totalEvents)}`);
-  console.log(`✅ Deleted: ${result.deletedCount}`);
-  console.log(`⏭️  Skipped: ${result.skippedCount}`);
-  console.log(`❌ Errors: ${result.errorCount}`);
-  console.log('');
+  logger.info('Deletion summary', {
+    totalEventsReviewed: Math.min(result.deletedCount + result.skippedCount + result.errorCount, totalEvents),
+    deleted: result.deletedCount,
+    skipped: result.skippedCount,
+    errors: result.errorCount,
+  });
 }

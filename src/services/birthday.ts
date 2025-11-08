@@ -121,15 +121,16 @@ class BirthdayService {
    * Display duplicate events to the user
    */
   displayDuplicates(duplicates: BirthdayRecord[], fullName: string, date: Date): void {
-    console.log('\n⚠️  Potential duplicate(s) found:');
-    duplicates.forEach((dup, index) => {
-      const duplicateName = getFullName(dup.firstName, dup.lastName);
-      const duplicateDate = formatDateISO(fromDate(dup.birthday));
-      console.log(`   ${index + 1}. ${duplicateName}'s Birthday`);
-      console.log(`      Date: ${duplicateDate}`);
+    logger.warn('Potential duplicate(s) found', {
+      duplicates: duplicates.map(dup => ({
+        name: getFullName(dup.firstName, dup.lastName),
+        date: formatDateISO(fromDate(dup.birthday)),
+      })),
+      tryingToAdd: {
+        name: fullName,
+        date: date.toLocaleDateString(),
+      },
     });
-    console.log(`\n   Trying to add: ${fullName}'s Birthday`);
-    console.log(`   Date: ${date.toLocaleDateString()}\n`);
   }
 
   /**
