@@ -22,7 +22,7 @@ export enum LogLevel {
 /**
  * Logger interface - abstraction over the logging library
  */
-export interface ILogger {
+export interface Logger {
   trace(message: string, ...args: unknown[]): void;
   debug(message: string, ...args: unknown[]): void;
   info(message: string, ...args: unknown[]): void;
@@ -33,13 +33,13 @@ export interface ILogger {
   /**
    * Create a child logger with additional context
    */
-  child(bindings: Record<string, unknown>): ILogger;
+  child(bindings: Record<string, unknown>): Logger;
 }
 
 /**
  * Pino logger implementation
  */
-class PinoLogger implements ILogger {
+class PinoLogger implements Logger {
   private logger: pino.Logger;
 
   constructor(logger: pino.Logger) {
@@ -82,7 +82,7 @@ class PinoLogger implements ILogger {
     }
   }
 
-  child(bindings: Record<string, unknown>): ILogger {
+  child(bindings: Record<string, unknown>): Logger {
     return new PinoLogger(this.logger.child(bindings));
   }
 }
@@ -97,7 +97,7 @@ export function createLogger(options?: {
   level?: LogLevel | string;
   pretty?: boolean;
   context?: Record<string, unknown>;
-}): ILogger {
+}): Logger {
   const level = options?.level ?? (process.env.LOG_LEVEL || 'info');
   const pretty = options?.pretty ?? (process.env.NODE_ENV === 'development');
   

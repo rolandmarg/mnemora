@@ -1,7 +1,7 @@
 /**
  * WhatsApp Output Channel
  * 
- * Adapter that wraps Twilio WhatsApp functionality to implement IOutputChannel
+ * Adapter that wraps Twilio WhatsApp functionality to implement OutputChannel
  * 
  * Note: This is a placeholder. The actual implementation should wrap
  * the existing Twilio WhatsApp service when it's created.

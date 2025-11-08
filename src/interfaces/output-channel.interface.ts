@@ -35,7 +35,7 @@ export interface OutputChannelMetadata {
  * 
  * All output channels (Console, SMS, WhatsApp, Email) implement this interface
  */
-export interface IOutputChannel {
+export interface OutputChannel {
   /**
    * Send a message to a single recipient
    * @param message - The message content to send

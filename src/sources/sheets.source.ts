@@ -1,7 +1,7 @@
 /**
  * Sheets Data Source
  * 
- * Adapter that wraps the existing SheetsService to implement IDataSource
+ * Adapter that wraps the existing SheetsService to implement DataSource
  */
 
 import sheetsClient from '../clients/google-sheets.client.js';

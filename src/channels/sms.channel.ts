@@ -1,7 +1,7 @@
 /**
  * SMS Output Channel
  * 
- * Adapter that wraps Twilio SMS functionality to implement IOutputChannel
+ * Adapter that wraps Twilio SMS functionality to implement OutputChannel
  * 
  * Note: This is a placeholder. The actual implementation should wrap
  * the existing Twilio SMS service when it's created.

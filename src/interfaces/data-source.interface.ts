@@ -44,7 +44,7 @@ export interface DataSourceMetadata {
  * 
  * @template T - The type of data items returned by this source
  */
-export interface IDataSource<T> {
+export interface DataSource<T> {
   /**
    * Read data from the source
    * @param options - Optional parameters for reading (date ranges, filters, etc.)

@@ -5,7 +5,7 @@
  * Provides common functionality and enforces interface implementation
  */
 
-import type { IDataSource, ReadOptions, WriteOptions, WriteResult, DeleteResult, DataSourceMetadata } from '../interfaces/data-source.interface.js';
+import type { DataSource, ReadOptions, WriteOptions, WriteResult, DeleteResult, DataSourceMetadata } from '../interfaces/data-source.interface.js';
 import type { AppConfig } from '../config.js';
 
 /**
@@ -16,7 +16,7 @@ import type { AppConfig } from '../config.js';
  * 
  * @template T - The type of data items returned by this source
  */
-export abstract class BaseDataSource<T> implements IDataSource<T> {
+export abstract class BaseDataSource<T> implements DataSource<T> {
   protected readonly config: AppConfig;
 
   constructor(config: AppConfig) {

@@ -5,7 +5,7 @@
  * Provides common functionality and enforces interface implementation
  */
 
-import type { IOutputChannel, SendOptions, SendResult, OutputChannelMetadata } from '../interfaces/output-channel.interface.js';
+import type { OutputChannel, SendOptions, SendResult, OutputChannelMetadata } from '../interfaces/output-channel.interface.js';
 
 /**
  * Abstract base class for output channels
@@ -13,7 +13,7 @@ import type { IOutputChannel, SendOptions, SendResult, OutputChannelMetadata } f
  * Provides common functionality and enforces interface implementation
  * All output channels should extend this class
  */
-export abstract class BaseOutputChannel implements IOutputChannel {
+export abstract class BaseOutputChannel implements OutputChannel {
   /**
    * Send a message to a single recipient
    * Must be implemented by subclasses

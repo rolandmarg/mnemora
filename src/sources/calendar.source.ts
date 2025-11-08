@@ -1,7 +1,7 @@
 /**
  * Calendar Data Source
  * 
- * Adapter that wraps the existing CalendarService to implement IDataSource
+ * Adapter that wraps the existing CalendarService to implement DataSource
  * Converts Event to BirthdayRecord at the boundary
  */
 
