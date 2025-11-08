@@ -16,6 +16,7 @@ export interface WhatsAppConfig {
 
 export interface ScheduleConfig {
   time: string;
+  timezone: string;
 }
 
 export interface AppConfig {
@@ -37,6 +38,7 @@ export const config: AppConfig = {
   },
   schedule: {
     time: process.env.SCHEDULE_TIME || '09:00',
+    timezone: process.env.TIMEZONE || process.env.TZ || 'America/Los_Angeles',
   },
 };
 

@@ -1,25 +1,48 @@
 /**
  * Date utility functions
+ * 
+ * All date operations use the timezone from config (defaults to America/Los_Angeles).
+ * Dates are explicitly converted to the configured timezone using date-fns-tz.
  */
 
+import { fromZonedTime, toZonedTime } from 'date-fns-tz';
+import { config } from '../config.js';
+
 /**
- * Get today's date
+ * Get the configured timezone (defaults to America/Los_Angeles)
+ */
+function getTimezone(): string {
+  return config.schedule.timezone;
+}
+
+/**
+ * Get today's date in the configured timezone
+ * 
+ * @returns Date object representing today in the configured timezone
  */
 export function today(): Date {
-  return new Date();
+  const tz = getTimezone();
+  const now = new Date();
+  // Get today's date in the configured timezone
+  const zonedDate = toZonedTime(now, tz);
+  // Return a date representing today at midnight in the configured timezone
+  return new Date(zonedDate.getFullYear(), zonedDate.getMonth(), zonedDate.getDate());
 }
 
 /**
  * Create a date from month (1-12) and day, optionally with year
  * If year is not provided, uses current year
+ * Date is created in the configured timezone
  */
 export function createDate(month: number, day: number, year?: number): Date {
-  if (year !== undefined) {
-    return new Date(year, month - 1, day);
-  }
-  const date = new Date();
-  date.setMonth(month - 1, day);
-  return date;
+  const tz = getTimezone();
+  const currentYear = year ?? today().getFullYear();
+  
+  // Create a date representing midnight in the configured timezone
+  const localDate = new Date(currentYear, month - 1, day, 0, 0, 0, 0);
+  
+  // Convert from the configured timezone to UTC
+  return fromZonedTime(localDate, tz);
 }
 
 /**
@@ -39,22 +62,29 @@ export function createDateFromMonthName(monthName: string, day: number, year?: n
 
 /**
  * Parse a date from a string (ISO format or other common formats)
- * For date-only strings (YYYY-MM-DD), parses as local date to avoid timezone conversion issues
+ * For date-only strings (YYYY-MM-DD), parses as midnight in the configured timezone
  * For datetime strings, uses standard parsing
  * @throws Error if the date string cannot be parsed
  */
 export function parseDateFromString(dateString: string): Date {
+  const tz = getTimezone();
+  
   // Check if it's a date-only string (YYYY-MM-DD format, no time component)
   // This is common for all-day events from Google Calendar
   const dateOnlyMatch = dateString.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
   if (dateOnlyMatch) {
-    // Parse as local date to avoid timezone conversion issues
-    // new Date("2024-11-08") interprets as UTC midnight, which can become Nov 7 in PST/PDT
-    // new Date(2024, 10, 8) creates a local date, preserving the intended day
     const year = parseInt(dateOnlyMatch[1], 10);
-    const month = parseInt(dateOnlyMatch[2], 10) - 1; // Month is 0-indexed
+    const month = parseInt(dateOnlyMatch[2], 10);
     const day = parseInt(dateOnlyMatch[3], 10);
-    const date = new Date(year, month, day);
+    
+    // Create a date representing midnight in the configured timezone
+    // Use Date constructor to create a date in system timezone, then
+    // use fromZonedTime to treat it as if it's in the configured timezone
+    const localDate = new Date(year, month - 1, day, 0, 0, 0, 0);
+    
+    // Convert from the configured timezone to UTC
+    // fromZonedTime treats the date as if it represents a time in the given timezone
+    const date = fromZonedTime(localDate, tz);
     if (isNaN(date.getTime())) {
       throw new Error(`Invalid date string: "${dateString}"`);
     }
