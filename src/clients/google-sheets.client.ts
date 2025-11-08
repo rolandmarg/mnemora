@@ -10,6 +10,7 @@ import { parseRowToBirthdays, type BirthdayRecord } from '../utils/birthday-help
 class GoogleSheetsClient {
   private readonly sheets: sheets_v4.Sheets;
   private readonly spreadsheetId: string;
+  private cachedSheetName: string | null = null;
 
   /**
    * Constructor - validates configuration and initializes sheets client
@@ -39,8 +40,14 @@ class GoogleSheetsClient {
 
   /**
    * Get the name of the first sheet in the spreadsheet
+   * Caches the result to avoid redundant API calls
    */
   private async getFirstSheetName(): Promise<string> {
+    // Return cached value if available
+    if (this.cachedSheetName !== null) {
+      return this.cachedSheetName;
+    }
+
     const response = await this.sheets.spreadsheets.get({
       spreadsheetId: this.spreadsheetId,
     });
@@ -50,7 +57,8 @@ class GoogleSheetsClient {
       throw new Error('No sheets found in spreadsheet');
     }
 
-    return sheets[0].properties?.title ?? 'Sheet1';
+    this.cachedSheetName = sheets[0].properties?.title ?? 'Sheet1';
+    return this.cachedSheetName;
   }
 
   /**
