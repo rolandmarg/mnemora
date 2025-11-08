@@ -15,14 +15,6 @@ import { config } from '../config.js';
 export type DataSourceType = 'calendar' | 'sheets';
 
 /**
- * Configuration for data source factory
- */
-export interface DataSourceConfig {
-  type: DataSourceType;
-  [key: string]: unknown;
-}
-
-/**
  * Factory for creating data source instances
  * 
  * Usage:
@@ -60,23 +52,5 @@ export class DataSourceFactory {
     }
   }
 
-  /**
-   * Create multiple data sources from configuration
-   * 
-   * @param configs - Array of data source configurations
-   * @returns Array of data source instances
-   */
-  static createMultiple(configs: DataSourceConfig[]): BaseDataSource<unknown>[] {
-    return configs.map(config => {
-      switch (config.type) {
-        case 'calendar':
-          return this.create('calendar');
-        case 'sheets':
-          return this.create('sheets');
-        default:
-          throw new Error(`Unsupported data source type: ${config.type}`);
-      }
-    });
-  }
 }
 

@@ -78,29 +78,5 @@ export class OutputChannelFactory {
     }
   }
 
-  /**
-   * Create multiple output channels from configuration
-   * 
-   * @param configs - Array of output channel configurations
-   * @returns Array of output channel instances (only enabled ones)
-   */
-  static createMultiple(configs: OutputChannelConfig[]): BaseOutputChannel[] {
-    return configs
-      .filter(config => config.enabled !== false)
-      .map(config => {
-        switch (config.type) {
-          case 'console':
-            return this.create('console');
-          case 'sms':
-            return this.create('sms');
-          case 'whatsapp':
-            return this.create('whatsapp');
-          case 'email':
-            return this.create('email', config);
-          default:
-            throw new Error(`Unsupported output channel type: ${config.type}`);
-        }
-      });
-  }
 }
 

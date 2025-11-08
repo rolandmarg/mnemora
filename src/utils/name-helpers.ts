@@ -5,7 +5,7 @@
 /**
  * Sanitize a name by removing trailing whitespace, dots, and other invalid characters
  */
-export function sanitizeName(name: string): string {
+function sanitizeName(name: string): string {
   if (!name) {
     return '';
   }

@@ -30,7 +30,7 @@ export interface Event {
 /**
  * Check if event is all-day
  */
-export function isAllDay(event: Event): boolean {
+function isAllDay(event: Event): boolean {
   return !!event.start?.date && !event.start?.dateTime;
 }
 
