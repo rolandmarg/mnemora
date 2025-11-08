@@ -1,6 +1,5 @@
 import { extractNameParts, sanitizeNames } from './name-helpers.js';
-import { createDate, createDateFromMonthName } from './date.js';
-import { parseDateString } from './date.js';
+import { createDate, createDateFromMonthName, parseDateString } from './date.js';
 
 /**
  * Birthday record type

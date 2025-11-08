@@ -1,5 +1,5 @@
 import { config } from '../config.js';
-import { createQuestionInterface, askConfirmation } from '../utils/cli/cli.js';
+import { createQuestionInterface, askConfirmation } from '../utils/cli-helpers.js';
 import calendarClient from '../clients/google-calendar.client.js';
 import { displayDeletionSummary } from '../utils/event-helpers.js';
 import { parseDateFromString, today, startOfYear, endOfYear, formatDateRange } from '../utils/date.js';

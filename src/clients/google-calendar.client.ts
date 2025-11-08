@@ -1,4 +1,4 @@
-import { google, calendar_v3 } from 'googleapis';
+import { google, type calendar_v3 } from 'googleapis';
 import { config } from '../config.js';
 import { startOfDay, endOfDay } from '../utils/date.js';
 import { 

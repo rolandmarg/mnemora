@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseArgs, hasFlag, getValue, getPositional, filterFlags } from '../utils/cli/script-helpers.js';
+import { parseArgs, hasFlag, getValue, getPositional, filterFlags } from '../utils/cli-helpers.js';
 
 describe('script-helpers', () => {
   describe('parseArgs', () => {
