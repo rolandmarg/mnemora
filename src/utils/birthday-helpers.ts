@@ -1,15 +1,43 @@
 import { extractNameParts, sanitizeNames } from './name-helpers.js';
-import { createDate, createDateFromMonthName } from '../date.js';
+import { createDate, createDateFromMonthName } from './date.js';
+import { parseDateString } from './date.js';
 
 /**
- * Birthday input parser utilities
+ * Birthday record type
  */
-
 export interface BirthdayRecord {
   firstName: string;
   lastName?: string;
   birthday: Date;
   year?: number;
+}
+
+/**
+ * Birthday helper utilities
+ */
+
+/**
+ * Parse a row to extract multiple birthday records
+ * A row can contain multiple name-date pairs (e.g., ["Name1", "Date1", "Name2", "Date2"])
+ */
+export function parseRowToBirthdays(row: string[]): BirthdayRecord[] {
+  const birthdays: BirthdayRecord[] = [];
+  for (let i = 0; i < row.length - 1; i++) {
+    const name = row[i]?.trim();
+    const dateStr = row[i + 1]?.trim();
+    if (!name || !dateStr) {
+      continue;
+    }
+    const birthday = parseDateString(dateStr);
+    if (!birthday) {
+      continue;
+    }
+    const nameParts = extractNameParts(name);
+    const { firstName, lastName } = sanitizeNames(nameParts.firstName, nameParts.lastName);
+    birthdays.push({ firstName, lastName, birthday });
+    i++; // Skip the next cell
+  }
+  return birthdays;
 }
 
 /**
@@ -136,3 +164,4 @@ export function parseInput(input: string): BirthdayRecord | null {
   
   return null;
 }
+

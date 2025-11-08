@@ -1,4 +1,4 @@
-import { getFullName } from './name/name-helpers.js';
+import { getFullName } from './name-helpers.js';
 
 /**
  * Event type - application-level event representation

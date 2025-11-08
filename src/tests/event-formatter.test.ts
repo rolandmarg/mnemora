@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatEvent, formatEventForDuplicate, type Event } from '../event-helpers.js';
+import { formatEvent, formatEventForDuplicate, type Event } from '../utils/event-helpers.js';
 
 describe('event-formatter', () => {
   describe('formatEvent', () => {

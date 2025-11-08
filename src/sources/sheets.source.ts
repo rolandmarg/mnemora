@@ -6,7 +6,7 @@
 
 import sheetsClient from '../clients/google-sheets.client.js';
 import { BaseDataSource } from '../base/base-data-source.js';
-import type { BirthdayRecord } from '../utils/name/birthday-parser.js';
+import type { BirthdayRecord } from '../utils/birthday-helpers.js';
 import type { ReadOptions, DataSourceMetadata } from '../interfaces/data-source.interface.js';
 import type { AppConfig } from '../config.js';
 

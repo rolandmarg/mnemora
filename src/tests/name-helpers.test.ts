@@ -12,7 +12,7 @@ import {
   removePunctuation,
   isAlphaSpace,
   isValidName,
-} from '../name/name-helpers.js';
+} from '../utils/name-helpers.js';
 
 describe('name-helpers', () => {
   describe('sanitizeName', () => {

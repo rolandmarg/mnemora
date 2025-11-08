@@ -67,75 +67,47 @@ export interface EventListOptions {
  */
 class GoogleCalendarClient {
   // Read-only client for fetching events
-  private readOnlyCalendar: CalendarClient | null = null;
-  private readOnlyInitialized: boolean = false;
+  private readonly readOnlyCalendar: CalendarClient;
 
   // Read-write client for modifying events
-  private readWriteCalendar: CalendarClient | null = null;
-  private readWriteInitialized: boolean = false;
+  private readonly readWriteCalendar: CalendarClient;
+
+  // Calendar ID - set during construction
+  private readonly calendarId: string;
 
   /**
-   * Validate Google Calendar credentials
-   * Throws error if credentials are missing
+   * Constructor - validates configuration and initializes calendar clients
    */
-  private validateCredentials(): void {
+  constructor() {
+    // Validate credentials
     if (!config.google.clientEmail || !config.google.privateKey) {
       throw new Error('Google Calendar credentials not configured. Please set GOOGLE_CLIENT_EMAIL and GOOGLE_PRIVATE_KEY in .env');
     }
-  }
 
-  /**
-   * Validate calendar ID is configured
-   * Throws error if calendar ID is missing
-   */
-  private validateCalendarId(): void {
+    // Validate and set calendar ID
     if (!config.google.calendarId) {
       throw new Error('Calendar ID not configured. Please set GOOGLE_CALENDAR_ID in .env');
     }
-  }
 
-  /**
-   * Initialize read-only calendar client
-   * Uses calendar.readonly scope - can only read events
-   */
-  private async initializeReadOnly(): Promise<void> {
-    if (this.readOnlyInitialized) {
-      return;
-    }
+    this.calendarId = config.google.calendarId;
 
-    this.validateCredentials();
-
-    const auth = new google.auth.JWT(
-      config.google.clientEmail!,
+    // Initialize read-only calendar client
+    const readOnlyAuth = new google.auth.JWT(
+      config.google.clientEmail,
       undefined,
-      config.google.privateKey!,
+      config.google.privateKey,
       ['https://www.googleapis.com/auth/calendar.readonly']
     );
+    this.readOnlyCalendar = google.calendar({ version: 'v3', auth: readOnlyAuth });
 
-    this.readOnlyCalendar = google.calendar({ version: 'v3', auth });
-    this.readOnlyInitialized = true;
-  }
-
-  /**
-   * Initialize read-write calendar client
-   * Uses calendar scope - can read and write events
-   */
-  private async initializeReadWrite(): Promise<void> {
-    if (this.readWriteInitialized) {
-      return;
-    }
-
-    this.validateCredentials();
-
-    const auth = new google.auth.JWT(
-      config.google.clientEmail!,
+    // Initialize read-write calendar client
+    const readWriteAuth = new google.auth.JWT(
+      config.google.clientEmail,
       undefined,
-      config.google.privateKey!,
+      config.google.privateKey,
       ['https://www.googleapis.com/auth/calendar']
     );
-
-    this.readWriteCalendar = google.calendar({ version: 'v3', auth });
-    this.readWriteInitialized = true;
+    this.readWriteCalendar = google.calendar({ version: 'v3', auth: readWriteAuth });
   }
 
   // ============================================================================
@@ -149,17 +121,12 @@ class GoogleCalendarClient {
    */
   async fetchEvents(options: EventListOptions): Promise<Event[]> {
     try {
-      await this.initializeReadOnly();
-      if (!this.readOnlyCalendar) {
-        throw new Error('Read-only calendar client not initialized');
-      }
-
       const { startDate, endDate, maxResults } = options;
       const start = startOfDay(startDate);
       const end = endOfDay(endDate); 
 
       const calendarEvents = await this.readOnlyCalendar.events.list({
-        calendarId: config.google.calendarId,
+        calendarId: this.calendarId,
         timeMin: start.toISOString(),
         timeMax: end.toISOString(),
         singleEvents: true,
@@ -212,16 +179,9 @@ class GoogleCalendarClient {
    * Uses read-write calendar client
    */
   async deleteEvent(eventId: string): Promise<boolean> {
-    await this.initializeReadWrite();
-    if (!this.readWriteCalendar) {
-      throw new Error('Read-write calendar client not initialized');
-    }
-
-    this.validateCalendarId();
-
     try {
       await this.readWriteCalendar.events.delete({
-        calendarId: config.google.calendarId,
+        calendarId: this.calendarId,
         eventId,
       });
       return true;
@@ -236,11 +196,6 @@ class GoogleCalendarClient {
    * Uses read-write calendar client
    */
   async deleteAllEvents(events: Event[]): Promise<DeletionResult> {
-    await this.initializeReadWrite();
-    if (!this.readWriteCalendar) {
-      throw new Error('Read-write calendar client not initialized');
-    }
-
     const result: DeletionResult = {
       deletedCount: 0,
       skippedCount: 0,
@@ -277,13 +232,6 @@ class GoogleCalendarClient {
    * Uses read-write calendar client
    */
   async insertEvent(event: Event): Promise<{ id: string }> {
-    await this.initializeReadWrite();
-    if (!this.readWriteCalendar) {
-      throw new Error('Read-write calendar client not initialized');
-    }
-
-    this.validateCalendarId();
-
     // Convert Event to CalendarEvent for Google Calendar API
     const calendarEvent = {
       summary: event.summary,
@@ -296,7 +244,7 @@ class GoogleCalendarClient {
     };
 
     const response = await this.readWriteCalendar.events.insert({
-      calendarId: config.google.calendarId,
+      calendarId: this.calendarId,
       requestBody: calendarEvent,
     });
 

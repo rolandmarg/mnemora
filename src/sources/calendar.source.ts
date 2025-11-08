@@ -7,10 +7,10 @@
 
 import calendarClient, { extractNameFromEvent, isBirthdayEvent } from '../clients/google-calendar.client.js';
 import birthdayService from '../services/birthday.js';
-import { extractNameParts } from '../utils/name/name-helpers.js';
+import { extractNameParts } from '../utils/name-helpers.js';
 import { parseDateFromString } from '../utils/date.js';
 import { BaseDataSource } from '../base/base-data-source.js';
-import type { BirthdayRecord } from '../utils/name/birthday-parser.js';
+import type { BirthdayRecord } from '../utils/birthday-helpers.js';
 import type { ReadOptions, WriteOptions, WriteResult, DataSourceMetadata } from '../interfaces/data-source.interface.js';
 import type { AppConfig } from '../config.js';
 import type { Event } from '../utils/event-helpers.js';

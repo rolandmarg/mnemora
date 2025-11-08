@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseInput } from '../name/birthday-parser.js';
+import { parseInput } from '../utils/birthday-helpers.js';
 
 describe('birthday-parser', () => {
   describe('parseInput', () => {

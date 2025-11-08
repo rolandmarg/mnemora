@@ -1,8 +1,8 @@
 import { config } from '../config.js';
 import calendarClient, { isBirthdayEvent, extractNameFromEvent } from '../clients/google-calendar.client.js';
 import { formatDateISO, fromDate, today, formatDateShort, formatDateMonthYear, parseDateFromString, startOfDay, isFirstDayOfMonth, startOfMonth, endOfMonth } from '../utils/date.js';
-import { getFullName } from '../utils/name/name-helpers.js';
-import type { BirthdayRecord } from '../utils/name/birthday-parser.js';
+import { getFullName } from '../utils/name-helpers.js';
+import type { BirthdayRecord } from '../utils/birthday-helpers.js';
 import type { Event } from '../utils/event-helpers.js';
 
 interface BirthdaysByDate {
