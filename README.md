@@ -1,20 +1,22 @@
 # Mnemora
 
-A bot that fetches Google Calendar birthdays and sends WhatsApp notifications.
+A TypeScript bot that manages birthdays across multiple data sources (Google Calendar, Google Sheets) and sends notifications through multiple output channels (Console, SMS, WhatsApp, Email).
 
 ## Features
 
-- 🎂 Daily birthday checks at 9am (configurable)
-- 📅 Monthly birthday digest on the 1st of each month
-- 📱 WhatsApp group notifications
-- 📆 Google Calendar integration
+- 🎂 Daily birthday checks
+- 📅 Monthly digest on the 1st of each month
+- 📆 Multi-source support (Google Calendar, Google Sheets)
+- 📱 Multi-channel notifications (Console, SMS, WhatsApp, Email)
+- 🔄 Data synchronization (Sheets → Calendar)
 
 ## Prerequisites
 
-- Node.js (v18 or higher)
-- TypeScript (installed as dev dependency)
+- Node.js (v18+)
+- Yarn
 - Google Calendar API credentials
-- WhatsApp account (for WhatsApp Web)
+- Google Sheets API credentials (optional)
+- Twilio account (optional, for SMS/WhatsApp)
 
 ## Setup
 
@@ -24,161 +26,124 @@ A bot that fetches Google Calendar birthdays and sends WhatsApp notifications.
 yarn install
 ```
 
-### 2. Google Calendar API Setup
+### 2. Google API Setup
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select an existing one
-3. Enable the **Google Calendar API**
-4. Create a **Service Account**:
-   - Go to "IAM & Admin" > "Service Accounts"
-   - Click "Create Service Account"
-   - Give it a name and create
-   - Click on the service account > "Keys" tab
-   - Click "Add Key" > "Create new key" > Choose JSON
-   - Download the JSON file
-5. Share your calendar with the service account:
-   - Open Google Calendar
-   - Go to Settings > "Share with specific people"
-   - Add the service account email (from the JSON file) with "See all event details" permission
+2. Enable **Google Calendar API** and **Google Sheets API**
+3. Create a **Service Account** and download JSON key
+4. Share your calendar with the service account email (See all event details)
+5. Share your Google Sheet with the service account email (Viewer/Editor)
 
-### 3. WhatsApp Setup
-
-1. The bot uses WhatsApp Web.js which requires scanning a QR code
-2. On first run, a QR code will be displayed in the terminal
-3. Scan it with your WhatsApp mobile app
-
-### 4. Get WhatsApp Group ID
-
-1. Run the helper script:
-   ```bash
-   yarn find-group
-   ```
-2. This will display all your WhatsApp groups with their IDs
-3. Copy the ID (without `@g.us`) to your `.env` file
-
-### 5. Configure Environment Variables
-
-Create a `.env` file in the root directory:
+### 3. Configure Environment Variables
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` with your credentials:
+Edit `.env`:
 
 ```env
-# Google Calendar API Configuration
+# Google Calendar
 GOOGLE_CALENDAR_ID=primary
 GOOGLE_CLIENT_EMAIL=your-service-account@project.iam.gserviceaccount.com
 GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
 GOOGLE_PROJECT_ID=your-project-id
 
-# WhatsApp Configuration
-WHATSAPP_GROUP_ID=your-group-id
+# Google Sheets (optional)
+GOOGLE_SPREADSHEET_ID=your-spreadsheet-id
 
-# Scheduler Configuration (24-hour format)
+# Twilio (optional)
+TWILIO_ACCOUNT_SID=your-account-sid
+TWILIO_AUTH_TOKEN=your-auth-token
+TWILIO_WHATSAPP_NUMBER=whatsapp:+14155238886
+TWILIO_SMS_NUMBER=+1234567890
+
+# Configuration
 SCHEDULE_TIME=09:00
+TIMEZONE=America/Los_Angeles
 ```
-
-**Note**: For `GOOGLE_PRIVATE_KEY`, copy the entire private key from your JSON file, including the `-----BEGIN PRIVATE KEY-----` and `-----END PRIVATE KEY-----` lines. Keep the `\n` characters as they are.
 
 ## Usage
 
-### Build TypeScript
+### Main Application
 
 ```bash
-yarn build
+yarn start          # Run once
+yarn dev            # Development mode with auto-reload
 ```
 
-This compiles TypeScript to JavaScript in the `dist/` directory.
-
-### Start the Bot
+### CLI Scripts
 
 ```bash
-yarn start
+yarn get-todays-birthdays                    # Get today's birthdays
+yarn get-monthly-digest                      # Get monthly digest
+yarn get-todays-birthdays-with-digest        # Get today's birthdays + monthly digest (if 1st)
+yarn get-all-birthdays                       # Read from Sheets, sync to Calendar, display all
+yarn delete-events --all                     # Delete all birthday events
+yarn delete-events --all --date-range "2024-01-01" "2024-12-31"  # Delete in date range
 ```
 
-This runs the compiled JavaScript from `dist/`.
-
-### Development Mode (with auto-reload)
+### Development
 
 ```bash
-yarn dev
+yarn build          # Compile TypeScript
+yarn type-check     # Type check without compiling
+yarn lint           # Lint code
+yarn lint:fix       # Auto-fix linting issues
+yarn test           # Run tests
+yarn test:run       # Run tests once
+yarn test:coverage  # Run tests with coverage
 ```
-
-This runs TypeScript directly with `tsx` and watches for changes.
-
-### Type Checking
-
-```bash
-yarn type-check
-```
-
-This checks TypeScript types without compiling.
-
-### Linting
-
-```bash
-yarn lint
-```
-
-This runs ESLint to check code quality and style.
-
-```bash
-yarn lint:fix
-```
-
-This runs ESLint and automatically fixes fixable issues.
-
-## How It Works
-
-1. **Daily Check (9am)**: The bot checks Google Calendar for birthdays today and sends congratulations messages to the WhatsApp group.
-
-2. **Monthly Digest (1st of month)**: On the first day of each month, the bot sends a digest of all upcoming birthdays for that month.
 
 ## Project Structure
 
 ```
-mnemora/
-├── src/
-│   ├── services/
-│   │   ├── calendar.ts      # Google Calendar integration
-│   │   ├── whatsapp.ts      # WhatsApp messaging
-│   │   └── birthday.ts      # Birthday logic
-│   ├── scripts/
-│   │   ├── add-birthday.ts  # Add birthday to calendar
-│   │   └── check-all-events.ts # Check all calendar events
-│   ├── types/
-│   │   └── qrcode-terminal.d.ts  # Type definitions
-│   ├── config.ts            # Configuration loader
-│   └── index.ts             # Main entry point
-├── dist/                # Compiled JavaScript (generated)
-├── .env                 # Environment variables (create this)
-├── tsconfig.json        # TypeScript configuration
-├── yarn.lock            # Yarn lockfile
-└── package.json
+src/
+├── base/              # Abstract base classes
+├── channels/          # Output channels (Console, SMS, WhatsApp, Email)
+├── clients/           # External API clients (Google Calendar, Google Sheets)
+├── factories/         # Factory classes for creating instances
+├── interfaces/        # TypeScript interfaces
+├── scripts/           # CLI scripts
+├── services/          # Business logic (BirthdayService)
+├── sources/           # Data sources (Calendar, Sheets)
+├── utils/             # Utility functions
+├── config.ts          # Configuration loader
+└── index.ts           # Main entry point
 ```
+
+## Architecture
+
+Mnemora uses a **pluggable architecture** with clear separation:
+
+- **Data Sources**: Abstract interface for reading/writing birthday data
+- **Output Channels**: Abstract interface for sending notifications
+- **Factories**: Create instances of data sources and output channels
+- **Services**: Business logic that orchestrates data sources and output channels
+
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for details.
+
+## Extending
+
+### Adding a New Data Source
+
+1. Create class extending `BaseDataSource<BirthdayRecord>`
+2. Implement `DataSource` interface
+3. Add type to `DataSourceFactory`
+
+### Adding a New Output Channel
+
+1. Create class extending `BaseOutputChannel`
+2. Implement `OutputChannel` interface
+3. Add type to `OutputChannelFactory`
 
 ## Troubleshooting
 
-### Google Calendar Issues
-
-- Ensure the service account has access to your calendar
-- Check that the calendar ID is correct (use "primary" for your main calendar)
-- Verify the private key is correctly formatted in `.env`
-
-### WhatsApp Issues
-
-- Make sure you scan the QR code when it appears
-- The QR code expires after a few minutes - restart the bot if needed
-- Ensure your WhatsApp account is active and connected
-
-### Group ID Issues
-
-- Group IDs are in the format: `120363123456789012@g.us`
-- You can find group IDs by using WhatsApp Web.js methods or checking the browser console in WhatsApp Web
+- **Calendar Issues**: Ensure service account has calendar access, check calendar ID
+- **Sheets Issues**: Ensure service account has sheet access, check spreadsheet ID
+- **Timezone Issues**: Set `TIMEZONE` env var (defaults to `America/Los_Angeles`)
+- **Logging**: Uses structured JSON logging with `pino`. Use `pino-pretty` for development
 
 ## License
 
 ISC
-
