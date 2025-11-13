@@ -81,7 +81,53 @@ yarn get-todays-birthdays-with-digest        # Get today's birthdays + monthly d
 yarn get-all-birthdays                       # Read from Sheets, sync to Calendar, display all
 yarn delete-events --all                     # Delete all birthday events
 yarn delete-events --all --date-range "2024-01-01" "2024-12-31"  # Delete in date range
+yarn manual-send                             # Manually send monthly digest + today's birthdays
 ```
+
+### Local Scheduling Setup (macOS)
+
+For local development/prototyping, you can set up native macOS launchd agents to run the birthday check daily at 9:00 AM Los Angeles time, and prompt for manual sending on bootup. Uses only built-in macOS tools - no external dependencies!
+
+#### Installation
+
+```bash
+yarn install-cron
+```
+
+This will:
+- Install a cron job that runs daily at 9:00 AM (system timezone - adjust if needed)
+- Install a LaunchAgent that prompts you to send messages on login/bootup
+- Create log files in `logs/` directory
+
+#### Uninstallation
+
+```bash
+yarn uninstall-cron
+```
+
+This removes the cron job and LaunchAgent.
+
+#### Manual Send
+
+You can manually trigger sending messages at any time:
+
+```bash
+yarn manual-send
+```
+
+This will always send:
+- Monthly digest (regardless of current date)
+- Today's birthday messages (if any)
+
+#### Notes
+
+- **Native macOS**: Uses launchd (built into macOS) - no external dependencies like cron or node-cron
+- **Timezone Support**: Native timezone support - runs at 9:00 AM Los Angeles time automatically
+- **Energy Efficient**: Wakes up only when scheduled, no 24/7 daemon
+- **Sleep/Wake Handling**: Automatically handles laptop sleep/wake - will run when system wakes up if time was missed
+- **Logs**: Check `logs/cron-YYYY-MM-DD.log` for daily execution logs
+- **Bootup Prompt**: On login, you'll get a terminal prompt asking if you want to send messages now
+- **Missed Days Recovery**: If the service was down (laptop shut down, cloud outage), it will automatically detect missed days and send messages for the most recent missed day on the next run. This prevents spamming with multiple days of messages.
 
 ### Development
 

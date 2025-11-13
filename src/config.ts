@@ -12,6 +12,7 @@ export interface GoogleConfig {
 
 export interface WhatsAppConfig {
   groupId: string | undefined;
+  headless: boolean;
 }
 
 export interface ScheduleConfig {
@@ -35,6 +36,7 @@ export const config: AppConfig = {
   },
   whatsapp: {
     groupId: process.env.WHATSAPP_GROUP_ID,
+    headless: process.env.WHATSAPP_HEADLESS === 'true',
   },
   schedule: {
     time: process.env.SCHEDULE_TIME || '09:00',

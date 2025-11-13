@@ -7,6 +7,36 @@ import type { OutputChannel } from '../interfaces/output-channel.interface.js';
 import type { WriteResult } from '../interfaces/data-source.interface.js';
 
 /**
+ * Birthday emojis for variety
+ */
+const BIRTHDAY_EMOJIS = ['🎂', '🎉', '🎈', '🎁', '🎊', '🥳', '🎀', '🎆', '🎇', '✨', '🌟', '💫', '🎪', '🎭', '🎨', '🎵', '🎶', '🎸', '🎹', '🎺', '🎻', '🥁', '🎤', '🎧', '🎬', '🎮', '🎯', '🎲', '🎰', '🎳'];
+
+/**
+ * Get a birthday emoji
+ */
+function getBirthdayEmoji(index: number): string {
+  return BIRTHDAY_EMOJIS[index % BIRTHDAY_EMOJIS.length];
+}
+
+/**
+ * Get a random emoji (different from the birthday emoji)
+ */
+function getRandomEmoji(index: number): string {
+  // Use a different offset to get variety
+  const randomIndex = (index * 7 + 13) % BIRTHDAY_EMOJIS.length;
+  return BIRTHDAY_EMOJIS[randomIndex];
+}
+
+/**
+ * Get a short birthday message: birthday emoji + random emoji + name
+ */
+function getPersonalBirthdayMessage(name: string, index: number): string {
+  const birthdayEmoji = getBirthdayEmoji(index);
+  const randomEmoji = getRandomEmoji(index);
+  return `${birthdayEmoji} ${randomEmoji} ${name}`;
+}
+
+/**
  * Birthday service for managing birthday events
  */
 class BirthdayService {
@@ -96,19 +126,30 @@ class BirthdayService {
         a.birthday.getTime() - b.birthday.getTime()
       );
       
-      // Group sorted records by formatted date
-      const birthdaysByDate = sortedRecords.reduce<Record<string, string[]>>((acc, record) => {
+      // Group sorted records by formatted date with emojis
+      const birthdaysByDate = sortedRecords.reduce<Record<string, { name: string; randomEmoji: string }[]>>((acc, record, index) => {
         const dateKey = formatDateShort(record.birthday);
         const fullName = getFullName(record.firstName, record.lastName);
-        (acc[dateKey] ??= []).push(fullName);
+        const randomEmoji = getRandomEmoji(index);
+        (acc[dateKey] ??= []).push({ name: fullName, randomEmoji });
         return acc;
       }, {});
 
       // Extract sorted dates (already sorted since records were sorted)
       const sortedDates = Object.keys(birthdaysByDate);
 
-      const monthlyDigest = `📅 Upcoming Birthdays in ${monthName}:\n\n${ 
-        sortedDates.map(date => `🎂 ${date}: ${birthdaysByDate[date].join(', ')}`).join('\n')}`;
+      // Calculate max width for date string (including emoji and colon) for alignment
+      const maxDateWidth = Math.max(...sortedDates.map(date => `🎂 ${date}: `.length));
+
+      // Format with newlines: birthday cake emoji before date, random emoji at end of name
+      // Pad dates to align names
+      const monthlyDigest = sortedDates.map(date => {
+        const people = birthdaysByDate[date];
+        const namesWithEmojis = people.map(p => `${p.name} ${p.randomEmoji}`).join(', ');
+        const datePrefix = `🎂 ${date}: `;
+        const paddedDatePrefix = datePrefix.padEnd(maxDateWidth);
+        return `${paddedDatePrefix}${namesWithEmojis}`;
+      }).join('\n');
 
       return {
         todaysBirthdays,
@@ -206,6 +247,22 @@ class BirthdayService {
       logger.error('Error getting all birthdays for year', error);
       throw error;
     }
+  }
+
+  /**
+   * Format today's birthday messages with personal congrats
+   * @param birthdays - Array of birthday records for today
+   * @returns Array of personalized birthday messages
+   */
+  formatTodaysBirthdayMessages(birthdays: BirthdayRecord[]): string[] {
+    if (birthdays.length === 0) {
+      return [];
+    }
+
+    return birthdays.map((record, index) => {
+      const fullName = getFullName(record.firstName, record.lastName);
+      return getPersonalBirthdayMessage(fullName, index);
+    });
   }
 
   /**

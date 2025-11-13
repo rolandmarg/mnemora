@@ -1,13 +1,16 @@
-import birthdayService from './services/birthday.js';
-import { OutputChannelFactory } from './factories/output-channel.factory.js';
-import { getFullName } from './utils/name-helpers.js';
-import { logger } from './utils/logger.js';
-import { getMissedDates, updateLastRunDate } from './utils/last-run-tracker.js';
-import { startOfDay } from './utils/date-helpers.js';
+import birthdayService from '../services/birthday.js';
+import { OutputChannelFactory } from '../factories/output-channel.factory.js';
+import { getFullName } from '../utils/name-helpers.js';
+import { logger } from '../utils/logger.js';
+import { getMissedDates, updateLastRunDate } from '../utils/last-run-tracker.js';
+import { startOfDay } from '../utils/date-helpers.js';
 
 /**
- * Manual execution mode - runs once and exits
- * Scheduling is disabled. Run manually with: npm start or npm run dev
+ * Manual send script - always sends monthly digest + today's birthdays
+ * 
+ * This script is used for manual triggering (e.g., on bootup prompt)
+ * It always sends the monthly digest regardless of the current date
+ * It also checks for and sends missed days
  */
 
 async function checkAndSendMissedDays(): Promise<void> {
@@ -75,26 +78,24 @@ async function checkAndSendMissedDays(): Promise<void> {
   }
 }
 
-async function runBirthdayCheck(): Promise<void> {
+async function manualSend(): Promise<void> {
   let whatsappChannel: ReturnType<typeof OutputChannelFactory.createWhatsAppOutputChannel> | null = null;
 
   try {
     // First, check for and send missed days
     await checkAndSendMissedDays();
 
-    logger.info('Running birthday check...');
+    logger.info('Running manual send...');
     
-    const { todaysBirthdays, monthlyDigest } = await birthdayService.getTodaysBirthdaysWithOptionalDigest();
+    // Always get monthly digest (regardless of date)
+    const { todaysBirthdays, monthlyDigest } = await birthdayService.getTodaysBirthdaysWithMonthlyDigest();
     
+    // Send monthly digest to WhatsApp if available
     if (monthlyDigest) {
-      logger.info('First day of month detected - generating monthly digest');
-      logger.info('Monthly digest', { monthlyDigest });
-      
-      // Send monthly digest to WhatsApp if available
+      logger.info('Sending monthly digest to WhatsApp group...');
       try {
         whatsappChannel = OutputChannelFactory.createWhatsAppOutputChannel();
         if (whatsappChannel.isAvailable()) {
-          logger.info('Sending monthly digest to WhatsApp group...');
           const result = await whatsappChannel.send(monthlyDigest);
           if (result.success) {
             logger.info('Monthly digest sent to WhatsApp successfully', {
@@ -114,6 +115,7 @@ async function runBirthdayCheck(): Promise<void> {
       }
     }
     
+    // Send today's birthday messages if any
     if (todaysBirthdays.length === 0) {
       logger.info('No birthdays today!');
     } else {
@@ -154,12 +156,12 @@ async function runBirthdayCheck(): Promise<void> {
       }
     }
     
-    logger.info('Birthday check completed successfully!');
+    logger.info('Manual send completed successfully!');
     
     // Update last run date after successful completion
     updateLastRunDate();
   } catch (error) {
-    logger.error('Error in birthday check', error);
+    logger.error('Error in manual send', error);
     process.exit(1);
   } finally {
     // Give the client time to save the session before destroying
@@ -181,6 +183,6 @@ async function runBirthdayCheck(): Promise<void> {
   }
 }
 
-// Run the check
-runBirthdayCheck();
+// Run the manual send
+manualSend();
 
