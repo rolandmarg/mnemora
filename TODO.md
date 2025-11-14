@@ -195,7 +195,28 @@ interface MessageSendCompletedEvent {
 
 ## Low Priority / Future Considerations
 
-### 7. WhatsApp Cloud API Migration
+### 7. AWS Deployment Playbooks
+**Status**: Not Started  
+**Priority**: Low  
+**Estimated Effort**: Medium
+
+**Proposed Changes**:
+- Automated deployment playbooks for AWS infrastructure
+- Infrastructure as Code (IaC) improvements
+- Multi-environment deployment strategies
+- Automated rollback procedures
+- Blue-green deployment support
+
+**Implementation**:
+- Create deployment playbooks/scripts
+- Enhance SAM template with more configuration options
+- Add deployment validation steps
+- Create staging environment setup
+- Document deployment procedures
+
+---
+
+### 8. WhatsApp Cloud API Migration
 **Status**: Documented (see MIGRATION_GUIDE.md)  
 **Priority**: Low (when WhatsApp Web.js becomes unsupported)  
 **Estimated Effort**: High
@@ -208,7 +229,7 @@ interface MessageSendCompletedEvent {
 
 ---
 
-### 8. CI/CD Pipeline
+### 9. CI/CD Pipeline
 **Status**: Not Started  
 **Priority**: Low  
 **Estimated Effort**: Medium
@@ -221,7 +242,7 @@ interface MessageSendCompletedEvent {
 
 ---
 
-### 9. Unit and Integration Tests
+### 10. Unit and Integration Tests
 **Status**: Not Started  
 **Priority**: Low  
 **Estimated Effort**: High
@@ -239,7 +260,7 @@ interface MessageSendCompletedEvent {
 
 ---
 
-### 10. Configuration Management
+### 11. Configuration Management
 **Status**: Not Started  
 **Priority**: Low  
 **Estimated Effort**: Low
@@ -252,7 +273,7 @@ interface MessageSendCompletedEvent {
 
 ---
 
-### 11. Performance Optimization
+### 12. Performance Optimization
 **Status**: Not Started  
 **Priority**: Low  
 **Estimated Effort**: Medium
@@ -265,7 +286,7 @@ interface MessageSendCompletedEvent {
 
 ---
 
-### 12. Monitoring Dashboard Enhancements
+### 13. Monitoring Dashboard Enhancements
 **Status**: Partially Complete (see MONITORING.md)  
 **Priority**: Low  
 **Estimated Effort**: Low
@@ -280,7 +301,7 @@ interface MessageSendCompletedEvent {
 
 ## Technical Debt
 
-### 13. Type Safety Improvements
+### 14. Type Safety Improvements
 **Status**: Ongoing  
 **Priority**: Low  
 **Estimated Effort**: Low
@@ -292,7 +313,7 @@ interface MessageSendCompletedEvent {
 
 ---
 
-### 14. Error Handling Standardization
+### 15. Error Handling Standardization
 **Status**: Ongoing  
 **Priority**: Low  
 **Estimated Effort**: Low
@@ -304,7 +325,7 @@ interface MessageSendCompletedEvent {
 
 ---
 
-### 15. Documentation Updates
+### 16. Documentation Updates
 **Status**: Ongoing  
 **Priority**: Low  
 **Estimated Effort**: Low
@@ -318,7 +339,7 @@ interface MessageSendCompletedEvent {
 
 ## Research / Exploration
 
-### 16. Alternative Message Channels
+### 17. Alternative Message Channels
 **Status**: Research  
 **Priority**: Very Low  
 **Estimated Effort**: Unknown
@@ -331,7 +352,7 @@ interface MessageSendCompletedEvent {
 
 ---
 
-### 17. Machine Learning Enhancements
+### 18. Machine Learning Enhancements
 **Status**: Research  
 **Priority**: Very Low  
 **Estimated Effort**: High
