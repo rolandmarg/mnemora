@@ -46,23 +46,29 @@ interface OutputChannel {
 
 **Implementations:**
 - `ConsoleOutputChannel`: Outputs to console (fully implemented)
-- `SMSOutputChannel`, `WhatsAppOutputChannel`, `EmailOutputChannel`: Placeholders
+- `WhatsAppOutputChannel`: Sends messages via whatsapp-web.js (fully implemented)
+- `SMSOutputChannel`: Placeholder for Twilio SMS
+- `EmailOutputChannel`: Placeholder for email notifications
 
 ### Factories
 
-Create instances using Factory Pattern:
+Create instances using Factory Pattern with type-safe method names:
 
 ```typescript
-const calendarSource = DataSourceFactory.create('calendar');
-const consoleChannel = OutputChannelFactory.create('console');
+const calendarSource = DataSourceFactory.createCalendarDataSource();
+const sheetsSource = DataSourceFactory.createSheetsDataSource();
+const consoleChannel = OutputChannelFactory.createConsoleOutputChannel();
+const whatsappChannel = OutputChannelFactory.createWhatsAppOutputChannel();
 ```
+
+**Note:** Factories use explicit method names (e.g., `createCalendarDataSource()`) rather than string-based `create()` for better type safety and IDE autocomplete support.
 
 ## Data Flow
 
 ### Reading Birthdays
 
 1. Script → `birthdayService.getTodaysBirthdays()`
-2. Service → `DataSourceFactory.create('calendar')`
+2. Service → `DataSourceFactory.createCalendarDataSource()`
 3. Data Source → `calendarClient.fetchEvents()`
 4. Client → Google Calendar API
 5. Data Source converts `Event[]` → `BirthdayRecord[]`
@@ -106,8 +112,10 @@ interface Event {
 ### Type Safety
 
 - All data sources return `BirthdayRecord[]` (unified type)
-- Factories use function overloads for type-safe creation
+- Factories use explicit method names for type-safe creation (e.g., `createCalendarDataSource()`)
+- All classes extend base classes (`BaseDataSource<T>`, `BaseOutputChannel`)
 - No `any` types (strict TypeScript)
+- Interfaces enforce contracts at compile time
 
 ## Extension Points
 
@@ -128,8 +136,9 @@ export class CSVDataSource extends BaseDataSource<BirthdayRecord> {
 
 Add to `DataSourceFactory`:
 ```typescript
-export type DataSourceType = 'calendar' | 'sheets' | 'csv';
-static create(type: 'csv'): CSVDataSource;
+static createCSVDataSource(): CSVDataSource {
+  return new CSVDataSource(config);
+}
 ```
 
 ### Adding a New Output Channel
@@ -147,8 +156,9 @@ export class TelegramOutputChannel extends BaseOutputChannel {
 
 Add to `OutputChannelFactory`:
 ```typescript
-export type OutputChannelType = 'console' | 'sms' | 'whatsapp' | 'email' | 'telegram';
-static create(type: 'telegram'): TelegramOutputChannel;
+static createTelegramOutputChannel(): TelegramOutputChannel {
+  return new TelegramOutputChannel(config);
+}
 ```
 
 ## Performance
@@ -168,6 +178,29 @@ static create(type: 'telegram'): TelegramOutputChannel;
 ## Error Handling
 
 - Service layer: Catches, logs, and re-throws with context
-- Data sources: Return error counts in results
+- Data sources: Return error counts in results (`WriteResult`, `DeleteResult`)
 - Output channels: Return `SendResult` with success/error status
 - Scripts: Catch errors, log, and exit with appropriate codes
+- All async operations wrapped in try/catch blocks
+- Structured logging with `pino` for error tracking
+
+## Architecture Compliance
+
+### ✅ Current Implementation Status
+
+- **All data sources** extend `BaseDataSource<BirthdayRecord>` ✅
+- **All output channels** extend `BaseOutputChannel` ✅
+- **All instantiations** go through factories ✅
+- **No direct instantiations** of concrete classes outside factories ✅
+- **Interfaces properly defined** and implemented ✅
+- **Type safety** enforced throughout ✅
+- **Base classes** provide default implementations where appropriate ✅
+
+### Best Practices Followed
+
+1. **Separation of Concerns**: Clear boundaries between data sources, output channels, and services
+2. **Dependency Inversion**: High-level modules depend on abstractions (interfaces), not concrete implementations
+3. **Open/Closed Principle**: Easy to extend with new data sources/channels without modifying existing code
+4. **Single Responsibility**: Each class has one clear purpose
+5. **Factory Pattern**: Centralized creation logic with type safety
+6. **Template Method Pattern**: Base classes define structure, subclasses implement specifics

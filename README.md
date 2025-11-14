@@ -2,6 +2,17 @@
 
 A TypeScript bot that manages birthdays across multiple data sources (Google Calendar, Google Sheets) and sends notifications through multiple output channels (Console, SMS, WhatsApp, Email).
 
+## ⚠️ Disclaimer
+
+**This project was primarily developed with the assistance of AI (Claude/Cursor AI).** While the code has been reviewed and tested, please be aware that:
+
+- Most of the codebase was generated or significantly assisted by AI models
+- The architecture and implementation decisions were made in collaboration with AI assistance
+- Code quality and patterns follow AI-generated conventions
+- Manual review and testing have been performed, but the codebase may contain AI-generated patterns or approaches
+
+For more details, see [DISCLAIMER.md](./DISCLAIMER.md).
+
 ## Features
 
 - 🎂 Daily birthday checks
@@ -16,7 +27,8 @@ A TypeScript bot that manages birthdays across multiple data sources (Google Cal
 - Yarn
 - Google Calendar API credentials
 - Google Sheets API credentials (optional)
-- Twilio account (optional, for SMS/WhatsApp)
+- WhatsApp account (for WhatsApp notifications via whatsapp-web.js)
+- Twilio account (optional, for SMS only)
 
 ## Setup
 
@@ -52,10 +64,13 @@ GOOGLE_PROJECT_ID=your-project-id
 # Google Sheets (optional)
 GOOGLE_SPREADSHEET_ID=your-spreadsheet-id
 
-# Twilio (optional)
+# WhatsApp (optional - uses whatsapp-web.js)
+# Set to the name of your WhatsApp group (e.g., "Bday bot testing")
+WHATSAPP_GROUP_ID=your-whatsapp-group-name
+
+# Twilio (optional, for SMS only)
 TWILIO_ACCOUNT_SID=your-account-sid
 TWILIO_AUTH_TOKEN=your-auth-token
-TWILIO_WHATSAPP_NUMBER=whatsapp:+14155238886
 TWILIO_SMS_NUMBER=+1234567890
 
 # Configuration
@@ -82,6 +97,8 @@ yarn get-all-birthdays                       # Read from Sheets, sync to Calenda
 yarn delete-events --all                     # Delete all birthday events
 yarn delete-events --all --date-range "2024-01-01" "2024-12-31"  # Delete in date range
 yarn manual-send                             # Manually send monthly digest + today's birthdays
+yarn send-monthly-digest-whatsapp            # Send monthly digest to WhatsApp group
+yarn send-test-message-whatsapp "Group Name" "Message"  # Send test message to WhatsApp
 ```
 
 ### Local Scheduling Setup (macOS)
@@ -95,9 +112,11 @@ yarn install-cron
 ```
 
 This will:
-- Install a cron job that runs daily at 9:00 AM (system timezone - adjust if needed)
+- Install a LaunchAgent that runs daily at 9:00 AM Los Angeles time
 - Install a LaunchAgent that prompts you to send messages on login/bootup
 - Create log files in `logs/` directory
+
+**Note:** On first run, WhatsApp will display a QR code in the terminal. Scan it with your WhatsApp mobile app to authenticate. The session will be saved for future use.
 
 #### Uninstallation
 
@@ -187,6 +206,11 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for details.
 
 - **Calendar Issues**: Ensure service account has calendar access, check calendar ID
 - **Sheets Issues**: Ensure service account has sheet access, check spreadsheet ID
+- **WhatsApp Issues**: 
+  - First time: Scan QR code displayed in terminal with WhatsApp mobile app
+  - Session saved: Check `.wwebjs_auth/` directory for saved session
+  - Group not found: Ensure `WHATSAPP_GROUP_ID` matches exact group name
+  - Connection issues: WhatsApp Web requires internet connection and phone to be online
 - **Timezone Issues**: Set `TIMEZONE` env var (defaults to `America/Los_Angeles`)
 - **Logging**: Uses structured JSON logging with `pino`. Use `pino-pretty` for development
 
