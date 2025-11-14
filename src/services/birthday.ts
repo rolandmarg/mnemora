@@ -1,7 +1,34 @@
+/**
+ * Birthday Service
+ * 
+ * Handles birthday data fetching, formatting, and message generation.
+ * Provides business logic for birthday operations.
+ */
+
+// External dependencies
+// (none)
+
+// Internal modules - Factories
 import { DataSourceFactory } from '../factories/data-source.factory.js';
-import { today, formatDateShort, formatDateMonthYear, startOfDay, isFirstDayOfMonth, startOfMonth, endOfMonth, startOfYear, endOfYear } from '../utils/date-helpers.js';
-import { getFullName } from '../utils/name-helpers.js';
+
+// Internal modules - Utils
 import { logger } from '../utils/logger.js';
+import { getFullName } from '../utils/name-helpers.js';
+import {
+  today,
+  formatDateShort,
+  formatDateMonthYear,
+  startOfDay,
+  isFirstDayOfMonth,
+  startOfMonth,
+  endOfMonth,
+  startOfYear,
+  endOfYear,
+} from '../utils/date-helpers.js';
+import { trackBirthdayFetch, trackApiCall, trackOperationDuration } from '../utils/metrics.js';
+import { sendGoogleCalendarApiFailedAlert, sendApiQuotaWarningAlert } from '../utils/alerting.js';
+
+// Internal modules - Types
 import type { BirthdayRecord } from '../utils/birthday-helpers.js';
 import type { OutputChannel } from '../interfaces/output-channel.interface.js';
 import type { WriteResult } from '../interfaces/data-source.interface.js';
@@ -48,13 +75,51 @@ class BirthdayService {
    * @returns Array of birthday records for today
    */
   async getTodaysBirthdays(): Promise<BirthdayRecord[]> {
+    const startTime = Date.now();
     try {
       const todayDate = today();
+      trackApiCall('calendar', true);
       const records = await this.calendarSource.read({ startDate: todayDate, endDate: todayDate });
+      
+      trackBirthdayFetch(records.length);
+      trackOperationDuration('getTodaysBirthdays', Date.now() - startTime);
       
       return records;
     } catch (error) {
+      trackApiCall('calendar', false);
+      trackOperationDuration('getTodaysBirthdays', Date.now() - startTime, { success: 'false' });
       logger.error('Error getting today\'s birthdays', error);
+      
+      // Determine error type and send appropriate alert
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const isAuthError = errorMessage.includes('401') || errorMessage.includes('403') || errorMessage.includes('authentication') || errorMessage.includes('permission');
+      const isQuotaError = errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate limit');
+      const isNetworkError = errorMessage.includes('timeout') || errorMessage.includes('ECONNREFUSED') || errorMessage.includes('network');
+      
+      if (isAuthError) {
+        sendGoogleCalendarApiFailedAlert(error, {
+          errorType: 'authentication',
+          operation: 'getTodaysBirthdays',
+        });
+      } else if (isQuotaError) {
+        sendApiQuotaWarningAlert('calendar', 100, {
+          errorMessage,
+          operation: 'getTodaysBirthdays',
+        });
+      } else if (isNetworkError) {
+        // Network errors are warnings (may be transient)
+        sendGoogleCalendarApiFailedAlert(error, {
+          errorType: 'network',
+          operation: 'getTodaysBirthdays',
+        });
+      } else {
+        // Other errors are critical (unknown issues)
+        sendGoogleCalendarApiFailedAlert(error, {
+          errorType: 'unknown',
+          operation: 'getTodaysBirthdays',
+        });
+      }
+      
       throw error;
     }
   }
@@ -97,11 +162,13 @@ class BirthdayService {
     todaysBirthdays: BirthdayRecord[];
     monthlyDigest: string;
   }> {
+    const startTime = Date.now();
     try {
       const todayDate = today();
       // Fetch entire month once
       const monthStart = startOfMonth(todayDate);
       const monthEnd = endOfMonth(todayDate);
+      trackApiCall('calendar', true);
       const monthRecords = await this.calendarSource.read({ startDate: monthStart, endDate: monthEnd });
       
       // Filter for today's birthdays from the month data
@@ -151,12 +218,46 @@ class BirthdayService {
         return `${paddedDatePrefix}${namesWithEmojis}`;
       }).join('\n');
 
+      trackBirthdayFetch(monthRecords.length);
+      trackOperationDuration('getTodaysBirthdaysWithMonthlyDigest', Date.now() - startTime);
+
       return {
         todaysBirthdays,
         monthlyDigest,
       };
     } catch (error) {
+      trackApiCall('calendar', false);
+      trackOperationDuration('getTodaysBirthdaysWithMonthlyDigest', Date.now() - startTime, { success: 'false' });
       logger.error('Error getting today\'s birthdays and monthly digest', error);
+      
+      // Determine error type and send appropriate alert
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const isAuthError = errorMessage.includes('401') || errorMessage.includes('403') || errorMessage.includes('authentication') || errorMessage.includes('permission');
+      const isQuotaError = errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate limit');
+      const isNetworkError = errorMessage.includes('timeout') || errorMessage.includes('ECONNREFUSED') || errorMessage.includes('network');
+      
+      if (isAuthError) {
+        sendGoogleCalendarApiFailedAlert(error, {
+          errorType: 'authentication',
+          operation: 'getTodaysBirthdaysWithMonthlyDigest',
+        });
+      } else if (isQuotaError) {
+        sendApiQuotaWarningAlert('calendar', 100, {
+          errorMessage,
+          operation: 'getTodaysBirthdaysWithMonthlyDigest',
+        });
+      } else if (isNetworkError) {
+        sendGoogleCalendarApiFailedAlert(error, {
+          errorType: 'network',
+          operation: 'getTodaysBirthdaysWithMonthlyDigest',
+        });
+      } else {
+        sendGoogleCalendarApiFailedAlert(error, {
+          errorType: 'unknown',
+          operation: 'getTodaysBirthdaysWithMonthlyDigest',
+        });
+      }
+      
       throw error;
     }
   }
@@ -168,10 +269,46 @@ class BirthdayService {
    * @returns Array of birthday records in the date range
    */
   async getBirthdays(startDate: Date, endDate: Date): Promise<BirthdayRecord[]> {
+    const startTime = Date.now();
     try {
-      return await this.calendarSource.read({ startDate, endDate });
+      trackApiCall('calendar', true);
+      const records = await this.calendarSource.read({ startDate, endDate });
+      trackBirthdayFetch(records.length);
+      trackOperationDuration('getBirthdays', Date.now() - startTime);
+      return records;
     } catch (error) {
+      trackApiCall('calendar', false);
+      trackOperationDuration('getBirthdays', Date.now() - startTime, { success: 'false' });
       logger.error('Error getting birthdays', error);
+      
+      // Determine error type and send appropriate alert
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const isAuthError = errorMessage.includes('401') || errorMessage.includes('403') || errorMessage.includes('authentication') || errorMessage.includes('permission');
+      const isQuotaError = errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate limit');
+      const isNetworkError = errorMessage.includes('timeout') || errorMessage.includes('ECONNREFUSED') || errorMessage.includes('network');
+      
+      if (isAuthError) {
+        sendGoogleCalendarApiFailedAlert(error, {
+          errorType: 'authentication',
+          operation: 'getBirthdays',
+        });
+      } else if (isQuotaError) {
+        sendApiQuotaWarningAlert('calendar', 100, {
+          errorMessage,
+          operation: 'getBirthdays',
+        });
+      } else if (isNetworkError) {
+        sendGoogleCalendarApiFailedAlert(error, {
+          errorType: 'network',
+          operation: 'getBirthdays',
+        });
+      } else {
+        sendGoogleCalendarApiFailedAlert(error, {
+          errorType: 'unknown',
+          operation: 'getBirthdays',
+        });
+      }
+      
       throw error;
     }
   }
@@ -186,12 +323,12 @@ class BirthdayService {
     startDate: Date,
     endDate: Date
   ): Promise<{ deletedCount: number; skippedCount: number; errorCount: number }> {
-    try {
-      return await this.calendarSource.deleteAll({ startDate, endDate });
-    } catch (error) {
-      logger.error('Error deleting birthdays', error);
-      throw error;
-    }
+    const { auditDeletionAttempt, SecurityError } = await import('../utils/security.js');
+    auditDeletionAttempt('BirthdayService.deleteAllBirthdays', {
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+    });
+    throw new SecurityError('Deletion of birthday events is disabled for security reasons');
   }
 
   /**
@@ -199,12 +336,19 @@ class BirthdayService {
    * @returns Array of birthday records from sheets
    */
   async readFromSheets(): Promise<BirthdayRecord[]> {
+    const startTime = Date.now();
     try {
       if (!this.sheetsSource.isAvailable()) {
         throw new Error('Google Sheets is not configured');
       }
-      return await this.sheetsSource.read({ skipHeaderRow: true });
+      trackApiCall('sheets', true);
+      const records = await this.sheetsSource.read({ skipHeaderRow: true });
+      trackBirthdayFetch(records.length);
+      trackOperationDuration('readFromSheets', Date.now() - startTime);
+      return records;
     } catch (error) {
+      trackApiCall('sheets', false);
+      trackOperationDuration('readFromSheets', Date.now() - startTime, { success: 'false' });
       logger.error('Error reading from sheets', error);
       throw error;
     }
@@ -307,7 +451,9 @@ class BirthdayService {
       // Use the first record's birthday date to get month name (all records in group have same date)
       const birthdaysByMonth = sortedDates.reduce<Record<string, { date: string; records: BirthdayRecord[] }[]>>((acc, date) => {
         const records = birthdaysByDate[date];
-        if (records.length === 0) return acc;
+        if (records.length === 0) {
+          return acc;
+        }
         
         // Use the first record's birthday to get month name (all records have same date)
         const monthName = records[0].birthday.toLocaleString('default', { month: 'long' });

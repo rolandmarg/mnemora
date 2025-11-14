@@ -4,9 +4,12 @@ import { getFullName } from '../utils/name-helpers.js';
 import { logger } from '../utils/logger.js';
 import { getMissedDates, updateLastRunDate } from '../utils/last-run-tracker.js';
 import { startOfDay } from '../utils/date-helpers.js';
+import { requireDevelopment, auditManualSend, SecurityError } from '../utils/security.js';
 
 /**
  * Manual send script - always sends monthly digest + today's birthdays
+ * 
+ * SECURITY: This script is disabled in production to prevent unauthorized message sending
  * 
  * This script is used for manual triggering (e.g., on bootup prompt)
  * It always sends the monthly digest regardless of the current date
@@ -14,7 +17,7 @@ import { startOfDay } from '../utils/date-helpers.js';
  */
 
 async function checkAndSendMissedDays(): Promise<void> {
-  const missedDates = getMissedDates();
+  const missedDates = await getMissedDates();
   
   if (missedDates.length === 0) {
     return;
@@ -79,6 +82,33 @@ async function checkAndSendMissedDays(): Promise<void> {
 }
 
 async function manualSend(): Promise<void> {
+  // SECURITY: Block in production
+  try {
+    requireDevelopment();
+  } catch (error) {
+    if (error instanceof SecurityError) {
+      auditManualSend('manual-send.ts', {
+        blocked: true,
+        reason: 'production_environment',
+      });
+      logger.error('SECURITY: Manual send blocked in production', {
+        script: 'manual-send.ts',
+        environment: process.env.NODE_ENV,
+      });
+      console.error('\n❌ SECURITY ERROR: Manual send is disabled in production\n');
+      console.error('Manual send scripts are disabled in production environment.');
+      console.error('Set NODE_ENV=development to enable manual sending.\n');
+      process.exit(1);
+    }
+    throw error;
+  }
+
+  // Audit log the manual send attempt
+  auditManualSend('manual-send.ts', {
+    blocked: false,
+    environment: process.env.NODE_ENV ?? 'development',
+  });
+
   let whatsappChannel: ReturnType<typeof OutputChannelFactory.createWhatsAppOutputChannel> | null = null;
 
   try {
@@ -125,9 +155,7 @@ async function manualSend(): Promise<void> {
       
       // Send personal birthday messages to WhatsApp if available
       try {
-        if (!whatsappChannel) {
-          whatsappChannel = OutputChannelFactory.createWhatsAppOutputChannel();
-        }
+        whatsappChannel ??= OutputChannelFactory.createWhatsAppOutputChannel();
         if (whatsappChannel.isAvailable()) {
           const birthdayMessages = birthdayService.formatTodaysBirthdayMessages(todaysBirthdays);
           logger.info('Sending birthday messages to WhatsApp group...');
@@ -159,7 +187,7 @@ async function manualSend(): Promise<void> {
     logger.info('Manual send completed successfully!');
     
     // Update last run date after successful completion
-    updateLastRunDate();
+    await updateLastRunDate();
   } catch (error) {
     logger.error('Error in manual send', error);
     process.exit(1);

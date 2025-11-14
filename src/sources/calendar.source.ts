@@ -23,7 +23,9 @@ import { logger } from '../utils/logger.js';
  */
 function eventToBirthdayRecord(event: Event): BirthdayRecord | null {
   const startDate = event.start?.date ?? event.start?.dateTime;
-  if (!startDate) return null;
+  if (!startDate) {
+    return null;
+  }
   
   try {
     const birthday = parseDateFromString(startDate);
@@ -36,7 +38,7 @@ function eventToBirthdayRecord(event: Event): BirthdayRecord | null {
     
     return {
       firstName,
-      lastName: lastName || undefined,
+      lastName: lastName ?? undefined,
       birthday,
       year,
     };
@@ -104,27 +106,27 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
 
   /**
    * Delete a single event from the calendar
+   * 
+   * SECURITY: This method is disabled to prevent unauthorized deletion
    */
   async delete(id: string): Promise<boolean> {
-    return calendarClient.deleteEvent(id);
+    const { auditDeletionAttempt, SecurityError } = await import('../utils/security.js');
+    auditDeletionAttempt('CalendarDataSource.delete', { eventId: id });
+    throw new SecurityError('Deletion of birthday events is disabled for security reasons');
   }
 
   /**
    * Delete all birthdays in bulk mode by date range
+   * 
+   * SECURITY: This method is disabled to prevent unauthorized deletion
    */
   async deleteAll(options: ReadOptions): Promise<DeleteResult> {
-    const { startDate, endDate } = options;
-    
-    if (!startDate || !endDate) {
-      return { deletedCount: 0, skippedCount: 0, errorCount: 0 };
-    }
-    
-    // Fetch events with IDs for deletion
-    const events = await calendarClient.fetchEvents({ startDate, endDate });
-    const birthdayEvents = events.filter(event => isBirthdayEvent(event));
-    
-    // Delete all birthday events
-    return calendarClient.deleteAllEvents(birthdayEvents);
+    const { auditDeletionAttempt, SecurityError } = await import('../utils/security.js');
+    auditDeletionAttempt('CalendarDataSource.deleteAll', { 
+      startDate: options.startDate?.toISOString(),
+      endDate: options.endDate?.toISOString(),
+    });
+    throw new SecurityError('Deletion of birthday events is disabled for security reasons');
   }
 
   async write(data: BirthdayRecord[], _options?: WriteOptions): Promise<WriteResult> {

@@ -1,11 +1,17 @@
 /**
- * Date utility functions
+ * Date Utility Functions
  * 
  * All date operations use the timezone from config (defaults to America/Los_Angeles).
  * Dates are explicitly converted to the configured timezone using date-fns-tz.
+ * 
+ * This module provides timezone-aware date operations for consistent date handling
+ * across the application.
  */
 
+// External dependencies
 import { fromZonedTime, toZonedTime } from 'date-fns-tz';
+
+// Internal modules
 import { config } from '../config.js';
 
 /**

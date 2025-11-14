@@ -58,7 +58,7 @@ async function getAllBirthdays(): Promise<void> {
     if (birthdayRecords.length === 0) {
       ctx.log.info('Completed successfully - no birthdays found');
     } else {
-      ctx.log.info(`Found ${birthdayRecords.length} birthday(s) in ${year}`);
+    ctx.log.info(`Found ${birthdayRecords.length} birthday(s) in ${year}`);
     }
     
     await birthdayService.formatAndSendAllBirthdays(ctx.outputChannel, birthdayRecords);

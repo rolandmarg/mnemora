@@ -24,7 +24,11 @@
     "lint:fix": "eslint --cache --cache-location .eslintcache --max-warnings 0 src/**/*.ts --fix",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "build:lambda": "yarn build",
+    "package:lambda": "sam build",
+    "deploy:lambda": "sam deploy --guided",
+    "invoke:local": "sam local invoke BirthdayBotFunction --event events/event.json"
   },
   "keywords": [
     "calendar",
@@ -35,16 +39,24 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@aws-sdk/client-cloudwatch": "^3.931.0",
+    "@aws-sdk/client-cloudwatch-logs": "^3.931.0",
+    "@aws-sdk/client-dynamodb": "^3.931.0",
+    "@aws-sdk/client-s3": "^3.931.0",
+    "@aws-sdk/client-sns": "^3.931.0",
+    "aws-xray-sdk-core": "^3.11.0",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
     "dotenv": "^16.4.5",
     "googleapis": "^144.0.0",
     "pino": "^10.1.0",
     "qrcode-terminal": "^0.12.0",
+    "uuid": "^13.0.0",
     "whatsapp-web.js": "^1.23.0"
   },
   "devDependencies": {
     "@types/node": "^24.10.0",
+    "@types/uuid": "^11.0.0",
     "@typescript-eslint/eslint-plugin": "^8.46.3",
     "@typescript-eslint/parser": "^8.46.3",
     "@vitest/ui": "^4.0.7",

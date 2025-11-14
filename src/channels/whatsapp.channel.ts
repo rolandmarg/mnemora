@@ -15,6 +15,17 @@ const { Client, LocalAuth } = pkg;
 import qrcode from 'qrcode-terminal';
 import { BaseOutputChannel } from '../base/base-output-channel.js';
 import { logger } from '../utils/logger.js';
+import { trackWhatsAppMessageSent, trackWhatsAppAuthRequired, trackOperationDuration } from '../utils/metrics.js';
+import { createWhatsAppSessionStorage } from '../utils/s3-storage.js';
+import { authReminder } from '../utils/auth-reminder.js';
+import {
+  sendWhatsAppAuthRequiredAlert,
+  sendWhatsAppClientInitFailedAlert,
+  sendWhatsAppGroupNotFoundAlert,
+  sendWhatsAppMessageFailedAlert,
+  sendWhatsAppAuthRefreshNeededAlert,
+} from '../utils/alerting.js';
+import { logSentMessage } from '../utils/message-logger.js';
 import type { SendOptions, SendResult, OutputChannelMetadata } from '../interfaces/output-channel.interface.js';
 import type { AppConfig } from '../config.js';
 import { existsSync, mkdirSync } from 'fs';
@@ -32,15 +43,25 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
   private isInitializing: boolean = false;
   private readonly config: AppConfig;
   private readonly sessionPath: string;
+  private readonly sessionStorage: ReturnType<typeof createWhatsAppSessionStorage>;
+  private readonly isLambda: boolean;
+  private authRequired: boolean = false;
 
   constructor(config: AppConfig) {
     super();
     this.config = config;
+    this.isLambda = !!(
+      process.env.AWS_LAMBDA_FUNCTION_NAME ??
+      process.env.LAMBDA_TASK_ROOT ??
+      process.env.AWS_EXECUTION_ENV
+    );
+    
     // Store session data in .wwebjs_auth directory
     this.sessionPath = join(process.cwd(), '.wwebjs_auth');
+    this.sessionStorage = createWhatsAppSessionStorage();
     
-    // Ensure session directory exists
-    if (!existsSync(this.sessionPath)) {
+    // Ensure session directory exists (for local development)
+    if (!this.isLambda && !existsSync(this.sessionPath)) {
       mkdirSync(this.sessionPath, { recursive: true });
     }
   }
@@ -139,7 +160,7 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
     }
 
     // Set a timeout for initialization (3 minutes)
-    let initTimeout: NodeJS.Timeout | null = setTimeout(() => {
+    let initTimeout: ReturnType<typeof setTimeout> | null = setTimeout(() => {
       if (!this.isReady) {
         logger.error('WhatsApp client initialization timeout');
         this.isInitializing = false;
@@ -160,24 +181,61 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
       }
     };
 
-    // QR Code event - display in terminal
+    // QR Code event - display in terminal or CloudWatch Logs
     this.client.on('qr', (qr: string) => {
       clearInitTimeout(); // Reset timeout when QR is shown
-      console.log('\n' + '='.repeat(60));
-      console.log('🔐 WHATSAPP AUTHENTICATION REQUIRED');
-      console.log('='.repeat(60));
-      console.log('\n📱 Please scan the QR code below with your WhatsApp mobile app:');
-      console.log('   1. Open WhatsApp on your phone');
-      console.log('   2. Go to Settings > Linked Devices');
-      console.log('   3. Tap "Link a Device"');
-      console.log('   4. Scan the QR code below\n');
-      console.log('-'.repeat(60));
-      qrcode.generate(qr, { small: true });
-      console.log('-'.repeat(60));
-      console.log('\n⏳ Waiting for you to scan the QR code...');
-      console.log('💡 Keep this terminal open while scanning\n');
+      trackWhatsAppAuthRequired();
+      this.authRequired = true;
       
-      logger.info('QR code displayed - waiting for user to scan');
+      // Send alert that authentication is required
+      sendWhatsAppAuthRequiredAlert({
+        qrCodeAvailable: true,
+        environment: this.isLambda ? 'lambda' : 'local',
+      });
+
+      if (this.isLambda) {
+        // In Lambda: Output QR code as structured JSON to CloudWatch Logs
+        logger.warn('🔐 WHATSAPP AUTHENTICATION REQUIRED - QR CODE IN LOGS', {
+          qrCode: qr,
+          instructions: [
+            '1. Open CloudWatch Logs and find this log entry',
+            '2. Copy the qrCode value from the log',
+            '3. Open WhatsApp on your phone',
+            '4. Go to Settings > Linked Devices',
+            '5. Tap "Link a Device"',
+            '6. Use a QR code generator to display the code and scan it',
+            `7. Or use: https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${  encodeURIComponent(qr)}`,
+          ],
+          qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`,
+          note: 'Lambda will timeout, but session will be saved to S3. Next invocation will use saved session.',
+        });
+        
+        // Also log QR code in a format that can be easily extracted
+        logger.info('QR_CODE_FOR_SCANNING', {
+          qrCode: qr,
+          format: 'base64',
+        });
+      } else {
+        // Local: Display QR code in terminal
+        console.log(`\n${  '='.repeat(60)}`);
+        console.log('🔐 WHATSAPP AUTHENTICATION REQUIRED');
+        console.log('='.repeat(60));
+        console.log('\n📱 Please scan the QR code below with your WhatsApp mobile app:');
+        console.log('   1. Open WhatsApp on your phone');
+        console.log('   2. Go to Settings > Linked Devices');
+        console.log('   3. Tap "Link a Device"');
+        console.log('   4. Scan the QR code below\n');
+        console.log('-'.repeat(60));
+        qrcode.generate(qr, { small: true });
+        console.log('-'.repeat(60));
+        console.log('\n⏳ Waiting for you to scan the QR code...');
+        console.log('💡 Keep this terminal open while scanning\n');
+      }
+      
+      logger.info('QR code displayed - waiting for user to scan', { 
+        qrCode: qr,
+        environment: this.isLambda ? 'lambda' : 'local',
+      });
     });
 
     // Loading screen event
@@ -193,11 +251,22 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
     });
 
     // Ready event - client is ready to use
-    this.client.on('ready', () => {
+    this.client.on('ready', async () => {
       clearInitTimeout();
-      console.log('✅ WhatsApp client is ready!');
-      console.log('💾 Session saved - you won\'t need to scan QR code again\n');
+      this.authRequired = false;
+      
+      if (!this.isLambda) {
+        console.log('✅ WhatsApp client is ready!');
+        console.log('💾 Session saved - you won\'t need to scan QR code again\n');
+      }
+      
       logger.info('WhatsApp client is ready');
+      
+      // Record authentication in reminder system
+      await authReminder.recordAuthentication().catch(() => {
+        // Ignore errors - non-critical
+      });
+      
       this.isReady = true;
       this.isInitializing = false;
       // Give a moment for session to be fully saved
@@ -212,7 +281,12 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
       logger.error('WhatsApp authentication failed', { error: msg });
       this.isReady = false;
       this.isInitializing = false;
-      reject(new Error(`WhatsApp authentication failed: ${msg}`));
+      const error = new Error(`WhatsApp authentication failed: ${msg}`);
+      sendWhatsAppClientInitFailedAlert(error, {
+        reason: 'auth_failure',
+        message: msg,
+      });
+      reject(error);
     });
 
     // Disconnected event
@@ -248,7 +322,12 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
         });
         this.client = null;
       }
-      reject(error instanceof Error ? error : new Error(String(error)));
+      const initError = error instanceof Error ? error : new Error(String(error));
+      sendWhatsAppClientInitFailedAlert(initError, {
+        reason: 'initialization_error',
+        errorMessage,
+      });
+      reject(initError);
     };
 
     // Handle client errors
@@ -266,7 +345,21 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
   }
 
   async send(message: string, options?: SendOptions): Promise<SendResult> {
+    const startTime = Date.now();
     try {
+      // Check if auth refresh is needed
+      await authReminder.checkAndEmitReminder().catch(() => {
+        // Ignore errors - non-critical
+      });
+      
+      // Get auth status and send INFO alert if refresh needed (7+ days)
+      const authStatus = await authReminder.getAuthStatus().catch(() => null);
+      if (authStatus?.needsRefresh) {
+        sendWhatsAppAuthRefreshNeededAlert(authStatus.daysSinceAuth, {
+          lastAuthDate: authStatus.lastAuthDate?.toISOString(),
+        });
+      }
+
       // Initialize client if needed
       await this.initializeClient();
 
@@ -308,19 +401,24 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
       }
 
       // Use group ID from config or from options
-      let groupId = options?.recipients?.[0] || this.config.whatsapp.groupId;
+      let groupId = options?.recipients?.[0] ?? this.config.whatsapp.groupId;
 
       // If groupId looks like a name (contains spaces or doesn't match ID pattern), search for it
       if (groupId && !groupId.includes('@') && (groupId.includes(' ') || !/^\d+$/.test(groupId))) {
         logger.info(`Searching for group by name: ${groupId}`);
         const foundGroupId = await this.findGroupByName(groupId);
+        
         if (foundGroupId) {
           groupId = foundGroupId;
           logger.info(`Found group ID: ${foundGroupId}`);
         } else {
+          const error = new Error(`Group "${groupId}" not found`);
+          sendWhatsAppGroupNotFoundAlert(groupId, {
+            searchedName: groupId,
+          });
           return {
             success: false,
-            error: new Error(`Group "${groupId}" not found`),
+            error,
           };
         }
       }
@@ -348,10 +446,32 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
 
           const result = await this.client.sendMessage(chatId, message);
 
+          const duration = Date.now() - startTime;
+          trackWhatsAppMessageSent(true);
+          trackOperationDuration('whatsapp.send', duration, { success: 'true', attempt: attempt.toString() });
+
           logger.info('WhatsApp message sent successfully', {
             groupId: chatId,
             messageId: result.id._serialized,
             attempt,
+            duration,
+          });
+
+          // Log and persist message (full content)
+          await logSentMessage(
+            result.id._serialized,
+            'other', // Will be set by caller if known
+            chatId,
+            message,
+            true,
+            duration,
+            undefined,
+            {
+              attempt,
+              from: result.from,
+            }
+          ).catch(() => {
+            // Ignore errors - message logging is non-critical
           });
 
           return {
@@ -395,9 +515,35 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
       }
       
       // Should never reach here, but TypeScript needs it
-      throw lastError || new Error('Failed to send message after retries');
+      throw lastError ?? new Error('Failed to send message after retries');
     } catch (error) {
+      const duration = Date.now() - startTime;
+      trackWhatsAppMessageSent(false);
+      trackOperationDuration('whatsapp.send', duration, { success: 'false' });
       logger.error('Error sending WhatsApp message', error);
+      
+      // Send alert for message send failure (after all retries)
+      sendWhatsAppMessageFailedAlert(error, {
+        groupId: options?.recipients?.[0] ?? this.config.whatsapp.groupId,
+        retries: 3, // maxRetries constant
+      });
+
+      // Log and persist failed message (full content)
+      await logSentMessage(
+        undefined,
+        'other', // Will be set by caller if known
+        options?.recipients?.[0] ?? this.config.whatsapp.groupId ?? 'unknown',
+        message,
+        false,
+        duration,
+        error,
+        {
+          retries: 3,
+        }
+      ).catch(() => {
+        // Ignore errors - message logging is non-critical
+      });
+      
       return {
         success: false,
         error: error instanceof Error ? error : new Error(String(error)),
@@ -435,6 +581,54 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
       logger.error('Error finding group by name', error);
       throw error;
     }
+  }
+
+  /**
+   * Check if authentication is required
+   */
+  async requiresAuth(): Promise<boolean> {
+    // Check auth reminder system
+    const needsRefresh = await authReminder.isRefreshNeeded();
+    if (needsRefresh) {
+      return true;
+    }
+
+    // Check if client needs authentication
+    if (this.authRequired) {
+      return true;
+    }
+
+    // Check if session exists
+    if (this.isLambda) {
+      // In Lambda, check S3 for session
+      const sessionExists = await this.sessionStorage.fileExists('session.json').catch(() => false);
+      return !sessionExists;
+    }
+    
+    // Local: check filesystem
+    const sessionFile = join(this.sessionPath, 'session.json');
+    return !existsSync(sessionFile);
+  }
+
+  /**
+   * Get authentication status
+   */
+  async getAuthStatus(): Promise<{
+    isReady: boolean;
+    requiresAuth: boolean;
+    authRequired: boolean;
+    lastAuthDate: Date | null;
+    daysSinceAuth: number | null;
+  }> {
+    const authStatus = await authReminder.getAuthStatus();
+    
+    return {
+      isReady: this.isReady,
+      requiresAuth: await this.requiresAuth(),
+      authRequired: this.authRequired,
+      lastAuthDate: authStatus.lastAuthDate,
+      daysSinceAuth: authStatus.daysSinceAuth,
+    };
   }
 
   isAvailable(): boolean {

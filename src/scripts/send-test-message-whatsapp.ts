@@ -1,19 +1,51 @@
 import { OutputChannelFactory } from '../factories/output-channel.factory.js';
 import { logger } from '../utils/logger.js';
+import { requireDevelopment, auditManualSend, SecurityError } from '../utils/security.js';
 
 /**
  * Script to send a test message to a WhatsApp group by name
+ * 
+ * SECURITY: This script is disabled in production to prevent unauthorized message sending
  * 
  * Usage: yarn send-test-message-whatsapp "Group Name" "Message"
  */
 
 async function sendTestMessageWhatsApp(): Promise<void> {
+  // SECURITY: Block in production
+  try {
+    requireDevelopment();
+  } catch (error) {
+    if (error instanceof SecurityError) {
+      auditManualSend('send-test-message-whatsapp.ts', {
+        blocked: true,
+        reason: 'production_environment',
+      });
+      logger.error('SECURITY: Test message send blocked in production', {
+        script: 'send-test-message-whatsapp.ts',
+        environment: process.env.NODE_ENV,
+      });
+      console.error('\n❌ SECURITY ERROR: Test message send is disabled in production\n');
+      console.error('Manual send scripts are disabled in production environment.');
+      console.error('Set NODE_ENV=development to enable manual sending.\n');
+      process.exit(1);
+    }
+    throw error;
+  }
+
   let whatsappChannel: ReturnType<typeof OutputChannelFactory.createWhatsAppOutputChannel> | null = null;
   let exitCode = 0;
 
+  // Audit log the test message send attempt
+  const groupName = process.argv[2] || 'Bday bot testing';
+  const message = process.argv[3] || '🎂 🎉 Test message from birthday bot!';
+  auditManualSend('send-test-message-whatsapp.ts', {
+    blocked: false,
+    environment: process.env.NODE_ENV ?? 'development',
+    groupName,
+    messageLength: message.length,
+  });
+
   try {
-    const groupName = process.argv[2] || 'Bday bot testing';
-    const message = process.argv[3] || '🎂 🎉 Test message from birthday bot!';
 
     console.log('\n🚀 Starting WhatsApp Test Message Script\n');
     console.log(`📱 Group: ${groupName}`);

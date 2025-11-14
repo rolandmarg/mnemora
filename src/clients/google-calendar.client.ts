@@ -137,55 +137,31 @@ class GoogleCalendarClient {
 
   /**
    * Delete a single event from the calendar
-   * Uses read-write calendar client
+   * 
+   * SECURITY: This method is disabled to prevent unauthorized deletion
+   * 
+   * @throws SecurityError - Always throws, deletion is disabled
    */
   async deleteEvent(eventId: string): Promise<boolean> {
-    try {
-      await this.readWriteCalendar.events.delete({
-        calendarId: this.calendarId,
-        eventId,
-      });
-      return true;
-    } catch (error) {
-      logger.error(`Error deleting event ${eventId}`, error);
-      return false;
-    }
+    const { auditDeletionAttempt, SecurityError } = await import('../utils/security.js');
+    auditDeletionAttempt('GoogleCalendarClient.deleteEvent', { eventId });
+    throw new SecurityError('Deletion of birthday events is disabled for security reasons');
   }
 
   /**
    * Delete all events in bulk mode
-   * Uses read-write calendar client
+   * 
+   * SECURITY: This method is disabled to prevent unauthorized deletion
+   * 
+   * @throws SecurityError - Always throws, deletion is disabled
    */
   async deleteAllEvents(events: Event[]): Promise<DeletionResult> {
-    const result: DeletionResult = {
-      deletedCount: 0,
-      skippedCount: 0,
-      errorCount: 0,
-    };
-
-    logger.info(`Deleting ${events.length} event(s)...`);
-
-    for (let i = 0; i < events.length; i++) {
-      const event = events[i];
-      const eventNumber = i + 1;
-      const totalEvents = events.length;
-
-      if (event.id) {
-        const success = await this.deleteEvent(event.id);
-        if (success) {
-          logger.info(`[${eventNumber}/${totalEvents}] Deleted: ${event.summary ?? 'Untitled Event'}`);
-          result.deletedCount++;
-        } else {
-          logger.warn(`[${eventNumber}/${totalEvents}] Failed to delete: ${event.summary ?? 'Untitled Event'}`);
-          result.errorCount++;
-        }
-      } else {
-        logger.warn(`[${eventNumber}/${totalEvents}] Event has no ID, cannot delete: ${event.summary ?? 'Untitled Event'}`);
-        result.errorCount++;
-      }
-    }
-
-    return result;
+    const { auditDeletionAttempt, SecurityError } = await import('../utils/security.js');
+    auditDeletionAttempt('GoogleCalendarClient.deleteAllEvents', {
+      eventCount: events.length,
+      eventIds: events.map(e => e.id).filter(Boolean),
+    });
+    throw new SecurityError('Deletion of birthday events is disabled for security reasons');
   }
 
   /**

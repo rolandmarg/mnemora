@@ -1,0 +1,238 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Mnemora Birthday Bot - AWS Lambda Deployment
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - prod
+    Description: Environment name
+  
+  GoogleCalendarId:
+    Type: String
+    Description: Google Calendar ID
+    NoEcho: false
+  
+  GoogleClientEmail:
+    Type: String
+    Description: Google Service Account Email
+    NoEcho: false
+  
+  GooglePrivateKey:
+    Type: String
+    Description: Google Service Account Private Key (base64 encoded)
+    NoEcho: true
+  
+  GoogleProjectId:
+    Type: String
+    Description: Google Cloud Project ID
+    NoEcho: false
+  
+  GoogleSpreadsheetId:
+    Type: String
+    Default: ''
+    Description: Google Spreadsheet ID (optional)
+    NoEcho: false
+  
+  WhatsAppGroupId:
+    Type: String
+    Description: WhatsApp Group Name or ID
+    NoEcho: false
+  
+  AlertEmail:
+    Type: String
+    Description: Email address for receiving alerts
+    NoEcho: false
+  
+  AlertPhone:
+    Type: String
+    Default: ''
+    Description: Phone number for SMS alerts (optional, e.g., +1234567890)
+    NoEcho: false
+
+Globals:
+  Function:
+    Timeout: 900
+    MemorySize: 512
+    Runtime: nodejs20.x
+    Environment:
+      Variables:
+        NODE_ENV: production
+        LOG_LEVEL: info
+        METRICS_NAMESPACE: !Sub 'Mnemora/BirthdayBot/${Environment}'
+        ENABLE_CLOUDWATCH_METRICS: 'true'
+        AWS_XRAY_ENABLED: 'true'
+
+Conditions:
+  HasSpreadsheetId: !Not [!Equals [!Ref GoogleSpreadsheetId, '']]
+  HasPhoneNumber: !Not [!Equals [!Ref AlertPhone, '']]
+
+Resources:
+  # SNS Topic for Alerts
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub 'mnemora-alerts-${Environment}'
+      DisplayName: Mnemora Birthday Bot Alerts
+      Subscription:
+        - Protocol: email
+          Endpoint: !Ref AlertEmail
+
+  # SNS Email Subscription
+  AlertEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref AlertTopic
+      Protocol: email
+      Endpoint: !Ref AlertEmail
+
+  # SNS SMS Subscription (optional)
+  AlertSMSSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: HasPhoneNumber
+    Properties:
+      TopicArn: !Ref AlertTopic
+      Protocol: sms
+      Endpoint: !Ref AlertPhone
+
+  # S3 Bucket for WhatsApp session storage
+  SessionStorageBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'mnemora-whatsapp-sessions-${Environment}-${AWS::AccountId}'
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldSessions
+            Status: Enabled
+            ExpirationInDays: 90
+
+  # Note: DynamoDB removed - using S3 instead (cheaper for once-a-day script)
+  # Execution tracking stored in S3 bucket (same bucket as WhatsApp sessions)
+
+  # CloudWatch Log Group
+  BirthdayBotLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${BirthdayBotFunction}'
+      RetentionInDays: 30
+
+  # Lambda Function
+  BirthdayBotFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'mnemora-birthday-bot-${Environment}'
+      CodeUri: dist/
+      Handler: lambda/handler.handler
+      Runtime: nodejs20.x
+      Timeout: 900
+      MemorySize: 512
+      Environment:
+        Variables:
+          GOOGLE_CALENDAR_ID: !Ref GoogleCalendarId
+          GOOGLE_CLIENT_EMAIL: !Ref GoogleClientEmail
+          GOOGLE_PRIVATE_KEY: !Ref GooglePrivateKey
+          GOOGLE_PROJECT_ID: !Ref GoogleProjectId
+          GOOGLE_SPREADSHEET_ID: !If [HasSpreadsheetId, !Ref GoogleSpreadsheetId, '']
+          WHATSAPP_GROUP_ID: !Ref WhatsAppGroupId
+          SCHEDULE_TIME: '09:00'
+          TIMEZONE: 'America/Los_Angeles'
+          AWS_REGION: !Ref AWS::Region
+          AWS_S3_BUCKET: !Ref SessionStorageBucket
+          AWS_CLOUDWATCH_LOG_GROUP: !Ref BirthdayBotLogGroup
+          AWS_XRAY_ENABLED: 'true'
+          SNS_TOPIC_ARN: !Ref AlertTopic
+      Policies:
+        - S3ReadWritePolicy:
+            BucketName: !Ref SessionStorageBucket
+        - CloudWatchLogsFullAccess
+        - CloudWatchMetricsFullAccess
+        - XRayWriteOnlyAccess
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt AlertTopic.TopicName
+      Events:
+        DailySchedule:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 9 * * ? *)
+            Description: Daily birthday check at 9 AM Los Angeles time
+            Enabled: true
+            Input: '{}'
+      Tracing: Active
+
+  # EventBridge Rule for daily execution
+  DailyExecutionRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub 'mnemora-daily-execution-${Environment}'
+      Description: Daily birthday check at 9 AM Los Angeles time
+      ScheduleExpression: cron(0 9 * * ? *)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt BirthdayBotFunction.Arn
+          Id: BirthdayBotTarget
+          Input: '{}'
+
+  # Lambda Function for Daily Summary
+  DailySummaryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'mnemora-daily-summary-${Environment}'
+      CodeUri: dist/
+      Handler: lambda/daily-summary-handler.handler
+      Runtime: nodejs20.x
+      Timeout: 60
+      MemorySize: 256
+      Environment:
+        Variables:
+          NODE_ENV: production
+          LOG_LEVEL: info
+          AWS_REGION: !Ref AWS::Region
+          AWS_S3_BUCKET: !Ref SessionStorageBucket
+          SNS_TOPIC_ARN: !Ref AlertTopic
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Ref SessionStorageBucket
+        - CloudWatchLogsFullAccess
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt AlertTopic.TopicName
+      Events:
+        DailySummarySchedule:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 22 * * ? *)
+            Description: Daily alert summary at 10 PM
+            Enabled: true
+            Input: '{}'
+
+Outputs:
+  BirthdayBotFunctionArn:
+    Description: ARN of the Lambda function
+    Value: !GetAtt BirthdayBotFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-FunctionArn'
+
+  SessionStorageBucketName:
+    Description: Name of the S3 bucket for session storage
+    Value: !Ref SessionStorageBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-SessionBucket'
+
+  # Execution tracking now uses S3 (same bucket as sessions)
+
+  LogGroupName:
+    Description: CloudWatch Log Group name
+    Value: !Ref BirthdayBotLogGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-LogGroup'
+
+  AlertTopicArn:
+    Description: ARN of the SNS topic for alerts
+    Value: !Ref AlertTopic
+    Export:
+      Name: !Sub '${AWS::StackName}-AlertTopic'
+

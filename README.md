@@ -160,6 +160,64 @@ yarn test:run       # Run tests once
 yarn test:coverage  # Run tests with coverage
 ```
 
+## AWS Lambda Deployment
+
+Mnemora can be deployed to AWS Lambda for serverless execution. The deployment includes:
+
+- **Lambda Function**: Runs daily birthday checks
+- **EventBridge Rule**: Schedules daily execution at 9 AM LA time
+- **S3 Bucket**: Stores WhatsApp session data
+- **DynamoDB Table**: Tracks execution history
+- **CloudWatch**: Logs, metrics, and alarms
+- **X-Ray**: Distributed tracing
+
+### Quick Start
+
+1. **Build the application**:
+   ```bash
+   yarn build:lambda
+   ```
+
+2. **Deploy with SAM**:
+   ```bash
+   sam deploy --guided
+   ```
+
+3. **Set up WhatsApp authentication** (first run):
+   - Check CloudWatch Logs for QR code
+   - Scan with WhatsApp mobile app
+   - Session saved to S3 automatically
+
+### Documentation
+
+- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Complete deployment guide
+- **[MONITORING.md](./MONITORING.md)** - Monitoring and alerting setup
+- **[MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md)** - WhatsApp Cloud API migration
+
+### Features
+
+- ✅ **Automatic scheduling** via EventBridge
+- ✅ **Session persistence** in S3 (no re-authentication needed)
+- ✅ **CloudWatch metrics** for monitoring
+- ✅ **CloudWatch alarms** for alerting
+- ✅ **X-Ray tracing** for debugging
+- ✅ **Cost-effective** (~$1/month)
+
+### Environment Variables for Lambda
+
+The following environment variables are automatically configured by the SAM template:
+
+- `GOOGLE_CALENDAR_ID` - Google Calendar ID
+- `GOOGLE_CLIENT_EMAIL` - Service account email
+- `GOOGLE_PRIVATE_KEY` - Service account private key
+- `GOOGLE_PROJECT_ID` - Google Cloud project ID
+- `WHATSAPP_GROUP_ID` - WhatsApp group name or ID
+- `AWS_S3_BUCKET` - S3 bucket for session storage
+- `AWS_DYNAMO_TABLE` - DynamoDB table for execution tracking
+- `AWS_CLOUDWATCH_LOG_GROUP` - CloudWatch log group name
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed setup instructions.
+
 ## Project Structure
 
 ```
@@ -188,6 +246,28 @@ Mnemora uses a **pluggable architecture** with clear separation:
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for details.
 
+## Future Improvements
+
+See [TODO.md](./TODO.md) for planned enhancements including:
+- Enhanced logging and message persistence
+- Event-driven architecture migration
+- Multi-group support
+- Advanced analytics
+- And more...
+
+## Documentation
+
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - System architecture and design patterns
+- **[BUSINESS_FLOWS.md](./BUSINESS_FLOWS.md)** - Complete execution flows and error scenarios
+- **[ALERTING_GUIDE.md](./ALERTING_GUIDE.md)** - Alert types, severity levels, and remediation
+- **[CODE_ORGANIZATION.md](./CODE_ORGANIZATION.md)** - Code organization and style guide
+- **[SECURITY.md](./SECURITY.md)** - Security safeguards and best practices
+- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - AWS Lambda deployment guide
+- **[MONITORING.md](./MONITORING.md)** - Monitoring and alerting setup
+- **[MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md)** - WhatsApp Cloud API migration
+- **[TODO.md](./TODO.md)** - Future improvements and roadmap
+- **[CONTRIBUTING.md](./CONTRIBUTING.md)** - How to contribute to the project
+
 ## Extending
 
 ### Adding a New Data Source
@@ -213,6 +293,35 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for details.
   - Connection issues: WhatsApp Web requires internet connection and phone to be online
 - **Timezone Issues**: Set `TIMEZONE` env var (defaults to `America/Los_Angeles`)
 - **Logging**: Uses structured JSON logging with `pino`. Use `pino-pretty` for development
+
+## Security
+
+**Security safeguards are in place to prevent unauthorized operations:**
+
+- **Deletion is disabled**: All deletion operations are completely disabled to prevent unauthorized deletion of birthday events
+- **Production protection**: Manual send scripts are blocked in production (`NODE_ENV=production`) to prevent spamming
+- **Audit logging**: All security-sensitive operations are logged for monitoring
+
+See [SECURITY.md](./SECURITY.md) for detailed security information.
+
+### Environment Variables
+
+- `NODE_ENV` - Set to `production` to enable production mode (blocks manual scripts)
+  - Development: `NODE_ENV=development` or unset (allows manual scripts)
+  - Production: `NODE_ENV=production` (blocks manual scripts, main check still works)
+
+## Contributing
+
+**Pull requests, feedback, and opinions are all welcome!** 🎉
+
+This project is open to improvements, suggestions, and new ideas. Whether you want to:
+- Fix a bug
+- Add a feature
+- Improve documentation
+- Share feedback or ideas
+- Discuss architecture decisions
+
+We'd love to hear from you! See [CONTRIBUTING.md](./CONTRIBUTING.md) for more details.
 
 ## License
 

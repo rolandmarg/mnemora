@@ -1,9 +1,12 @@
 import birthdayService from '../services/birthday.js';
 import { OutputChannelFactory } from '../factories/output-channel.factory.js';
 import { logger } from '../utils/logger.js';
+import { requireDevelopment, auditManualSend, SecurityError } from '../utils/security.js';
 
 /**
  * Script to send monthly digest to WhatsApp group
+ * 
+ * SECURITY: This script is disabled in production to prevent unauthorized message sending
  * 
  * Gets the monthly digest of upcoming birthdays and sends it to the configured WhatsApp group
  * 
@@ -14,11 +17,39 @@ import { logger } from '../utils/logger.js';
  */
 
 async function sendMonthlyDigestWhatsApp(): Promise<void> {
+  // SECURITY: Block in production
+  try {
+    requireDevelopment();
+  } catch (error) {
+    if (error instanceof SecurityError) {
+      auditManualSend('send-monthly-digest-whatsapp.ts', {
+        blocked: true,
+        reason: 'production_environment',
+      });
+      logger.error('SECURITY: Monthly digest send blocked in production', {
+        script: 'send-monthly-digest-whatsapp.ts',
+        environment: process.env.NODE_ENV,
+      });
+      console.error('\n❌ SECURITY ERROR: Monthly digest send is disabled in production\n');
+      console.error('Manual send scripts are disabled in production environment.');
+      console.error('Set NODE_ENV=development to enable manual sending.\n');
+      process.exit(1);
+    }
+    throw error;
+  }
+
   let whatsappChannel: ReturnType<typeof OutputChannelFactory.createWhatsAppOutputChannel> | null = null;
   let exitCode = 0;
 
+  // Audit log the monthly digest send attempt
+  const groupName = process.argv[2]; // Get group name from command line argument
+  auditManualSend('send-monthly-digest-whatsapp.ts', {
+    blocked: false,
+    environment: process.env.NODE_ENV ?? 'development',
+    groupName: groupName || 'from-config',
+  });
+
   try {
-    const groupName = process.argv[2]; // Get group name from command line argument
     
     console.log('\n🚀 Starting WhatsApp Monthly Digest Script\n');
     if (groupName) {

@@ -20,10 +20,18 @@ export interface ScheduleConfig {
   timezone: string;
 }
 
+export interface AWSConfig {
+  region: string | undefined;
+  s3Bucket: string | undefined;
+  cloudWatchLogGroup: string | undefined;
+  enableXRay: boolean;
+}
+
 export interface AppConfig {
   google: GoogleConfig;
   whatsapp: WhatsAppConfig;
   schedule: ScheduleConfig;
+  aws: AWSConfig;
 }
 
 export const config: AppConfig = {
@@ -41,6 +49,12 @@ export const config: AppConfig = {
   schedule: {
     time: process.env.SCHEDULE_TIME || '09:00',
     timezone: process.env.TIMEZONE || process.env.TZ || 'America/Los_Angeles',
+  },
+  aws: {
+    region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION,
+    s3Bucket: process.env.AWS_S3_BUCKET,
+    cloudWatchLogGroup: process.env.AWS_CLOUDWATCH_LOG_GROUP,
+    enableXRay: process.env.AWS_XRAY_ENABLED !== 'false',
   },
 };
 
