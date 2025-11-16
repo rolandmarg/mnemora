@@ -70,7 +70,8 @@ echo ""
 
 sam deploy \
   --template-file "$PROJECT_ROOT/infrastructure/template.yaml" \
-  --config-file "$PROJECT_ROOT/infrastructure/samconfig.toml"
+  --config-file "$PROJECT_ROOT/infrastructure/samconfig.toml" \
+  "$@"
 
 echo ""
 echo "=========================================="
