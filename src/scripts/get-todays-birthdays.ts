@@ -1,10 +1,6 @@
-import birthdayService from '../services/birthday.js';
-import { getFullName } from '../utils/name-helpers.js';
-import { logger } from '../utils/logger.js';
-
-/**
- * Script to get today's birthdays
- */
+import birthdayService from '../services/birthday.service.js';
+import { getFullName } from '../utils/name-helpers.util.js';
+import { logger } from '../clients/logger.client.js';
 
 async function getTodaysBirthdays(): Promise<void> {
   try {
@@ -29,6 +25,5 @@ async function getTodaysBirthdays(): Promise<void> {
   }
 }
 
-// Run the script
 getTodaysBirthdays();
 

@@ -1,18 +1,7 @@
-/**
- * Delete Events Script - DISABLED FOR SECURITY
- * 
- * This script has been disabled for security reasons.
- * Deletion of birthday events is not allowed to prevent unauthorized data loss.
- */
+import { logger } from '../clients/logger.client.js';
+import { auditDeletionAttempt } from '../utils/security.util.js';
 
-import { logger } from '../utils/logger.js';
-import { auditDeletionAttempt } from '../utils/security.js';
-
-/**
- * Main function - exits immediately with security error
- */
 async function main(): Promise<void> {
-  // Audit log the attempt
   auditDeletionAttempt('delete-events.ts', {
     script: 'delete-events',
     args: process.argv.slice(2),

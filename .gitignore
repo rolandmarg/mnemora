@@ -48,3 +48,5 @@ coverage/
 *.test.ts.snap
 vitest.config.ts.timestamp-*
 
+samconfig.toml
+.aws-sam

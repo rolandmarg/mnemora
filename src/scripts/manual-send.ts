@@ -1,20 +1,10 @@
-import birthdayService from '../services/birthday.js';
-import { OutputChannelFactory } from '../factories/output-channel.factory.js';
-import { getFullName } from '../utils/name-helpers.js';
-import { logger } from '../utils/logger.js';
-import { getMissedDates, updateLastRunDate } from '../utils/last-run-tracker.js';
-import { startOfDay } from '../utils/date-helpers.js';
-import { requireDevelopment, auditManualSend, SecurityError } from '../utils/security.js';
-
-/**
- * Manual send script - always sends monthly digest + today's birthdays
- * 
- * SECURITY: This script is disabled in production to prevent unauthorized message sending
- * 
- * This script is used for manual triggering (e.g., on bootup prompt)
- * It always sends the monthly digest regardless of the current date
- * It also checks for and sends missed days
- */
+import birthdayService from '../services/birthday.service.js';
+import { OutputChannelFactory } from '../output-channel/output-channel.factory.js';
+import { getFullName } from '../utils/name-helpers.util.js';
+import { logger } from '../clients/logger.client.js';
+import { getMissedDates, updateLastRunDate } from '../utils/last-run-tracker.util.js';
+import { startOfDay } from '../utils/date-helpers.util.js';
+import { requireDevelopment, auditManualSend, SecurityError } from '../utils/security.util.js';
 
 async function checkAndSendMissedDays(): Promise<void> {
   const missedDates = await getMissedDates();
@@ -23,7 +13,6 @@ async function checkAndSendMissedDays(): Promise<void> {
     return;
   }
 
-  // Only send the most recent missed day (last in array) to avoid spamming
   const lastMissedDate = missedDates[missedDates.length - 1];
   
   logger.info(`Found ${missedDates.length} missed day(s), sending messages for most recent: ${lastMissedDate.toISOString().split('T')[0]}`, {
@@ -40,7 +29,6 @@ async function checkAndSendMissedDays(): Promise<void> {
       return;
     }
 
-    // Process only the last missed date
     try {
       const startDate = startOfDay(lastMissedDate);
       const endDate = startOfDay(lastMissedDate);
@@ -52,7 +40,9 @@ async function checkAndSendMissedDays(): Promise<void> {
         });
 
         const birthdayMessages = birthdayService.formatTodaysBirthdayMessages(birthdays);
-        for (const message of birthdayMessages) {
+        await birthdayMessages.reduce(async (promise, message) => {
+          await promise;
+          if (!whatsappChannel) return;
           const result = await whatsappChannel.send(message);
           if (result.success) {
             logger.info('Missed birthday message sent', {
@@ -60,7 +50,7 @@ async function checkAndSendMissedDays(): Promise<void> {
             });
           }
           await new Promise(resolve => setTimeout(resolve, 1000));
-        }
+        }, Promise.resolve());
       } else {
         logger.info(`No birthdays on most recent missed date: ${lastMissedDate.toISOString().split('T')[0]}`);
       }
@@ -82,7 +72,6 @@ async function checkAndSendMissedDays(): Promise<void> {
 }
 
 async function manualSend(): Promise<void> {
-  // SECURITY: Block in production
   try {
     requireDevelopment();
   } catch (error) {
@@ -103,7 +92,6 @@ async function manualSend(): Promise<void> {
     throw error;
   }
 
-  // Audit log the manual send attempt
   auditManualSend('manual-send.ts', {
     blocked: false,
     environment: process.env.NODE_ENV ?? 'development',
@@ -117,10 +105,8 @@ async function manualSend(): Promise<void> {
 
     logger.info('Running manual send...');
     
-    // Always get monthly digest (regardless of date)
     const { todaysBirthdays, monthlyDigest } = await birthdayService.getTodaysBirthdaysWithMonthlyDigest();
     
-    // Send monthly digest to WhatsApp if available
     if (monthlyDigest) {
       logger.info('Sending monthly digest to WhatsApp group...');
       try {
@@ -141,11 +127,9 @@ async function manualSend(): Promise<void> {
         }
       } catch (error) {
         logger.error('Error sending monthly digest to WhatsApp', error);
-        // Don't fail the entire process if WhatsApp fails
       }
     }
     
-    // Send today's birthday messages if any
     if (todaysBirthdays.length === 0) {
       logger.info('No birthdays today!');
     } else {
@@ -153,15 +137,15 @@ async function manualSend(): Promise<void> {
         birthdays: todaysBirthdays.map(record => getFullName(record.firstName, record.lastName)),
       });
       
-      // Send personal birthday messages to WhatsApp if available
       try {
         whatsappChannel ??= OutputChannelFactory.createWhatsAppOutputChannel();
         if (whatsappChannel.isAvailable()) {
           const birthdayMessages = birthdayService.formatTodaysBirthdayMessages(todaysBirthdays);
           logger.info('Sending birthday messages to WhatsApp group...');
           
-          // Send each birthday message separately for better personalization
-          for (const message of birthdayMessages) {
+          await birthdayMessages.reduce(async (promise, message) => {
+            await promise;
+            if (!whatsappChannel) return;
             const result = await whatsappChannel.send(message);
             if (result.success) {
               logger.info('Birthday message sent to WhatsApp successfully', {
@@ -172,33 +156,27 @@ async function manualSend(): Promise<void> {
                 error: result.error?.message,
               });
             }
-            // Small delay between messages to avoid rate limiting
             await new Promise(resolve => setTimeout(resolve, 1000));
-          }
+          }, Promise.resolve());
         } else {
           logger.info('WhatsApp channel is not available (WHATSAPP_GROUP_ID not configured)');
         }
       } catch (error) {
         logger.error('Error sending birthday messages to WhatsApp', error);
-        // Don't fail the entire process if WhatsApp fails
       }
     }
     
     logger.info('Manual send completed successfully!');
     
-    // Update last run date after successful completion
     await updateLastRunDate();
   } catch (error) {
     logger.error('Error in manual send', error);
     process.exit(1);
   } finally {
-    // Give the client time to save the session before destroying
-    // Wait a bit to ensure session is saved to disk
     if (whatsappChannel) {
       await new Promise(resolve => setTimeout(resolve, 2000));
     }
     
-    // Cleanup WhatsApp client (without logging out to preserve session)
     if (whatsappChannel && 'destroy' in whatsappChannel && typeof whatsappChannel.destroy === 'function') {
       try {
         await whatsappChannel.destroy();
@@ -206,11 +184,9 @@ async function manualSend(): Promise<void> {
         logger.error('Error destroying WhatsApp client', error);
       }
     }
-    // Exit after completion
     process.exit(0);
   }
 }
 
-// Run the manual send
 manualSend();
 

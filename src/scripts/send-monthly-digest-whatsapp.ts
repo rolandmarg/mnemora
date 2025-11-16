@@ -1,23 +1,9 @@
-import birthdayService from '../services/birthday.js';
-import { OutputChannelFactory } from '../factories/output-channel.factory.js';
-import { logger } from '../utils/logger.js';
-import { requireDevelopment, auditManualSend, SecurityError } from '../utils/security.js';
-
-/**
- * Script to send monthly digest to WhatsApp group
- * 
- * SECURITY: This script is disabled in production to prevent unauthorized message sending
- * 
- * Gets the monthly digest of upcoming birthdays and sends it to the configured WhatsApp group
- * 
- * Usage: yarn send-monthly-digest-whatsapp [group-name]
- * If group-name is not provided, uses WHATSAPP_GROUP_ID from .env
- * 
- * If not authenticated, will display QR code in terminal for scanning
- */
+import birthdayService from '../services/birthday.service.js';
+import { OutputChannelFactory } from '../output-channel/output-channel.factory.js';
+import { logger } from '../clients/logger.client.js';
+import { requireDevelopment, auditManualSend, SecurityError } from '../utils/security.util.js';
 
 async function sendMonthlyDigestWhatsApp(): Promise<void> {
-  // SECURITY: Block in production
   try {
     requireDevelopment();
   } catch (error) {
@@ -41,8 +27,7 @@ async function sendMonthlyDigestWhatsApp(): Promise<void> {
   let whatsappChannel: ReturnType<typeof OutputChannelFactory.createWhatsAppOutputChannel> | null = null;
   let exitCode = 0;
 
-  // Audit log the monthly digest send attempt
-  const groupName = process.argv[2]; // Get group name from command line argument
+  const groupName = process.argv[2];
   auditManualSend('send-monthly-digest-whatsapp.ts', {
     blocked: false,
     environment: process.env.NODE_ENV ?? 'development',
@@ -75,7 +60,6 @@ async function sendMonthlyDigestWhatsApp(): Promise<void> {
       todaysBirthdaysCount: todaysBirthdays.length,
     });
 
-    // Create WhatsApp channel
     console.log('📱 Initializing WhatsApp connection...\n');
     whatsappChannel = OutputChannelFactory.createWhatsAppOutputChannel();
     
@@ -90,8 +74,6 @@ async function sendMonthlyDigestWhatsApp(): Promise<void> {
     console.log('📤 Sending monthly digest to WhatsApp group...\n');
     logger.info('Sending monthly digest to WhatsApp group...', { groupName });
     
-    // The send method will handle initialization and QR code display if needed
-    // Pass group name if provided, otherwise it will use config
     const result = await whatsappChannel.send(monthlyDigest, groupName ? {
       recipients: [groupName],
     } : undefined);
@@ -120,19 +102,16 @@ async function sendMonthlyDigestWhatsApp(): Promise<void> {
     logger.error('Error sending monthly digest to WhatsApp', error);
     exitCode = 1;
   } finally {
-    // Give the client time to save the session before destroying
     if (whatsappChannel) {
       try {
         logger.info('Waiting for session to be saved...');
         await new Promise(resolve => setTimeout(resolve, 3000));
         
-        // Cleanup WhatsApp client (without logging out to preserve session)
         if ('destroy' in whatsappChannel && typeof whatsappChannel.destroy === 'function') {
           await whatsappChannel.destroy();
         }
       } catch (error) {
         logger.error('Error during cleanup', error);
-        // Don't fail the script if cleanup fails
       }
     }
     
@@ -140,6 +119,5 @@ async function sendMonthlyDigestWhatsApp(): Promise<void> {
   }
 }
 
-// Run the script
 sendMonthlyDigestWhatsApp();
 

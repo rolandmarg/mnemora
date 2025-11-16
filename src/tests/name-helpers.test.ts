@@ -3,7 +3,7 @@ import {
   sanitizeNames,
   getFullName,
   extractNameParts,
-} from '../utils/name-helpers.js';
+} from '../utils/name-helpers.util.js';
 
 describe('name-helpers', () => {
   describe('sanitizeNames', () => {

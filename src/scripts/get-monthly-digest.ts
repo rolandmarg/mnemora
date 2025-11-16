@@ -1,10 +1,6 @@
-import birthdayService from '../services/birthday.js';
-import { getFullName } from '../utils/name-helpers.js';
-import { logger } from '../utils/logger.js';
-
-/**
- * Script to get monthly digest of upcoming birthdays
- */
+import birthdayService from '../services/birthday.service.js';
+import { getFullName } from '../utils/name-helpers.util.js';
+import { logger } from '../clients/logger.client.js';
 
 async function getMonthlyDigest(): Promise<void> {
   try {
@@ -31,6 +27,5 @@ async function getMonthlyDigest(): Promise<void> {
   }
 }
 
-// Run the script
 getMonthlyDigest();
 

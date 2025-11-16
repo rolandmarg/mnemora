@@ -1,17 +1,8 @@
-import { OutputChannelFactory } from '../factories/output-channel.factory.js';
-import { logger } from '../utils/logger.js';
-import { requireDevelopment, auditManualSend, SecurityError } from '../utils/security.js';
-
-/**
- * Script to send a test message to a WhatsApp group by name
- * 
- * SECURITY: This script is disabled in production to prevent unauthorized message sending
- * 
- * Usage: yarn send-test-message-whatsapp "Group Name" "Message"
- */
+import { OutputChannelFactory } from '../output-channel/output-channel.factory.js';
+import { logger } from '../clients/logger.client.js';
+import { requireDevelopment, auditManualSend, SecurityError } from '../utils/security.util.js';
 
 async function sendTestMessageWhatsApp(): Promise<void> {
-  // SECURITY: Block in production
   try {
     requireDevelopment();
   } catch (error) {
@@ -35,7 +26,6 @@ async function sendTestMessageWhatsApp(): Promise<void> {
   let whatsappChannel: ReturnType<typeof OutputChannelFactory.createWhatsAppOutputChannel> | null = null;
   let exitCode = 0;
 
-  // Audit log the test message send attempt
   const groupName = process.argv[2] || 'Bday bot testing';
   const message = process.argv[3] || '🎂 🎉 Test message from birthday bot!';
   auditManualSend('send-test-message-whatsapp.ts', {
@@ -53,7 +43,6 @@ async function sendTestMessageWhatsApp(): Promise<void> {
     
     logger.info('Sending test message to WhatsApp', { groupName, message });
 
-    // Create WhatsApp channel
     console.log('📱 Initializing WhatsApp connection...\n');
     whatsappChannel = OutputChannelFactory.createWhatsAppOutputChannel();
     
@@ -68,7 +57,6 @@ async function sendTestMessageWhatsApp(): Promise<void> {
     console.log('📤 Sending message to WhatsApp group...\n');
     logger.info('Sending message to WhatsApp group...');
     
-    // Send message using group name
     const result = await whatsappChannel.send(message, {
       recipients: [groupName],
     });
@@ -96,19 +84,16 @@ async function sendTestMessageWhatsApp(): Promise<void> {
     logger.error('Error sending message to WhatsApp', error);
     exitCode = 1;
   } finally {
-    // Give the client time to save the session before destroying
     if (whatsappChannel) {
       try {
         logger.info('Waiting for session to be saved...');
         await new Promise(resolve => setTimeout(resolve, 3000));
         
-        // Cleanup WhatsApp client (without logging out to preserve session)
         if ('destroy' in whatsappChannel && typeof whatsappChannel.destroy === 'function') {
           await whatsappChannel.destroy();
         }
       } catch (error) {
         logger.error('Error during cleanup', error);
-        // Don't fail the script if cleanup fails
       }
     }
     
@@ -116,6 +101,5 @@ async function sendTestMessageWhatsApp(): Promise<void> {
   }
 }
 
-// Run the script
 sendTestMessageWhatsApp();
 

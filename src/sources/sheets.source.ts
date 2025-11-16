@@ -1,20 +1,10 @@
-/**
- * Sheets Data Source
- * 
- * Adapter that wraps the existing SheetsService to implement DataSource
- */
-
 import sheetsClient from '../clients/google-sheets.client.js';
-import { BaseDataSource } from '../base/base-data-source.js';
-import type { BirthdayRecord } from '../utils/birthday-helpers.js';
-import type { ReadOptions, DataSourceMetadata } from '../interfaces/data-source.interface.js';
+import { BaseDataSource } from '../data-source/data-source.base.js';
+import { parseRowToBirthdays } from '../utils/birthday-helpers.util.js';
+import type { BirthdayRecord } from '../types/birthday.types.js';
+import type { ReadOptions, DataSourceMetadata } from '../data-source/data-source.interface.js';
 import type { AppConfig } from '../config.js';
 
-/**
- * Sheets data source implementation
- * 
- * Reads birthday data from Google Sheets
- */
 export class SheetsDataSource extends BaseDataSource<BirthdayRecord> {
   constructor(config: AppConfig) {
     super(config);
@@ -22,7 +12,8 @@ export class SheetsDataSource extends BaseDataSource<BirthdayRecord> {
 
   async read(options?: ReadOptions): Promise<BirthdayRecord[]> {
     const skipHeaderRow = (options?.skipHeaderRow as boolean) ?? true;
-    return sheetsClient.readBirthdays(skipHeaderRow);
+    const rows = await sheetsClient.readRows({ skipHeaderRow });
+    return rows.flatMap(row => parseRowToBirthdays(row));
   }
 
   isAvailable(): boolean {

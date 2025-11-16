@@ -1,27 +1,12 @@
-/**
- * Daily Summary Lambda Handler
- * 
- * Runs daily at 10 PM to generate and send alert summaries
- * Only sends summary if there are active alerts
- */
-
-import { logger } from '../utils/logger.js';
-import { setCorrelationId } from '../utils/correlation.js';
-import { alerting } from '../utils/alerting.js';
+import { alerting } from '../services/alerting.service.js';
+import { logger } from '../clients/logger.client.js';
+import { setCorrelationId } from '../utils/correlation.util.js';
 import type { EventBridgeEvent, LambdaContext, LambdaResponse } from './types.js';
 
-/**
- * Lambda handler for daily summary
- * 
- * @param event - EventBridge event
- * @param context - Lambda context
- * @returns Response
- */
 export async function handler(
   event: EventBridgeEvent,
   context: LambdaContext
 ): Promise<LambdaResponse> {
-  // Initialize correlation ID from request ID
   const correlationId = context.awsRequestId;
   if (correlationId) {
     setCorrelationId(correlationId);
@@ -34,7 +19,6 @@ export async function handler(
   });
 
   try {
-    // Generate and send daily summary
     await alerting.sendDailySummary();
 
     logger.info('Daily summary handler completed successfully', {

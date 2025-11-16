@@ -11,8 +11,6 @@ A TypeScript bot that manages birthdays across multiple data sources (Google Cal
 - Code quality and patterns follow AI-generated conventions
 - Manual review and testing have been performed, but the codebase may contain AI-generated patterns or approaches
 
-For more details, see [DISCLAIMER.md](./DISCLAIMER.md).
-
 ## Features
 
 - 🎂 Daily birthday checks
@@ -190,9 +188,9 @@ Mnemora can be deployed to AWS Lambda for serverless execution. The deployment i
 
 ### Documentation
 
-- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Complete deployment guide
-- **[MONITORING.md](./MONITORING.md)** - Monitoring and alerting setup
-- **[MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md)** - WhatsApp Cloud API migration
+- **[docs/operations/DEPLOYMENT.md](./docs/operations/DEPLOYMENT.md)** - Complete deployment guide
+- **[docs/operations/MONITORING.md](./docs/operations/MONITORING.md)** - Monitoring and alerting setup
+- **[docs/operations/MIGRATION_GUIDE.md](./docs/operations/MIGRATION_GUIDE.md)** - WhatsApp Cloud API migration
 
 ### Features
 
@@ -216,17 +214,16 @@ The following environment variables are automatically configured by the SAM temp
 - `AWS_DYNAMO_TABLE` - DynamoDB table for execution tracking
 - `AWS_CLOUDWATCH_LOG_GROUP` - CloudWatch log group name
 
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed setup instructions.
+See [docs/operations/DEPLOYMENT.md](./docs/operations/DEPLOYMENT.md) for detailed setup instructions.
 
 ## Project Structure
 
 ```
 src/
-├── base/              # Abstract base classes
+├── data-source/       # Data source abstraction (interface, base, factory)
+├── output-channel/    # Output channel abstraction (interface, base, factory)
 ├── channels/          # Output channels (Console, SMS, WhatsApp, Email)
 ├── clients/           # External API clients (Google Calendar, Google Sheets)
-├── factories/         # Factory classes for creating instances
-├── interfaces/        # TypeScript interfaces
 ├── scripts/           # CLI scripts
 ├── services/          # Business logic (BirthdayService)
 ├── sources/           # Data sources (Calendar, Sheets)
@@ -244,11 +241,11 @@ Mnemora uses a **pluggable architecture** with clear separation:
 - **Factories**: Create instances of data sources and output channels
 - **Services**: Business logic that orchestrates data sources and output channels
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for details.
+See [docs/technical/ARCHITECTURE.md](./docs/technical/ARCHITECTURE.md) for details.
 
 ## Future Improvements
 
-See [TODO.md](./TODO.md) for planned enhancements including:
+See [docs/TODO.md](./docs/TODO.md) for planned enhancements including:
 - Enhanced logging and message persistence
 - Event-driven architecture migration
 - Multi-group support
@@ -257,16 +254,23 @@ See [TODO.md](./TODO.md) for planned enhancements including:
 
 ## Documentation
 
-- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - System architecture and design patterns
-- **[BUSINESS_FLOWS.md](./BUSINESS_FLOWS.md)** - Complete execution flows and error scenarios
-- **[ALERTING_GUIDE.md](./ALERTING_GUIDE.md)** - Alert types, severity levels, and remediation
-- **[CODE_ORGANIZATION.md](./CODE_ORGANIZATION.md)** - Code organization and style guide
-- **[SECURITY.md](./SECURITY.md)** - Security safeguards and best practices
-- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - AWS Lambda deployment guide
-- **[MONITORING.md](./MONITORING.md)** - Monitoring and alerting setup
-- **[MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md)** - WhatsApp Cloud API migration
-- **[TODO.md](./TODO.md)** - Future improvements and roadmap
-- **[CONTRIBUTING.md](./CONTRIBUTING.md)** - How to contribute to the project
+### Technical Documentation
+- **[docs/technical/ARCHITECTURE.md](./docs/technical/ARCHITECTURE.md)** - System architecture and design patterns
+- **[docs/technical/BUSINESS_FLOWS.md](./docs/technical/BUSINESS_FLOWS.md)** - Complete execution flows and error scenarios
+- **[docs/technical/CODE_ORGANIZATION.md](./docs/technical/CODE_ORGANIZATION.md)** - Code organization and style guide
+
+### Operations Documentation
+- **[docs/operations/DEPLOYMENT.md](./docs/operations/DEPLOYMENT.md)** - AWS Lambda deployment guide
+- **[docs/operations/MONITORING.md](./docs/operations/MONITORING.md)** - Monitoring and alerting setup
+- **[docs/operations/ALERTING_GUIDE.md](./docs/operations/ALERTING_GUIDE.md)** - Alert types, severity levels, and remediation
+- **[docs/operations/SECURITY.md](./docs/operations/SECURITY.md)** - Security safeguards and best practices
+- **[docs/operations/PLAYBOOKS.md](./docs/operations/PLAYBOOKS.md)** - AWS deployment playbooks and quick reference
+- **[docs/operations/GET_QR_CODE.md](./docs/operations/GET_QR_CODE.md)** - How to get WhatsApp QR code from AWS Lambda
+- **[docs/operations/MIGRATION_GUIDE.md](./docs/operations/MIGRATION_GUIDE.md)** - WhatsApp Cloud API migration
+
+### Project Management
+- **[docs/TODO.md](./docs/TODO.md)** - Future improvements and roadmap
+- **[docs/CONTRIBUTING.md](./docs/CONTRIBUTING.md)** - How to contribute to the project
 
 ## Extending
 
@@ -302,7 +306,7 @@ See [TODO.md](./TODO.md) for planned enhancements including:
 - **Production protection**: Manual send scripts are blocked in production (`NODE_ENV=production`) to prevent spamming
 - **Audit logging**: All security-sensitive operations are logged for monitoring
 
-See [SECURITY.md](./SECURITY.md) for detailed security information.
+See [docs/operations/SECURITY.md](./docs/operations/SECURITY.md) for detailed security information.
 
 ### Environment Variables
 
@@ -321,7 +325,7 @@ This project is open to improvements, suggestions, and new ideas. Whether you wa
 - Share feedback or ideas
 - Discuss architecture decisions
 
-We'd love to hear from you! See [CONTRIBUTING.md](./CONTRIBUTING.md) for more details.
+We'd love to hear from you! See [docs/CONTRIBUTING.md](./docs/CONTRIBUTING.md) for more details.
 
 ## License
 

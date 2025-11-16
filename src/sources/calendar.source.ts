@@ -1,26 +1,17 @@
-/**
- * Calendar Data Source
- * 
- * Adapter that wraps the existing CalendarService to implement DataSource
- * Converts Event to BirthdayRecord at the boundary
- */
-
 import calendarClient from '../clients/google-calendar.client.js';
-import { extractNameFromEvent, isBirthdayEvent } from '../utils/event-helpers.js';
-import { extractNameParts } from '../utils/name-helpers.js';
-import { parseDateFromString, fromDate, formatDateISO, today } from '../utils/date-helpers.js';
-import { getFullName } from '../utils/name-helpers.js';
-import { BaseDataSource } from '../base/base-data-source.js';
-import { getDateRangeForBirthdays, type BirthdayRecord } from '../utils/birthday-helpers.js';
-import type { ReadOptions, WriteOptions, WriteResult, DeleteResult, DataSourceMetadata } from '../interfaces/data-source.interface.js';
-import type { AppConfig } from '../config.js';
-import type { Event } from '../utils/event-helpers.js';
+import { BaseDataSource } from '../data-source/data-source.base.js';
+import { extractNameFromEvent, isBirthdayEvent } from '../utils/event-helpers.util.js';
+import { extractNameParts, getFullName } from '../utils/name-helpers.util.js';
+import { parseDateFromString, fromDate, formatDateISO, today } from '../utils/date-helpers.util.js';
+import { getDateRangeForBirthdays } from '../utils/birthday-helpers.util.js';
+import { auditDeletionAttempt, SecurityError } from '../utils/security.util.js';
 import { config } from '../config.js';
-import { logger } from '../utils/logger.js';
+import { logger } from '../clients/logger.client.js';
+import type { BirthdayRecord } from '../types/birthday.types.js';
+import type { Event } from '../types/event.types.js';
+import type { ReadOptions, WriteOptions, WriteResult, DeleteResult, DataSourceMetadata } from '../data-source/data-source.interface.js';
+import type { AppConfig } from '../config.js';
 
-/**
- * Convert Event to BirthdayRecord
- */
 function eventToBirthdayRecord(event: Event): BirthdayRecord | null {
   const startDate = event.start?.date ?? event.start?.dateTime;
   if (!startDate) {
@@ -32,7 +23,6 @@ function eventToBirthdayRecord(event: Event): BirthdayRecord | null {
     const fullName = extractNameFromEvent(event);
     const { firstName, lastName } = extractNameParts(fullName);
     
-    // Extract year from description if available (e.g., "Birthday of John Doe (born 1990)")
     const yearMatch = event.description?.match(/born (\d{4})/);
     const year = yearMatch ? parseInt(yearMatch[1], 10) : undefined;
     
@@ -47,11 +37,6 @@ function eventToBirthdayRecord(event: Event): BirthdayRecord | null {
   }
 }
 
-/**
- * Calendar data source implementation
- * 
- * Reads birthday events from Google Calendar and converts them to BirthdayRecord
- */
 export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
   constructor(config: AppConfig) {
     super(config);
@@ -67,23 +52,17 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
     } else if (startDate) {
       events = await calendarClient.fetchEvents({ startDate, endDate: startDate });
     } else {
-      // Default: get today's events
       const todayDate = today();
       events = await calendarClient.fetchEvents({ startDate: todayDate, endDate: todayDate });
     }
 
-    // Filter for birthday events
     const birthdayEvents = events.filter(event => isBirthdayEvent(event));
     
-    // Convert to BirthdayRecord
     return birthdayEvents
       .map(eventToBirthdayRecord)
       .filter((record): record is BirthdayRecord => record !== null);
   }
 
-  /**
-   * Check for duplicate birthday events
-   */
   async checkForDuplicates(birthday: BirthdayRecord): Promise<BirthdayRecord[]> {
     try {
       const eventDate = fromDate(birthday.birthday);
@@ -92,7 +71,6 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
         endDate: eventDate,
       });
       
-      // Filter for matching birthdays by name
       return existingBirthdays.filter(existing => {
         const firstNameMatch = existing.firstName.toLowerCase() === birthday.firstName.toLowerCase();
         const lastNameMatch = (existing.lastName ?? '').toLowerCase() === (birthday.lastName ?? '').toLowerCase();
@@ -104,24 +82,12 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
     }
   }
 
-  /**
-   * Delete a single event from the calendar
-   * 
-   * SECURITY: This method is disabled to prevent unauthorized deletion
-   */
   async delete(id: string): Promise<boolean> {
-    const { auditDeletionAttempt, SecurityError } = await import('../utils/security.js');
     auditDeletionAttempt('CalendarDataSource.delete', { eventId: id });
     throw new SecurityError('Deletion of birthday events is disabled for security reasons');
   }
 
-  /**
-   * Delete all birthdays in bulk mode by date range
-   * 
-   * SECURITY: This method is disabled to prevent unauthorized deletion
-   */
   async deleteAll(options: ReadOptions): Promise<DeleteResult> {
-    const { auditDeletionAttempt, SecurityError } = await import('../utils/security.js');
     auditDeletionAttempt('CalendarDataSource.deleteAll', { 
       startDate: options.startDate?.toISOString(),
       endDate: options.endDate?.toISOString(),
@@ -130,8 +96,6 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
   }
 
   async write(data: BirthdayRecord[], _options?: WriteOptions): Promise<WriteResult> {
-    // Optimization: Batch fetch all existing birthdays for the date range upfront
-    // This reduces API calls from 2N (N for duplicate checks + N for inserts) to N+1
     const getLookupKey = (b: BirthdayRecord) => 
       `${formatDateISO(fromDate(b.birthday))}|${b.firstName.toLowerCase()}|${(b.lastName ?? '').toLowerCase()}`;
     
@@ -146,19 +110,15 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
       return map;
     }, {} as Record<string, BirthdayRecord[]>);
     
-    let added = 0;
-    let skipped = 0;
-    let errors = 0;
-    
-    for (const birthday of data) {
+    const result = await data.reduce(async (accPromise, birthday) => {
+      const acc = await accPromise;
       try {
         const fullName = getFullName(birthday.firstName, birthday.lastName);
         const lookupKey = getLookupKey(birthday);
         
         if (existingBirthdaysMap[lookupKey]?.length) {
           logger.info(`Skipping duplicate birthday for ${fullName}`);
-          skipped++;
-          continue;
+          return { ...acc, skipped: acc.skipped + 1 };
         }
 
         const dateString = formatDateISO(fromDate(birthday.birthday));
@@ -176,15 +136,15 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
           calendar: config.google.calendarId,
         });
         
-        existingBirthdaysMap[lookupKey] = [birthday]; // Cache to prevent duplicates in same batch
-        added++;
+        existingBirthdaysMap[lookupKey] = [birthday];
+        return { ...acc, added: acc.added + 1 };
       } catch (error) {
-        errors++;
         logger.error(`Error writing birthday for ${birthday.firstName} ${birthday.lastName ?? ''}`, error);
+        return { ...acc, errors: acc.errors + 1 };
       }
-    }
+    }, Promise.resolve({ added: 0, skipped: 0, errors: 0 }));
     
-    return { added, skipped, errors };
+    return result;
   }
 
   isAvailable(): boolean {

@@ -1,10 +1,6 @@
-import birthdayService from '../services/birthday.js';
-import { getFullName } from '../utils/name-helpers.js';
-import { logger } from '../utils/logger.js';
-
-/**
- * Script to get today's birthdays and optionally monthly digest if it's first day of month
- */
+import birthdayService from '../services/birthday.service.js';
+import { getFullName } from '../utils/name-helpers.util.js';
+import { logger } from '../clients/logger.client.js';
 
 async function getTodaysBirthdaysWithDigest(): Promise<void> {
   try {
@@ -34,6 +30,5 @@ async function getTodaysBirthdaysWithDigest(): Promise<void> {
   }
 }
 
-// Run the script
 getTodaysBirthdaysWithDigest();
 
