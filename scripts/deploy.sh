@@ -3,6 +3,11 @@
 
 set -e
 
+# Get the script directory and project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$PROJECT_ROOT"
+
 echo "=========================================="
 echo "Mnemora AWS Deployment"
 echo "=========================================="
@@ -50,7 +55,7 @@ echo "✅ Build complete"
 # Build with SAM
 echo ""
 echo "Building with SAM..."
-sam build --template-file infrastructure/template.yaml
+sam build --template-file "$PROJECT_ROOT/infrastructure/template.yaml"
 echo "✅ SAM build complete"
 
 # Deploy
@@ -59,7 +64,7 @@ echo "Deploying to AWS..."
 echo "This may take 5-10 minutes..."
 echo ""
 
-sam deploy --template-file infrastructure/template.yaml --config-file infrastructure/samconfig.toml --resolve-s3
+sam deploy --template-file "$PROJECT_ROOT/infrastructure/template.yaml" --config-file "$PROJECT_ROOT/infrastructure/samconfig.toml" --resolve-s3
 
 echo ""
 echo "=========================================="
