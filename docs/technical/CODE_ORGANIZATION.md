@@ -2,33 +2,6 @@
 
 This document explains how the codebase is organized and the conventions we follow.
 
-## Import Organization
-
-Imports are organized in the following order:
-
-1. **External dependencies** - Third-party packages
-2. **Internal modules** - Organized by category:
-   - Services
-   - Factories
-   - Utils (grouped by functionality)
-   - Types/Interfaces
-
-Example:
-```typescript
-// External dependencies
-import { fromZonedTime, toZonedTime } from 'date-fns-tz';
-
-// Internal modules - Services
-import birthdayService from './services/birthday.js';
-
-// Internal modules - Factories
-import { OutputChannelFactory } from './output-channel/output-channel.factory.js';
-
-// Internal modules - Utils
-import { logger } from './utils/logger.js';
-import { getFullName } from './utils/name-helpers.js';
-```
-
 ## File Structure
 
 ### Directory Organization
@@ -147,9 +120,10 @@ async function process(): Promise<void> { }
 ### Comment Style
 ```typescript
 /**
- * Check and send messages for missed days
+ * Check and send monthly digest for latest missed 1st-of-month date
  * 
- * Only processes the most recent missed day to avoid spamming the group.
+ * Only recovers the latest (most recent) missed monthly digest to avoid spamming.
+ * Individual birthday messages are NOT recovered.
  */
 async function checkAndSendMissedDays(): Promise<void> {
   // Implementation

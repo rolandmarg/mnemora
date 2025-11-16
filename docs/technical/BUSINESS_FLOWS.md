@@ -5,7 +5,7 @@ Complete documentation of all execution flows, decision trees, and error scenari
 ## Table of Contents
 
 1. [Normal Execution Flow](#normal-execution-flow)
-2. [Missed Days Recovery Flow](#missed-days-recovery-flow)
+2. [Missed Monthly Digest Recovery Flow](#missed-monthly-digest-recovery-flow)
 3. [Monthly Digest Flow](#monthly-digest-flow)
 4. [WhatsApp Authentication Flow](#whatsapp-authentication-flow)
 5. [Error Scenarios and Recovery](#error-scenarios-and-recovery)
@@ -27,35 +27,43 @@ Complete documentation of all execution flows, decision trees, and error scenari
    - Track execution start metric
    - Call `runBirthdayCheck()`
 
-2. **Check for Missed Days** (`src/index-core.ts::checkAndSendMissedDays()`)
+2. **Check for Missed Monthly Digests** (`src/services/birthday-orchestrator.service.ts::checkAndSendMissedDays()`)
    - Read last run date from S3 (or local file)
    - Calculate missed dates since last run
-   - If missed dates exist:
-     - Take only the most recent missed date (to avoid spamming)
-     - Fetch birthdays for that date from Google Calendar
-     - Send birthday messages via WhatsApp (if birthdays exist)
-     - Log missed days recovery
-   - If no missed dates: Continue to main flow
+   - Filter for missed 1st-of-month dates only
+   - If missed 1st-of-month dates exist:
+     - For each missed 1st-of-month date:
+       - Fetch entire month's birthdays for that date
+       - Generate monthly digest message
+       - Send monthly digest via WhatsApp
+       - Wait 1 second between sends
+     - Log missed monthly digest recovery
+   - If no missed 1st-of-month dates: Continue to main flow
+   - Note: Only monthly digests are recovered, not individual birthday messages
 
-3. **Fetch Today's Birthdays** (`src/services/birthday.ts::getTodaysBirthdaysWithOptionalDigest()`)
+3. **Fetch Today's Birthdays** (`src/services/birthday.service.ts::getTodaysBirthdaysWithMonthlyDigest()`)
    - Check if today is first day of month
    - If first of month:
      - Fetch entire month's birthdays (optimized single API call)
-     - Filter for today's birthdays
-     - Generate monthly digest message
+     - Filter for today's birthdays from month data
+     - Return both `todaysBirthdays` and `monthlyBirthdays`
    - If not first of month:
      - Fetch only today's birthdays
+     - Return `todaysBirthdays` only
    - Track API calls and operation duration
 
 4. **Send Monthly Digest** (if first of month)
    - Format monthly digest: `🎂 Date: Name 🎉, Name 🎭`
    - Initialize WhatsApp channel
-   - Send digest to WhatsApp group
+   - Resolve group identifier (name or ID) using `resolveGroupId()`
+   - Send digest to WhatsApp group via `recipients` array
    - Track monthly digest sent metric
-   - If send fails: Log warning (non-critical)
+   - If send fails on 1st: CRITICAL alert
+   - If send fails on other days: WARNING alert
 
 5. **Send Today's Birthday Messages** (if birthdays exist)
    - Format personal messages: `🎂 🎉 Name` (one per person)
+   - Note: On 1st of month, both monthly digest AND today's birthday messages are sent
    - For each birthday:
      - Send individual message to WhatsApp group
      - Wait 1 second between messages (rate limiting)
@@ -80,40 +88,42 @@ Complete documentation of all execution flows, decision trees, and error scenari
 
 ---
 
-## Missed Days Recovery Flow
+## Missed Monthly Digest Recovery Flow
 
 ### Trigger
 - Detected during normal execution flow
 - Calculated by comparing last run date to today
+- Only recovers missed 1st-of-month dates (for monthly digests)
 
 ### Flow Steps
 
-1. **Detection** (`src/utils/last-run-tracker.ts::getMissedDates()`)
+1. **Detection** (`src/services/last-run-tracker.service.ts::getMissedDates()`)
    - Read last run date from S3
    - Calculate all dates between last run and today (exclusive)
    - Return array of missed dates
 
 2. **Recovery Decision**
-   - If missed dates exist:
-     - Take only the **most recent** missed date (last in array)
-     - This prevents spamming multiple days of messages
-   - If no missed dates: Skip recovery
+   - Filter missed dates to only include 1st-of-month dates
+   - If missed 1st-of-month dates exist:
+     - Take only the **latest** (most recent) missed 1st-of-month date
+     - This prevents spamming multiple monthly digests
+   - If no missed 1st-of-month dates: Skip recovery
+   - Note: Individual birthday messages are NOT recovered, only monthly digests
 
-3. **Fetch Missed Day Birthdays**
-   - Query Google Calendar for birthdays on missed date
-   - If birthdays found:
-     - Format personal birthday messages
-     - Send each message via WhatsApp
-     - Track birthday sent metrics
-   - If no birthdays: Log and continue
+3. **Fetch Missed Month's Birthdays**
+   - Query Google Calendar for entire month's birthdays for the latest missed 1st-of-month
+   - Generate monthly digest message
+   - Send monthly digest via WhatsApp
+   - If no birthdays found: Log and skip
 
 4. **Error Handling**
    - If WhatsApp unavailable: Log and skip (non-critical)
-   - If calendar API fails: Log error (recovery fails silently)
+   - If calendar API fails: Log error and send alert
    - Recovery failures don't block main execution
+   - Each failed recovery sends `missed-days-recovery-failed` alert
 
 ### Success Criteria
-- Most recent missed day's birthdays sent (if any)
+- Latest missed 1st-of-month monthly digest sent (if any)
 - Main execution continues normally
 - Missed days metric tracked
 
@@ -147,7 +157,8 @@ Complete documentation of all execution flows, decision trees, and error scenari
 
 4. **Send Digest**
    - Initialize WhatsApp channel
-   - Send formatted digest to group
+   - Resolve group identifier using `resolveGroupId()` (accepts name or ID)
+   - Send formatted digest to group via `recipients` array
    - Track `monthly_digest.sent` metric
    - Record in monitoring: `monthlyDigestSent: true`
 
@@ -363,20 +374,22 @@ Complete documentation of all execution flows, decision trees, and error scenari
 
 ### Scenario 7: WhatsApp Group Not Found
 
-**Trigger**: Group name doesn't match any group in WhatsApp
+**Trigger**: Group identifier (name or ID) doesn't match any group in WhatsApp
 
 **Flow**:
-1. `findGroupByName()` searches all chats
-2. No matching group found
-3. Return error from `send()`
-4. Send WARNING alert: `whatsapp-group-not-found`
-5. Log group name that was searched
+1. `resolveGroupId()` attempts to resolve identifier
+2. If identifier looks like a name: `findGroupByName()` searches all chats
+3. No matching group found
+4. Return error from `send()`
+5. Send WARNING alert: `whatsapp-group-not-found`
+6. Log identifier that was searched
 
 **Alert**: WARNING (email, SMS optional)
 **Recovery**: 
-- Verify group name matches exactly (case-sensitive)
+- Verify group name matches exactly (case-sensitive) or group ID is correct
 - Ensure bot's WhatsApp account is in the group
-- Check group name in WhatsApp
+- Check group name/ID in WhatsApp
+- Verify `WHATSAPP_GROUP_ID` config if using default
 
 ---
 
@@ -423,20 +436,21 @@ Complete documentation of all execution flows, decision trees, and error scenari
 
 ---
 
-### Scenario 10: Missed Days Recovery Failed
+### Scenario 10: Missed Monthly Digest Recovery Failed
 
-**Trigger**: Recovery attempt fails (API error, WhatsApp unavailable)
+**Trigger**: Monthly digest recovery attempt fails (API error, WhatsApp unavailable)
 
 **Flow**:
-1. `checkAndSendMissedDays()` encounters error
-2. Error logged
-3. Send WARNING alert: `missed-days-recovery-failed`
+1. `checkAndSendMissedDays()` encounters error during monthly digest recovery
+2. Error logged with specific missed date (latest missed 1st-of-month)
+3. Send WARNING alert: `missed-days-recovery-failed` with stage: 'monthly-digest-recovery'
 4. Main execution continues (recovery is best-effort)
+5. Note: Only the latest missed monthly digest is recovered, not all missed ones
 
 **Alert**: WARNING (email, SMS optional)
 **Recovery**: 
-- Check CloudWatch Logs for specific error
-- Manually trigger recovery if needed
+- Check CloudWatch Logs for specific error and missed date
+- Manually trigger monthly digest send for the missed 1st-of-month date if needed
 - Fix underlying issue (API, WhatsApp, etc.)
 
 ---
@@ -568,10 +582,13 @@ Complete documentation of all execution flows, decision trees, and error scenari
 ```
 Start
   ↓
-Check Missed Days?
-  ├─ Yes → Recover Most Recent Missed Day
-  │         ├─ Success → Continue
-  │         └─ Failure → Log, Continue (non-critical)
+Check Missed 1st-of-Month Dates?
+  ├─ Yes → Take Latest Missed 1st-of-Month
+  │         ├─ Fetch Month's Birthdays
+  │         ├─ Generate Monthly Digest
+  │         ├─ Send Digest via WhatsApp
+  │         │   ├─ Success → Track Metric
+  │         │   └─ Failure → WARNING Alert
   └─ No → Continue
   ↓
 Is First of Month?
@@ -625,9 +642,13 @@ Verify Client State
   ├─ CONNECTED/OPENING → Continue
   └─ Other → Reinitialize
   ↓
-Find Group by Name/ID
-  ├─ Found → Continue
-  └─ Not Found → WARNING Alert, Return Error
+Resolve Group Identifier (via resolveGroupId)
+  ├─ Accepts name or ID from recipients array
+  ├─ Falls back to config.whatsapp.groupId if undefined
+  ├─ If name: Searches for group by name
+  ├─ If ID: Normalizes format (adds @g.us if needed)
+  ├─ Found/Valid → Continue
+  └─ Not Found/Invalid → WARNING Alert, Return Error
   ↓
 Send Message (with Retries)
   ├─ Success → Track Metric, Return Success
@@ -756,25 +777,26 @@ Continue or Fail Execution (based on error type)
 
 ## Edge Cases
 
-### Edge Case 1: Multiple Missed Days
-- **Behavior**: Only recover most recent missed day
-- **Rationale**: Avoid spamming group with multiple days of messages
+### Edge Case 1: Multiple Missed 1st-of-Month Dates
+- **Behavior**: Only recover the latest (most recent) missed 1st-of-month date
+- **Rationale**: Prevents spamming the group with multiple monthly digests
 - **Alert**: None (expected behavior)
 
-### Edge Case 2: No Birthdays on Missed Day
-- **Behavior**: Log and continue (no messages sent)
-- **Rationale**: Nothing to send
+### Edge Case 2: No Birthdays in Missed Month
+- **Behavior**: Log and skip recovery (no digest sent)
+- **Rationale**: Nothing to send for that month
 - **Alert**: None
 
-### Edge Case 3: Monthly Digest on Day with Birthdays
+### Edge Case 3: Monthly Digest on Day with Birthdays (1st of Month)
 - **Behavior**: Send both monthly digest AND today's birthday messages
 - **Rationale**: Both are relevant on 1st of month
+- **Note**: People with birthdays on the 1st appear in both the digest and get individual messages
 - **Alert**: None (normal behavior)
 
-### Edge Case 4: WhatsApp Unavailable During Recovery
+### Edge Case 4: WhatsApp Unavailable During Monthly Digest Recovery
 - **Behavior**: Skip recovery, continue main execution
 - **Rationale**: Recovery is best-effort, main execution is priority
-- **Alert**: WARNING if recovery was needed
+- **Alert**: WARNING `missed-days-recovery-failed` if recovery was needed
 
 ### Edge Case 5: Execution Runs Twice Same Day
 - **Behavior**: Second execution sees today as "last run", no missed days
@@ -788,7 +810,7 @@ Continue or Fail Execution (based on error type)
 ### Execution Duration Targets
 - Normal execution: <2 minutes
 - With monthly digest: <3 minutes
-- With missed days recovery: <4 minutes
+- With missed monthly digest recovery: <4 minutes (depends on number of missed 1st-of-months)
 - Maximum timeout: 15 minutes (Lambda limit)
 
 ### API Call Optimization
@@ -830,9 +852,10 @@ Continue or Fail Execution (based on error type)
    - Request quota increase from Google
 
 5. **Group Not Found**
-   - Verify exact group name (case-sensitive)
+   - Verify exact group name (case-sensitive) or correct group ID
    - Ensure bot's WhatsApp account is in group
-   - Check group name in WhatsApp settings
+   - Check group name/ID in WhatsApp settings
+   - Verify `WHATSAPP_GROUP_ID` config if using default
 
 ---
 

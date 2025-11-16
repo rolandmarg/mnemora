@@ -94,10 +94,15 @@ class BirthdayOrchestratorService {
       return;
     }
 
+    // Only recover the latest (most recent) missed 1st-of-month to avoid spamming
+    const latestMissedFirst = missedFirstOfMonths.sort((a, b) => b.getTime() - a.getTime())[0];
+    const dateStr = latestMissedFirst.toISOString().split('T')[0];
+
     trackMissedDaysDetected(this.metrics, missedFirstOfMonths.length);
 
-    this.ctx.logger.info(`Found ${missedFirstOfMonths.length} missed 1st-of-month date(s) to recover`, {
+    this.ctx.logger.info(`Found ${missedFirstOfMonths.length} missed 1st-of-month date(s), recovering latest: ${dateStr}`, {
       missedFirstOfMonths: missedFirstOfMonths.map(d => d.toISOString().split('T')[0]),
+      recovering: dateStr,
     });
 
     let whatsappChannel: ReturnType<typeof OutputChannelFactory.createWhatsAppOutputChannel> | null = null;
@@ -109,50 +114,45 @@ class BirthdayOrchestratorService {
         return;
       }
 
-      for (const missedFirst of missedFirstOfMonths) {
-        const dateStr = missedFirst.toISOString().split('T')[0];
-        try {
-          const monthStart = startOfMonth(missedFirst);
-          const monthEnd = endOfMonth(missedFirst);
-          const monthlyBirthdays = await this.birthdayService.getBirthdays(monthStart, monthEnd);
+      try {
+        const monthStart = startOfMonth(latestMissedFirst);
+        const monthEnd = endOfMonth(latestMissedFirst);
+        const monthlyBirthdays = await this.birthdayService.getBirthdays(monthStart, monthEnd);
 
-          if (monthlyBirthdays.length === 0) {
-            this.ctx.logger.info(`No birthdays found for missed monthly digest: ${dateStr}`);
-            continue;
-          }
+        if (monthlyBirthdays.length === 0) {
+          this.ctx.logger.info(`No birthdays found for missed monthly digest: ${dateStr}`);
+          return;
+        }
 
-          const monthlyDigest = this.birthdayService.formatMonthlyDigest(monthlyBirthdays);
+        const monthlyDigest = this.birthdayService.formatMonthlyDigest(monthlyBirthdays);
+        
+        this.ctx.logger.info(`Sending monthly digest for missed 1st-of-month: ${dateStr}`, {
+          monthlyBirthdaysCount: monthlyBirthdays.length,
+        });
+
+        const result = await whatsappChannel.send(monthlyDigest);
+        
+        if (result.success) {
+          trackMonthlyDigestSent(this.metrics);
+          this.ctx.logger.info('Missed monthly digest sent successfully', { date: dateStr });
           
-          this.ctx.logger.info(`Sending monthly digest for missed 1st-of-month: ${dateStr}`, {
-            monthlyBirthdaysCount: monthlyBirthdays.length,
+          await this.logMessage(result.messageId, 'monthly-digest', whatsappChannel, monthlyDigest, true);
+        } else {
+          this.ctx.logger.warn('Failed to send missed monthly digest', {
+            date: dateStr,
+            error: result.error?.message,
           });
-
-          const result = await whatsappChannel.send(monthlyDigest);
-          
-          if (result.success) {
-            trackMonthlyDigestSent(this.metrics);
-            this.ctx.logger.info('Missed monthly digest sent successfully', { date: dateStr });
-            
-            await this.logMessage(result.messageId, 'monthly-digest', whatsappChannel, monthlyDigest, true);
-            
-            await new Promise(resolve => setTimeout(resolve, 1000));
-          } else {
-            this.ctx.logger.warn('Failed to send missed monthly digest', {
-              date: dateStr,
-              error: result.error?.message,
-            });
-            this.alerting.sendMonthlyDigestFailedAlert(result.error, {
-              date: dateStr,
-              isRecovery: true,
-            });
-          }
-        } catch (error) {
-          this.ctx.logger.error(`Error recovering monthly digest for ${dateStr}`, error);
-          this.alerting.sendMissedDaysRecoveryFailedAlert(error, {
-            missedDate: dateStr,
-            stage: 'monthly-digest-recovery',
+          this.alerting.sendMonthlyDigestFailedAlert(result.error, {
+            date: dateStr,
+            isRecovery: true,
           });
         }
+      } catch (error) {
+        this.ctx.logger.error(`Error recovering monthly digest for ${dateStr}`, error);
+        this.alerting.sendMissedDaysRecoveryFailedAlert(error, {
+          missedDate: dateStr,
+          stage: 'monthly-digest-recovery',
+        });
       }
     } catch (error) {
       this.ctx.logger.error('Error processing missed monthly digest recovery', error);

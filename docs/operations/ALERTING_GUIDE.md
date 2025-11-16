@@ -159,12 +159,13 @@ Complete guide to all alert types, severity levels, and remediation steps for Mn
   5. Check if session files are corrupted
 
 #### 10. `missed-days-recovery-failed`
-- **Trigger**: Failed to recover and send messages for missed days
+- **Trigger**: Failed to recover and send monthly digest for latest missed 1st-of-month date
 - **Severity**: WARNING
 - **Delivery**: Email (SMS optional)
+- **Note**: Only the latest missed monthly digest is recovered (not all missed ones), and individual birthday messages are NOT recovered
 - **Remediation Steps**:
-  1. Check CloudWatch Logs for specific error
-  2. Manually trigger recovery if needed
+  1. Check CloudWatch Logs for specific error and missed date
+  2. Manually trigger monthly digest send for the missed 1st-of-month date if needed
   3. Fix underlying issue (API, WhatsApp, etc.)
 
 #### 11. `s3-storage-failed`

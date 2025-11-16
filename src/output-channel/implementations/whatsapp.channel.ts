@@ -56,6 +56,7 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
 
   async send(message: string, options?: SendOptions): Promise<SendResult> {
     const startTime = Date.now();
+    let resolvedGroupId: string | undefined;
 
     try {
       await this.authReminder.checkAndEmitReminder().catch(() => {});
@@ -69,7 +70,7 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
 
       // Resolve group identifier from recipients or config (this also initializes the client)
       const identifier = options?.recipients?.[0];
-      const resolvedGroupId = await this.resolveGroupId(identifier);
+      resolvedGroupId = await this.resolveGroupId(identifier);
 
       if (!this.ctx.clients.whatsapp.isClientReady()) {
         return {
