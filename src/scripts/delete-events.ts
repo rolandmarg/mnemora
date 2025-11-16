@@ -1,13 +1,13 @@
-import { logger } from '../clients/logger.client.js';
+import { appContext } from '../app-context.js';
 import { auditDeletionAttempt } from '../utils/security.util.js';
 
 async function main(): Promise<void> {
-  auditDeletionAttempt('delete-events.ts', {
+  auditDeletionAttempt(appContext, 'delete-events.ts', {
     script: 'delete-events',
     args: process.argv.slice(2),
   });
 
-  logger.error('SECURITY: Deletion script is disabled', {
+  appContext.logger.error('SECURITY: Deletion script is disabled', {
     reason: 'Deletion of birthday events is disabled for security reasons',
     script: 'delete-events.ts',
   });

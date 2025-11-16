@@ -13,7 +13,6 @@ import {
   formatDateMonthYear,
   formatDateRange,
   isFirstDayOfMonth,
-  fromDate,
 } from '../utils/date-helpers.util.js';
 
 describe('date utilities', () => {
@@ -182,23 +181,6 @@ describe('date utilities', () => {
     it('should return false for other days', () => {
       const date = new Date(2024, 4, 15);
       expect(isFirstDayOfMonth(date)).toBe(false);
-    });
-  });
-
-  describe('fromDate', () => {
-    it('should create a new Date instance', () => {
-      const original = new Date(2024, 4, 15);
-      const result = fromDate(original);
-      expect(result).not.toBe(original);
-      expect(result.getTime()).toBe(original.getTime());
-    });
-
-    it('should not modify original date when result is modified', () => {
-      const original = new Date(2024, 4, 15);
-      const result = fromDate(original);
-      result.setDate(20);
-      expect(original.getDate()).toBe(15);
-      expect(result.getDate()).toBe(20);
     });
   });
 });

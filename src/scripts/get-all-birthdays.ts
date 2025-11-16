@@ -1,15 +1,13 @@
 import { OutputChannelFactory } from '../output-channel/output-channel.factory.js';
+import { BirthdayService } from '../services/birthday.service.js';
+import { appContext } from '../app-context.js';
 import { today } from '../utils/date-helpers.util.js';
-import { logger } from '../clients/logger.client.js';
-import birthdayService from '../services/birthday.service.js';
 
 async function getAllBirthdays(): Promise<void> {
-  const ctx = {
-    log: logger.child({ script: 'get-all-birthdays' }),
-    outputChannel: OutputChannelFactory.createConsoleOutputChannel(),
-  };
+  const birthdayService = new BirthdayService(appContext);
+  const outputChannel = OutputChannelFactory.createConsoleOutputChannel();
 
-  if (!ctx.outputChannel.isAvailable()) {
+  if (!outputChannel.isAvailable()) {
     throw new Error('Output channel is not available');
   }
   
@@ -17,40 +15,40 @@ async function getAllBirthdays(): Promise<void> {
   const year = todayDate.getFullYear();
   
   try {
-    ctx.log.info('Step 1: Reading birthdays from Google Sheets...');
+    appContext.logger.info('Step 1: Reading birthdays from Google Sheets...');
     
     const sheetBirthdays = await birthdayService.readFromSheets();
-    ctx.log.info(`Found ${sheetBirthdays.length} birthday(s) in Google Sheets`);
+    appContext.logger.info(`Found ${sheetBirthdays.length} birthday(s) in Google Sheets`);
     
-    ctx.log.info('Step 2: Syncing birthdays to Google Calendar...');
+    appContext.logger.info('Step 2: Syncing birthdays to Google Calendar...');
     
     const writeResult = await birthdayService.syncToCalendar(sheetBirthdays);
-    ctx.log.info('Sync completed', { 
+    appContext.logger.info('Sync completed', { 
       synced: writeResult.added, 
       skipped: writeResult.skipped, 
       errors: writeResult.errors 
     });
     
-    ctx.log.info('Step 3: Reading all birthdays from Google Calendar...');
+    appContext.logger.info('Step 3: Reading all birthdays from Google Calendar...');
     
-    ctx.log.info(`Fetching events from ${year}`);
+    appContext.logger.info(`Fetching events from ${year}`);
     
     const birthdayRecords = await birthdayService.getAllBirthdaysForYear();
     
-    ctx.log.info('Step 4: Displaying all birthdays...');
+    appContext.logger.info('Step 4: Displaying all birthdays...');
     
     if (birthdayRecords.length === 0) {
-      ctx.log.info('Completed successfully - no birthdays found');
+      appContext.logger.info('Completed successfully - no birthdays found');
     } else {
-    ctx.log.info(`Found ${birthdayRecords.length} birthday(s) in ${year}`);
+    appContext.logger.info(`Found ${birthdayRecords.length} birthday(s) in ${year}`);
     }
     
-    await birthdayService.formatAndSendAllBirthdays(ctx.outputChannel, birthdayRecords);
+    await birthdayService.formatAndSendAllBirthdays(outputChannel, birthdayRecords);
     
-    ctx.log.info('Completed successfully');
+    appContext.logger.info('Completed successfully');
     process.exit(0);
   } catch (error) {
-    ctx.log.error('Error getting all birthdays', error);
+    appContext.logger.error('Error getting all birthdays', error);
     process.exit(1);
   }
 }

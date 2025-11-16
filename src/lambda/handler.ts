@@ -1,7 +1,7 @@
 import { runBirthdayCheck } from '../services/birthday-orchestrator.service.js';
-import { sendLambdaExecutionFailedAlert, sendLambdaTimeoutAlert } from '../services/alerting.service.js';
-import { logger } from '../clients/logger.client.js';
-import { metrics } from '../services/metrics.service.js';
+import { AlertingService } from '../services/alerting.service.js';
+import { MetricsCollector } from '../services/metrics.service.js';
+import { appContext } from '../app-context.js';
 import { setCorrelationId } from '../utils/correlation.util.js';
 import type { EventBridgeEvent, LambdaContext, LambdaResponse } from './types.js';
 
@@ -9,12 +9,15 @@ export async function handler(
   event: EventBridgeEvent,
   context: LambdaContext
 ): Promise<LambdaResponse | void> {
+  const alerting = new AlertingService(appContext);
+  const metrics = new MetricsCollector(appContext);
+  
   const correlationId = context.awsRequestId;
   if (correlationId) {
     setCorrelationId(correlationId);
   }
 
-  logger.info('Lambda function invoked', {
+  appContext.logger.info('Lambda function invoked', {
     functionName: context.functionName,
     requestId: context.awsRequestId,
     eventSource: event.source,
@@ -25,7 +28,7 @@ export async function handler(
   const timeoutWarning = setTimeout(() => {
     const remaining = context.getRemainingTimeInMillis();
     if (remaining < 60000) {
-      logger.warn('Lambda execution approaching timeout', {
+      appContext.logger.warn('Lambda execution approaching timeout', {
         remainingTime: remaining,
         requestId: context.awsRequestId,
       });
@@ -33,11 +36,11 @@ export async function handler(
   }, (context.getRemainingTimeInMillis() - 60000));
 
   try {
-    await runBirthdayCheck();
+    await runBirthdayCheck(appContext);
     
     clearTimeout(timeoutWarning);
 
-    logger.info('Lambda function completed successfully', {
+    appContext.logger.info('Lambda function completed successfully', {
       requestId: context.awsRequestId,
       remainingTime: context.getRemainingTimeInMillis(),
     });
@@ -54,7 +57,7 @@ export async function handler(
   } catch (error) {
     clearTimeout(timeoutWarning);
     
-    logger.error('Lambda function failed', error, {
+    appContext.logger.error('Lambda function failed', error, {
       requestId: context.awsRequestId,
       remainingTime: context.getRemainingTimeInMillis(),
     });
@@ -62,13 +65,13 @@ export async function handler(
     // Check if this is a timeout error
     const remainingTime = context.getRemainingTimeInMillis();
     if (remainingTime <= 0 || (error instanceof Error && error.message.includes('timeout'))) {
-      sendLambdaTimeoutAlert({
+      alerting.sendLambdaTimeoutAlert({
         requestId: context.awsRequestId,
         functionName: context.functionName,
         remainingTime,
       });
     } else {
-      sendLambdaExecutionFailedAlert(error, {
+      alerting.sendLambdaExecutionFailedAlert(error, {
         requestId: context.awsRequestId,
         functionName: context.functionName,
         remainingTime,
@@ -78,7 +81,7 @@ export async function handler(
     try {
       await metrics.flush();
     } catch (flushError) {
-      logger.error('Error flushing metrics', flushError);
+      appContext.logger.error('Error flushing metrics', flushError);
     }
 
     return {

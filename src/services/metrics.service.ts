@@ -1,8 +1,6 @@
 import type { MetricDatum } from '@aws-sdk/client-cloudwatch';
-import cloudWatchMetricsClient from '../clients/cloudwatch.client.js';
-import { logger } from '../clients/logger.client.js';
 import { getCorrelationId } from '../utils/correlation.util.js';
-import { isLambdaEnvironment } from '../utils/env.util.js';
+import type { AppContext } from '../app-context.js';
 import type { MetricUnit, MetricDataPoint } from '../types/metrics.types.js';
 
 class MetricsCollector {
@@ -11,9 +9,9 @@ class MetricsCollector {
   private readonly enabled: boolean;
   private readonly batchSize: number = 20;
 
-  constructor() {
+  constructor(private readonly ctx: AppContext) {
     this.namespace = process.env.METRICS_NAMESPACE ?? 'Mnemora/BirthdayBot';
-    this.enabled = process.env.ENABLE_CLOUDWATCH_METRICS !== 'false' && isLambdaEnvironment();
+    this.enabled = process.env.ENABLE_CLOUDWATCH_METRICS !== 'false' && ctx.isLambda;
   }
 
   addMetric(
@@ -38,8 +36,8 @@ class MetricsCollector {
 
     this.metrics.push(metric);
 
-    if (!isLambdaEnvironment()) {
-      logger.debug('Metric recorded', {
+    if (!this.ctx.isLambda) {
+      this.ctx.logger.debug('Metric recorded', {
         name,
         value,
         unit,
@@ -61,7 +59,7 @@ class MetricsCollector {
   }
 
   async flush(): Promise<void> {
-    if (!this.enabled || !cloudWatchMetricsClient.isAvailable() || this.metrics.length === 0) {
+    if (!this.enabled || !this.ctx.clients.cloudWatch.isAvailable() || this.metrics.length === 0) {
       return;
     }
 
@@ -82,13 +80,13 @@ class MetricsCollector {
             : undefined,
         }));
 
-        await cloudWatchMetricsClient.putMetricData(this.namespace, metricData);
+        await this.ctx.clients.cloudWatch.putMetricData(this.namespace, metricData);
       }));
 
-      logger.debug(`Flushed ${this.metrics.length} metrics to CloudWatch`);
+      this.ctx.logger.debug(`Flushed ${this.metrics.length} metrics to CloudWatch`);
       this.metrics = [];
     } catch (error) {
-      logger.error('Failed to flush metrics to CloudWatch', error);
+      this.ctx.logger.error('Failed to flush metrics to CloudWatch', error);
     }
   }
 
@@ -101,46 +99,46 @@ class MetricsCollector {
   }
 }
 
-export const metrics = new MetricsCollector();
-
-export function trackExecutionStart(): void {
+export function trackExecutionStart(metrics: MetricsCollector): void {
   metrics.incrementCounter('execution.started');
 }
 
-export function trackExecutionComplete(durationMs: number, success: boolean = true): void {
+export function trackExecutionComplete(metrics: MetricsCollector, durationMs: number, success: boolean = true): void {
   metrics.incrementCounter(success ? 'execution.completed' : 'execution.failed');
   metrics.recordDuration('execution.duration', durationMs);
 }
 
-export function trackBirthdayFetch(count: number): void {
+export function trackBirthdayFetch(metrics: MetricsCollector, count: number): void {
   metrics.incrementCounter('birthdays.fetched', count);
 }
 
-export function trackBirthdaySent(count: number = 1): void {
+export function trackBirthdaySent(metrics: MetricsCollector, count: number = 1): void {
   metrics.incrementCounter('birthdays.sent', count);
 }
 
-export function trackMonthlyDigestSent(): void {
+export function trackMonthlyDigestSent(metrics: MetricsCollector): void {
   metrics.incrementCounter('monthly_digest.sent');
 }
 
-export function trackMissedDaysDetected(count: number): void {
+export function trackMissedDaysDetected(metrics: MetricsCollector, count: number): void {
   metrics.incrementCounter('missed_days.detected', count);
 }
 
-export function trackApiCall(service: 'calendar' | 'sheets', success: boolean = true): void {
+export function trackApiCall(metrics: MetricsCollector, service: 'calendar' | 'sheets', success: boolean = true): void {
   metrics.incrementCounter(`api.${service}.calls`, 1, { Status: success ? 'success' : 'failure' });
 }
 
-export function trackWhatsAppMessageSent(success: boolean = true): void {
+export function trackWhatsAppMessageSent(metrics: MetricsCollector, success: boolean = true): void {
   metrics.incrementCounter(success ? 'whatsapp.messages.sent' : 'whatsapp.messages.failed');
 }
 
-export function trackWhatsAppAuthRequired(): void {
+export function trackWhatsAppAuthRequired(metrics: MetricsCollector): void {
   metrics.incrementCounter('whatsapp.auth.required');
 }
 
-export function trackOperationDuration(operation: string, durationMs: number, dimensions?: Record<string, string>): void {
+export function trackOperationDuration(metrics: MetricsCollector, operation: string, durationMs: number, dimensions?: Record<string, string>): void {
   metrics.recordDuration(`operation.${operation}.duration`, durationMs, dimensions);
 }
+
+export { MetricsCollector };
 

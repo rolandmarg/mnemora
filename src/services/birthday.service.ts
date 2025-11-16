@@ -1,6 +1,5 @@
 import { DataSourceFactory } from '../data-source/data-source.factory.js';
-import { logger } from '../clients/logger.client.js';
-import { trackBirthdayFetch, trackApiCall, trackOperationDuration } from './metrics.service.js';
+import { MetricsCollector, trackBirthdayFetch, trackApiCall, trackOperationDuration } from './metrics.service.js';
 import { getFullName } from '../utils/name-helpers.util.js';
 import {
   today,
@@ -13,7 +12,8 @@ import {
   startOfYear,
   endOfYear,
 } from '../utils/date-helpers.util.js';
-import { sendGoogleCalendarApiFailedAlert, sendApiQuotaWarningAlert } from './alerting.service.js';
+import { AlertingService } from './alerting.service.js';
+import type { AppContext } from '../app-context.js';
 import type { BirthdayRecord } from '../types/birthday.types.js';
 import type { OutputChannel } from '../output-channel/output-channel.interface.js';
 import type { WriteResult } from '../data-source/data-source.interface.js';
@@ -36,24 +36,31 @@ function getPersonalBirthdayMessage(name: string, index: number): string {
 }
 
 class BirthdayService {
-  private readonly calendarSource = DataSourceFactory.createCalendarDataSource();
-  private readonly sheetsSource = DataSourceFactory.createSheetsDataSource();
+  private readonly calendarSource: ReturnType<typeof DataSourceFactory.createCalendarDataSource>;
+  private readonly sheetsSource: ReturnType<typeof DataSourceFactory.createSheetsDataSource>;
+  private readonly metrics: MetricsCollector;
+
+  constructor(private readonly ctx: AppContext) {
+    this.calendarSource = DataSourceFactory.createCalendarDataSource(ctx);
+    this.sheetsSource = DataSourceFactory.createSheetsDataSource(ctx);
+    this.metrics = new MetricsCollector(ctx);
+  }
 
   async getTodaysBirthdays(): Promise<BirthdayRecord[]> {
     const startTime = Date.now();
     try {
       const todayDate = today();
-      trackApiCall('calendar', true);
+      trackApiCall(this.metrics, 'calendar', true);
       const records = await this.calendarSource.read({ startDate: todayDate, endDate: todayDate });
       
-      trackBirthdayFetch(records.length);
-      trackOperationDuration('getTodaysBirthdays', Date.now() - startTime);
+      trackBirthdayFetch(this.metrics, records.length);
+      trackOperationDuration(this.metrics, 'getTodaysBirthdays', Date.now() - startTime);
       
       return records;
     } catch (error) {
-      trackApiCall('calendar', false);
-      trackOperationDuration('getTodaysBirthdays', Date.now() - startTime, { success: 'false' });
-      logger.error('Error getting today\'s birthdays', error);
+      trackApiCall(this.metrics, 'calendar', false);
+      trackOperationDuration(this.metrics, 'getTodaysBirthdays', Date.now() - startTime, { success: 'false' });
+      this.ctx.logger.error('Error getting today\'s birthdays', error);
       
       // Determine error type and send appropriate alert
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -61,23 +68,24 @@ class BirthdayService {
       const isQuotaError = errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate limit');
       const isNetworkError = errorMessage.includes('timeout') || errorMessage.includes('ECONNREFUSED') || errorMessage.includes('network');
       
+      const alerting = new AlertingService(this.ctx);
       if (isAuthError) {
-        sendGoogleCalendarApiFailedAlert(error, {
+        alerting.sendGoogleCalendarApiFailedAlert(error, {
           errorType: 'authentication',
           operation: 'getTodaysBirthdays',
         });
       } else if (isQuotaError) {
-        sendApiQuotaWarningAlert('calendar', 100, {
+        alerting.sendApiQuotaWarningAlert('calendar', 100, {
           errorMessage,
           operation: 'getTodaysBirthdays',
         });
       } else if (isNetworkError) {
-        sendGoogleCalendarApiFailedAlert(error, {
+        alerting.sendGoogleCalendarApiFailedAlert(error, {
           errorType: 'network',
           operation: 'getTodaysBirthdays',
         });
       } else {
-        sendGoogleCalendarApiFailedAlert(error, {
+        alerting.sendGoogleCalendarApiFailedAlert(error, {
           errorType: 'unknown',
           operation: 'getTodaysBirthdays',
         });
@@ -117,7 +125,7 @@ class BirthdayService {
       const todayDate = today();
       const monthStart = startOfMonth(todayDate);
       const monthEnd = endOfMonth(todayDate);
-      trackApiCall('calendar', true);
+      trackApiCall(this.metrics, 'calendar', true);
       const monthRecords = await this.calendarSource.read({ startDate: monthStart, endDate: monthEnd });
       
       const todayStart = startOfDay(todayDate);
@@ -158,17 +166,17 @@ class BirthdayService {
         return `${paddedDatePrefix}${namesWithEmojis}`;
       }).join('\n');
 
-      trackBirthdayFetch(monthRecords.length);
-      trackOperationDuration('getTodaysBirthdaysWithMonthlyDigest', Date.now() - startTime);
+      trackBirthdayFetch(this.metrics, monthRecords.length);
+      trackOperationDuration(this.metrics, 'getTodaysBirthdaysWithMonthlyDigest', Date.now() - startTime);
 
       return {
         todaysBirthdays,
         monthlyDigest,
       };
     } catch (error) {
-      trackApiCall('calendar', false);
-      trackOperationDuration('getTodaysBirthdaysWithMonthlyDigest', Date.now() - startTime, { success: 'false' });
-      logger.error('Error getting today\'s birthdays and monthly digest', error);
+      trackApiCall(this.metrics, 'calendar', false);
+      trackOperationDuration(this.metrics, 'getTodaysBirthdaysWithMonthlyDigest', Date.now() - startTime, { success: 'false' });
+      this.ctx.logger.error('Error getting today\'s birthdays and monthly digest', error);
       
       // Determine error type and send appropriate alert
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -176,23 +184,24 @@ class BirthdayService {
       const isQuotaError = errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate limit');
       const isNetworkError = errorMessage.includes('timeout') || errorMessage.includes('ECONNREFUSED') || errorMessage.includes('network');
       
+      const alerting = new AlertingService(this.ctx);
       if (isAuthError) {
-        sendGoogleCalendarApiFailedAlert(error, {
+        alerting.sendGoogleCalendarApiFailedAlert(error, {
           errorType: 'authentication',
           operation: 'getTodaysBirthdaysWithMonthlyDigest',
         });
       } else if (isQuotaError) {
-        sendApiQuotaWarningAlert('calendar', 100, {
+        alerting.sendApiQuotaWarningAlert('calendar', 100, {
           errorMessage,
           operation: 'getTodaysBirthdaysWithMonthlyDigest',
         });
       } else if (isNetworkError) {
-        sendGoogleCalendarApiFailedAlert(error, {
+        alerting.sendGoogleCalendarApiFailedAlert(error, {
           errorType: 'network',
           operation: 'getTodaysBirthdaysWithMonthlyDigest',
         });
       } else {
-        sendGoogleCalendarApiFailedAlert(error, {
+        alerting.sendGoogleCalendarApiFailedAlert(error, {
           errorType: 'unknown',
           operation: 'getTodaysBirthdaysWithMonthlyDigest',
         });
@@ -205,15 +214,15 @@ class BirthdayService {
   async getBirthdays(startDate: Date, endDate: Date): Promise<BirthdayRecord[]> {
     const startTime = Date.now();
     try {
-      trackApiCall('calendar', true);
+      trackApiCall(this.metrics, 'calendar', true);
       const records = await this.calendarSource.read({ startDate, endDate });
-      trackBirthdayFetch(records.length);
-      trackOperationDuration('getBirthdays', Date.now() - startTime);
+      trackBirthdayFetch(this.metrics, records.length);
+      trackOperationDuration(this.metrics, 'getBirthdays', Date.now() - startTime);
       return records;
     } catch (error) {
-      trackApiCall('calendar', false);
-      trackOperationDuration('getBirthdays', Date.now() - startTime, { success: 'false' });
-      logger.error('Error getting birthdays', error);
+      trackApiCall(this.metrics, 'calendar', false);
+      trackOperationDuration(this.metrics, 'getBirthdays', Date.now() - startTime, { success: 'false' });
+      this.ctx.logger.error('Error getting birthdays', error);
       
       // Determine error type and send appropriate alert
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -221,23 +230,24 @@ class BirthdayService {
       const isQuotaError = errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate limit');
       const isNetworkError = errorMessage.includes('timeout') || errorMessage.includes('ECONNREFUSED') || errorMessage.includes('network');
       
+      const alerting = new AlertingService(this.ctx);
       if (isAuthError) {
-        sendGoogleCalendarApiFailedAlert(error, {
+        alerting.sendGoogleCalendarApiFailedAlert(error, {
           errorType: 'authentication',
           operation: 'getBirthdays',
         });
       } else if (isQuotaError) {
-        sendApiQuotaWarningAlert('calendar', 100, {
+        alerting.sendApiQuotaWarningAlert('calendar', 100, {
           errorMessage,
           operation: 'getBirthdays',
         });
       } else if (isNetworkError) {
-        sendGoogleCalendarApiFailedAlert(error, {
+        alerting.sendGoogleCalendarApiFailedAlert(error, {
           errorType: 'network',
           operation: 'getBirthdays',
         });
       } else {
-        sendGoogleCalendarApiFailedAlert(error, {
+        alerting.sendGoogleCalendarApiFailedAlert(error, {
           errorType: 'unknown',
           operation: 'getBirthdays',
         });
@@ -253,15 +263,15 @@ class BirthdayService {
       if (!this.sheetsSource.isAvailable()) {
         throw new Error('Google Sheets is not configured');
       }
-      trackApiCall('sheets', true);
+      trackApiCall(this.metrics, 'sheets', true);
       const records = await this.sheetsSource.read({ skipHeaderRow: true });
-      trackBirthdayFetch(records.length);
-      trackOperationDuration('readFromSheets', Date.now() - startTime);
+      trackBirthdayFetch(this.metrics, records.length);
+      trackOperationDuration(this.metrics, 'readFromSheets', Date.now() - startTime);
       return records;
     } catch (error) {
-      trackApiCall('sheets', false);
-      trackOperationDuration('readFromSheets', Date.now() - startTime, { success: 'false' });
-      logger.error('Error reading from sheets', error);
+      trackApiCall(this.metrics, 'sheets', false);
+      trackOperationDuration(this.metrics, 'readFromSheets', Date.now() - startTime, { success: 'false' });
+      this.ctx.logger.error('Error reading from sheets', error);
       throw error;
     }
   }
@@ -276,7 +286,7 @@ class BirthdayService {
       }
       return await this.calendarSource.write(birthdays);
     } catch (error) {
-      logger.error('Error syncing to calendar', error);
+      this.ctx.logger.error('Error syncing to calendar', error);
       throw error;
     }
   }
@@ -290,7 +300,7 @@ class BirthdayService {
       
       return await this.calendarSource.read({ startDate: yearStart, endDate: yearEnd });
     } catch (error) {
-      logger.error('Error getting all birthdays for year', error);
+      this.ctx.logger.error('Error getting all birthdays for year', error);
       throw error;
     }
   }
@@ -362,10 +372,10 @@ class BirthdayService {
       
       await outputChannel.send('\n✅ Completed successfully!');
     } catch (error) {
-      logger.error('Error formatting and sending birthdays', error);
+      this.ctx.logger.error('Error formatting and sending birthdays', error);
       throw error;
     }
   }
 }
 
-export default new BirthdayService();
+export { BirthdayService };

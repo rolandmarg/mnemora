@@ -1,23 +1,20 @@
-import snsClient from '../clients/sns.client.js';
-import { config } from '../config.js';
-import { logger } from '../clients/logger.client.js';
-import { createWhatsAppSessionStorage } from '../utils/storage.util.js';
+import { FileStorage } from '../clients/s3.client.js';
 import { getCorrelationId } from '../utils/correlation.util.js';
-import { isLambdaEnvironment } from '../utils/env.util.js';
 import { AlertSeverity, AlertType } from '../types/alerting.types.js';
+import type { AppContext } from '../app-context.js';
 import type { AlertState, AlertDetails } from '../types/alerting.types.js';
 
 interface ActiveAlerts {
   [alertId: string]: AlertState;
 }
 
-function getCloudWatchLogsUrl(): string | undefined {
-  if (!isLambdaEnvironment()) {
+function getCloudWatchLogsUrl(ctx: AppContext): string | undefined {
+  if (!ctx.isLambda) {
     return undefined;
   }
 
   const functionName = process.env.AWS_LAMBDA_FUNCTION_NAME;
-  const region = config.aws?.region ?? process.env.AWS_REGION ?? 'us-east-1';
+  const region = ctx.config.aws?.region ?? process.env.AWS_REGION ?? 'us-east-1';
   const requestId = getCorrelationId();
 
   if (functionName && requestId) {
@@ -29,20 +26,18 @@ function getCloudWatchLogsUrl(): string | undefined {
 
 export class AlertingService {
   private readonly topicArn: string | undefined;
-  private readonly storage: ReturnType<typeof createWhatsAppSessionStorage>;
-  private readonly isLambda: boolean;
+  private readonly storage: FileStorage;
   private readonly alertStateKey = 'alerts/active-alerts.json';
   private readonly deduplicationWindowMs = 60 * 60 * 1000;
 
-  constructor() {
-    this.isLambda = isLambdaEnvironment();
+  constructor(private readonly ctx: AppContext) {
     this.topicArn = process.env.SNS_TOPIC_ARN;
-    this.storage = createWhatsAppSessionStorage();
+    this.storage = new FileStorage('.wwebjs_auth');
   }
 
   private async loadActiveAlerts(): Promise<ActiveAlerts> {
     try {
-      if (this.isLambda) {
+      if (this.ctx.isLambda) {
         const data = await this.storage.readFile(this.alertStateKey);
         if (data) {
           return JSON.parse(data.toString('utf-8')) as ActiveAlerts;
@@ -50,19 +45,19 @@ export class AlertingService {
       }
       return {};
     } catch (error) {
-      logger.warn('Error loading active alerts, starting fresh', error);
+      this.ctx.logger.warn('Error loading active alerts, starting fresh', error);
       return {};
     }
   }
 
   private async saveActiveAlerts(alerts: ActiveAlerts): Promise<void> {
     try {
-      if (this.isLambda) {
+      if (this.ctx.isLambda) {
         const data = JSON.stringify(alerts, null, 2);
         await this.storage.writeFile(this.alertStateKey, data);
       }
     } catch (error) {
-      logger.error('Error saving active alerts', error);
+      this.ctx.logger.error('Error saving active alerts', error);
     }
   }
 
@@ -128,16 +123,16 @@ export class AlertingService {
         alert.resolved = true;
         alert.resolvedAt = new Date().toISOString();
         await this.saveActiveAlerts(alerts);
-        logger.info('Alert resolved', { alertId, resolvedAt: alert.resolvedAt });
+        this.ctx.logger.info('Alert resolved', { alertId, resolvedAt: alert.resolvedAt });
       }
     } catch (error) {
-      logger.error('Error resolving alert', error);
+      this.ctx.logger.error('Error resolving alert', error);
     }
   }
 
   private formatAlertMessage(details: AlertDetails, alertState: AlertState): string {
     const correlationId = getCorrelationId();
-    const logsUrl = getCloudWatchLogsUrl();
+    const logsUrl = getCloudWatchLogsUrl(this.ctx);
     const now = new Date().toISOString();
 
     let message = `[${details.severity}] ${details.title}\n\n`;
@@ -162,9 +157,9 @@ export class AlertingService {
 
     if (details.metadata) {
       message += `\nAdditional Details:\n`;
-      message += Object.entries(details.metadata)
+      message += `${Object.entries(details.metadata)
         .map(([key, value]) => `  ${key}: ${JSON.stringify(value)}`)
-        .join('\n') + '\n';
+        .join('\n')  }\n`;
     }
 
     if (alertState.count > 1) {
@@ -186,8 +181,8 @@ export class AlertingService {
   }
 
   async sendAlert(details: AlertDetails): Promise<void> {
-    if (!snsClient.isAvailable() || !this.topicArn) {
-      logger.warn('Alert would be sent (SNS not configured)', {
+    if (!this.ctx.clients.sns.isAvailable() || !this.topicArn) {
+      this.ctx.logger.warn('Alert would be sent (SNS not configured)', {
         type: details.type,
         severity: details.severity,
         title: details.title,
@@ -202,7 +197,7 @@ export class AlertingService {
       const alertState = await this.updateAlertState(alerts, alertId, details.severity, now);
 
       if (!this.shouldSendAlert(alertState, now)) {
-        logger.debug('Alert deduplicated (sent recently)', {
+        this.ctx.logger.debug('Alert deduplicated (sent recently)', {
           alertId,
           lastSent: alertState.lastSent,
         });
@@ -215,9 +210,9 @@ export class AlertingService {
 
       const sendSMS = details.severity === AlertSeverity.CRITICAL;
 
-      await snsClient.publishAlert(subject, message, details.severity, details.type, sendSMS);
+      await this.ctx.clients.sns.publishAlert(subject, message, details.severity, details.type, sendSMS);
 
-      logger.info('Alert sent via SNS', {
+      this.ctx.logger.info('Alert sent via SNS', {
         type: details.type,
         severity: details.severity,
         alertId,
@@ -226,7 +221,7 @@ export class AlertingService {
 
       await this.saveActiveAlerts(alerts);
     } catch (error) {
-      logger.error('Error sending alert via SNS', error, {
+      this.ctx.logger.error('Error sending alert via SNS', error, {
         type: details.type,
         severity: details.severity,
       });
@@ -238,14 +233,14 @@ export class AlertingService {
       const alerts = await this.loadActiveAlerts();
       return Object.values(alerts).filter(alert => !alert.resolved);
     } catch (error) {
-      logger.error('Error getting active alerts', error);
+      this.ctx.logger.error('Error getting active alerts', error);
       return [];
     }
   }
 
   async sendDailySummary(): Promise<void> {
-    if (!snsClient.isAvailable() || !this.topicArn) {
-      logger.warn('Daily summary would be sent (SNS not configured)');
+    if (!this.ctx.clients.sns.isAvailable() || !this.topicArn) {
+      this.ctx.logger.warn('Daily summary would be sent (SNS not configured)');
       return;
     }
 
@@ -253,7 +248,7 @@ export class AlertingService {
       const activeAlerts = await this.getActiveAlerts();
 
       if (activeAlerts.length === 0) {
-        logger.debug('No active alerts for daily summary');
+        this.ctx.logger.debug('No active alerts for daily summary');
         return;
       }
 
@@ -291,21 +286,16 @@ export class AlertingService {
       summary += 'View details in CloudWatch Logs or AWS Console.\n';
 
       const subject = `[INFO] Mnemora Birthday Bot: Daily Alert Summary (${activeAlerts.length} active)`;
-      await snsClient.publishAlert(subject, summary, AlertSeverity.INFO, 'daily-summary', false);
+      await this.ctx.clients.sns.publishAlert(subject, summary, AlertSeverity.INFO, 'daily-summary', false);
 
-      logger.info('Daily alert summary sent', { alertCount: activeAlerts.length });
+      this.ctx.logger.info('Daily alert summary sent', { alertCount: activeAlerts.length });
     } catch (error) {
-      logger.error('Error sending daily alert summary', error);
+      this.ctx.logger.error('Error sending daily alert summary', error);
     }
   }
 
-}
-
-export const alertingService = new AlertingService();
-export const alerting = alertingService;
-
-export function sendLambdaExecutionFailedAlert(error: Error | unknown, context?: Record<string, unknown>): void {
-  alertingService.sendAlert({
+  sendLambdaExecutionFailedAlert(error: Error | unknown, context?: Record<string, unknown>): void {
+    this.sendAlert({
     type: AlertType.LAMBDA_EXECUTION_FAILED,
     severity: AlertSeverity.CRITICAL,
     title: 'Lambda Execution Failed',
@@ -322,8 +312,8 @@ export function sendLambdaExecutionFailedAlert(error: Error | unknown, context?:
   });
 }
 
-export function sendLambdaTimeoutAlert(context?: Record<string, unknown>): void {
-  alertingService.sendAlert({
+  sendLambdaTimeoutAlert(context?: Record<string, unknown>): void {
+    this.sendAlert({
     type: AlertType.LAMBDA_TIMEOUT,
     severity: AlertSeverity.CRITICAL,
     title: 'Lambda Execution Timeout',
@@ -339,8 +329,8 @@ export function sendLambdaTimeoutAlert(context?: Record<string, unknown>): void 
   });
 }
 
-export function sendDailyExecutionMissedAlert(date: string, context?: Record<string, unknown>): void {
-  alertingService.sendAlert({
+  sendDailyExecutionMissedAlert(date: string, context?: Record<string, unknown>): void {
+    this.sendAlert({
     type: AlertType.DAILY_EXECUTION_MISSED,
     severity: AlertSeverity.CRITICAL,
     title: 'Daily Execution Missed',
@@ -359,8 +349,8 @@ export function sendDailyExecutionMissedAlert(date: string, context?: Record<str
   });
 }
 
-export function sendMonthlyDigestFailedAlert(error: Error | unknown, context?: Record<string, unknown>): void {
-  alertingService.sendAlert({
+  sendMonthlyDigestFailedAlert(error: Error | unknown, context?: Record<string, unknown>): void {
+    this.sendAlert({
     type: AlertType.MONTHLY_DIGEST_FAILED,
     severity: AlertSeverity.CRITICAL,
     title: 'Monthly Digest Failed',
@@ -377,11 +367,11 @@ export function sendMonthlyDigestFailedAlert(error: Error | unknown, context?: R
   });
 }
 
-export function sendGoogleCalendarApiFailedAlert(
-  error: Error | unknown,
-  context?: Record<string, unknown>
-): void {
-  alertingService.sendAlert({
+  sendGoogleCalendarApiFailedAlert(
+    error: Error | unknown,
+    context?: Record<string, unknown>
+  ): void {
+    this.sendAlert({
     type: AlertType.GOOGLE_CALENDAR_API_FAILED,
     severity: AlertSeverity.CRITICAL,
     title: 'Google Calendar API Failed',
@@ -399,10 +389,8 @@ export function sendGoogleCalendarApiFailedAlert(
   });
 }
 
-// WARNING Alerts
-
-export function sendWhatsAppMessageFailedAlert(error: Error | unknown, context?: Record<string, unknown>): void {
-  alertingService.sendAlert({
+  sendWhatsAppMessageFailedAlert(error: Error | unknown, context?: Record<string, unknown>): void {
+    this.sendAlert({
     type: AlertType.WHATSAPP_MESSAGE_FAILED,
     severity: AlertSeverity.WARNING,
     title: 'WhatsApp Message Failed',
@@ -419,8 +407,8 @@ export function sendWhatsAppMessageFailedAlert(error: Error | unknown, context?:
   });
 }
 
-export function sendWhatsAppAuthRequiredAlert(context?: Record<string, unknown>): void {
-  alertingService.sendAlert({
+  sendWhatsAppAuthRequiredAlert(context?: Record<string, unknown>): void {
+    this.sendAlert({
     type: AlertType.WHATSAPP_AUTH_REQUIRED,
     severity: AlertSeverity.WARNING,
     title: 'WhatsApp Authentication Required',
@@ -440,8 +428,8 @@ export function sendWhatsAppAuthRequiredAlert(context?: Record<string, unknown>)
   });
 }
 
-export function sendWhatsAppGroupNotFoundAlert(groupName: string, context?: Record<string, unknown>): void {
-  alertingService.sendAlert({
+  sendWhatsAppGroupNotFoundAlert(groupName: string, context?: Record<string, unknown>): void {
+    this.sendAlert({
     type: AlertType.WHATSAPP_GROUP_NOT_FOUND,
     severity: AlertSeverity.WARNING,
     title: 'WhatsApp Group Not Found',
@@ -459,8 +447,8 @@ export function sendWhatsAppGroupNotFoundAlert(groupName: string, context?: Reco
   });
 }
 
-export function sendWhatsAppClientInitFailedAlert(error: Error | unknown, context?: Record<string, unknown>): void {
-  alertingService.sendAlert({
+  sendWhatsAppClientInitFailedAlert(error: Error | unknown, context?: Record<string, unknown>): void {
+    this.sendAlert({
     type: AlertType.WHATSAPP_CLIENT_INIT_FAILED,
     severity: AlertSeverity.WARNING,
     title: 'WhatsApp Client Initialization Failed',
@@ -477,8 +465,8 @@ export function sendWhatsAppClientInitFailedAlert(error: Error | unknown, contex
   });
 }
 
-export function sendMissedDaysRecoveryFailedAlert(error: Error | unknown, context?: Record<string, unknown>): void {
-  alertingService.sendAlert({
+  sendMissedDaysRecoveryFailedAlert(error: Error | unknown, context?: Record<string, unknown>): void {
+    this.sendAlert({
     type: AlertType.MISSED_DAYS_RECOVERY_FAILED,
     severity: AlertSeverity.WARNING,
     title: 'Missed Days Recovery Failed',
@@ -493,8 +481,8 @@ export function sendMissedDaysRecoveryFailedAlert(error: Error | unknown, contex
   });
 }
 
-export function sendCloudWatchMetricsFailedAlert(error: Error | unknown, context?: Record<string, unknown>): void {
-  alertingService.sendAlert({
+  sendCloudWatchMetricsFailedAlert(error: Error | unknown, context?: Record<string, unknown>): void {
+    this.sendAlert({
     type: AlertType.CLOUDWATCH_METRICS_FAILED,
     severity: AlertSeverity.WARNING,
     title: 'CloudWatch Metrics Failed',
@@ -510,10 +498,8 @@ export function sendCloudWatchMetricsFailedAlert(error: Error | unknown, context
   });
 }
 
-// INFO Alerts
-
-export function sendWhatsAppAuthRefreshNeededAlert(daysSinceAuth: number | null, context?: Record<string, unknown>): void {
-  alertingService.sendAlert({
+  sendWhatsAppAuthRefreshNeededAlert(daysSinceAuth: number | null, context?: Record<string, unknown>): void {
+    this.sendAlert({
     type: AlertType.WHATSAPP_AUTH_REFRESH_NEEDED,
     severity: AlertSeverity.INFO,
     title: 'WhatsApp Auth Refresh Recommended',
@@ -530,8 +516,8 @@ export function sendWhatsAppAuthRefreshNeededAlert(daysSinceAuth: number | null,
   });
 }
 
-export function sendHighExecutionDurationAlert(durationMs: number, context?: Record<string, unknown>): void {
-  alertingService.sendAlert({
+  sendHighExecutionDurationAlert(durationMs: number, context?: Record<string, unknown>): void {
+    this.sendAlert({
     type: AlertType.HIGH_EXECUTION_DURATION,
     severity: AlertSeverity.INFO,
     title: 'High Execution Duration',
@@ -550,8 +536,8 @@ export function sendHighExecutionDurationAlert(durationMs: number, context?: Rec
   });
 }
 
-export function sendApiQuotaWarningAlert(service: 'calendar' | 'sheets', usagePercent: number, context?: Record<string, unknown>): void {
-  alertingService.sendAlert({
+  sendApiQuotaWarningAlert(service: 'calendar' | 'sheets', usagePercent: number, context?: Record<string, unknown>): void {
+    this.sendAlert({
     type: AlertType.API_QUOTA_WARNING,
     severity: AlertSeverity.INFO,
     title: 'API Quota Warning',
@@ -567,5 +553,7 @@ export function sendApiQuotaWarningAlert(service: 'calendar' | 'sheets', usagePe
       'Monitor API usage in Google Cloud Console',
     ],
   });
+  }
+
 }
 

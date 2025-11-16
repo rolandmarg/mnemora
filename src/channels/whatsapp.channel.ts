@@ -16,30 +16,15 @@
 // Internal modules - Base
 import { BaseOutputChannel } from '../output-channel/output-channel.base.js';
 
-// Internal modules - Clients
-import whatsappClient from '../clients/whatsapp.client.js';
-
 // Internal modules - Services
-import {
-  sendWhatsAppAuthRequiredAlert,
-  sendWhatsAppClientInitFailedAlert,
-  sendWhatsAppGroupNotFoundAlert,
-  sendWhatsAppMessageFailedAlert,
-  sendWhatsAppAuthRefreshNeededAlert,
-} from '../services/alerting.service.js';
-
-// Internal modules - Clients
-import { logger } from '../clients/logger.client.js';
-
-// Internal modules - Services
-import { trackWhatsAppMessageSent, trackWhatsAppAuthRequired, trackOperationDuration } from '../services/metrics.service.js';
-import { authReminder } from '../services/auth-reminder.service.js';
+import { AlertingService } from '../services/alerting.service.js';
+import { MetricsCollector, trackWhatsAppMessageSent, trackWhatsAppAuthRequired, trackOperationDuration } from '../services/metrics.service.js';
+import { AuthReminderService } from '../services/auth-reminder.service.js';
 import { logSentMessage } from '../services/message-logger.service.js';
-import { isLambdaEnvironment } from '../utils/env.util.js';
 
 // Internal modules - Types
 import type { SendOptions, SendResult, OutputChannelMetadata } from '../output-channel/output-channel.interface.js';
-import type { AppConfig } from '../config.js';
+import type { AppContext } from '../app-context.js';
 
 /**
  * WhatsApp output channel implementation using whatsapp-web.js
@@ -48,33 +33,35 @@ import type { AppConfig } from '../config.js';
  * Runs completely headless - QR code shown in terminal only
  */
 export class WhatsAppOutputChannel extends BaseOutputChannel {
-  private readonly config: AppConfig;
-  private readonly isLambda: boolean;
+  private readonly alerting: AlertingService;
+  private readonly metrics: MetricsCollector;
+  private readonly authReminder: AuthReminderService;
 
-  constructor(config: AppConfig) {
+  constructor(private readonly ctx: AppContext) {
     super();
-    this.config = config;
-    this.isLambda = isLambdaEnvironment();
+    this.alerting = new AlertingService(ctx);
+    this.metrics = new MetricsCollector(ctx);
+    this.authReminder = new AuthReminderService(ctx);
   }
 
   private async initializeClient(): Promise<void> {
     try {
-      await whatsappClient.initialize();
+      await this.ctx.clients.whatsapp.initialize();
       
-      if (whatsappClient.requiresAuth()) {
-        trackWhatsAppAuthRequired();
-        sendWhatsAppAuthRequiredAlert({
+      if (this.ctx.clients.whatsapp.requiresAuth()) {
+        trackWhatsAppAuthRequired(this.metrics);
+        this.alerting.sendWhatsAppAuthRequiredAlert({
           qrCodeAvailable: true,
-          environment: this.isLambda ? 'lambda' : 'local',
+          environment: this.ctx.isLambda ? 'lambda' : 'local',
         });
       }
       
-      if (whatsappClient.isClientReady()) {
-        await authReminder.recordAuthentication().catch(() => {});
+      if (this.ctx.clients.whatsapp.isClientReady()) {
+        await this.authReminder.recordAuthentication().catch(() => {});
       }
     } catch (error) {
-      logger.error('Failed to initialize WhatsApp client', error);
-      sendWhatsAppClientInitFailedAlert(error instanceof Error ? error : new Error(String(error)), {
+      this.ctx.logger.error('Failed to initialize WhatsApp client', error);
+      this.alerting.sendWhatsAppClientInitFailedAlert(error instanceof Error ? error : new Error(String(error)), {
         reason: 'initialization_error',
       });
       throw error;
@@ -84,36 +71,36 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
   async send(message: string, options?: SendOptions): Promise<SendResult> {
     const startTime = Date.now();
     try {
-      await authReminder.checkAndEmitReminder().catch(() => {});
+      await this.authReminder.checkAndEmitReminder().catch(() => {});
       
-      const authStatus = await authReminder.getAuthStatus().catch(() => null);
+      const authStatus = await this.authReminder.getAuthStatus().catch(() => null);
       if (authStatus?.needsRefresh) {
-        sendWhatsAppAuthRefreshNeededAlert(authStatus.daysSinceAuth, {
+        this.alerting.sendWhatsAppAuthRefreshNeededAlert(authStatus.daysSinceAuth, {
           lastAuthDate: authStatus.lastAuthDate?.toISOString(),
         });
       }
 
       await this.initializeClient();
 
-      if (!whatsappClient.isClientReady()) {
+      if (!this.ctx.clients.whatsapp.isClientReady()) {
         return {
           success: false,
           error: new Error('WhatsApp client is not ready'),
         };
       }
 
-      let groupId = options?.recipients?.[0] ?? this.config.whatsapp.groupId;
+      let groupId = options?.recipients?.[0] ?? this.ctx.config.whatsapp.groupId;
 
       if (groupId && !groupId.includes('@') && (groupId.includes(' ') || !/^\d+$/.test(groupId))) {
-        logger.info(`Searching for group by name: ${groupId}`);
-        const foundGroup = await whatsappClient.findGroupByName(groupId);
+        this.ctx.logger.info(`Searching for group by name: ${groupId}`);
+        const foundGroup = await this.ctx.clients.whatsapp.findGroupByName(groupId);
         
         if (foundGroup) {
           groupId = foundGroup.id;
-          logger.info(`Found group ID: ${foundGroup.id}`);
+          this.ctx.logger.info(`Found group ID: ${foundGroup.id}`);
         } else {
           const error = new Error(`Group "${groupId}" not found`);
-          sendWhatsAppGroupNotFoundAlert(groupId, {
+          this.alerting.sendWhatsAppGroupNotFoundAlert(groupId, {
             searchedName: groupId,
           });
           return {
@@ -137,17 +124,17 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
       
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-          if (!whatsappClient.isClientReady()) {
+          if (!this.ctx.clients.whatsapp.isClientReady()) {
             throw new Error('Client is not ready');
           }
 
-          const result = await whatsappClient.sendMessage(chatId, message);
+          const result = await this.ctx.clients.whatsapp.sendMessage(chatId, message);
 
           const duration = Date.now() - startTime;
-          trackWhatsAppMessageSent(true);
-          trackOperationDuration('whatsapp.send', duration, { success: 'true', attempt: attempt.toString() });
+          trackWhatsAppMessageSent(this.metrics, true);
+          trackOperationDuration(this.metrics, 'whatsapp.send', duration, { success: 'true', attempt: attempt.toString() });
 
-          logger.info('WhatsApp message sent successfully', {
+          this.ctx.logger.info('WhatsApp message sent successfully', {
             groupId: chatId,
             messageId: result.id,
             attempt,
@@ -155,6 +142,7 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
           });
 
           await logSentMessage(
+            this.ctx,
             result.id,
             'other',
             chatId,
@@ -185,12 +173,12 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
                                   lastError.message.includes('Target closed');
           
           if (isProtocolError && attempt < maxRetries) {
-            logger.warn(`WhatsApp send attempt ${attempt} failed, retrying...`, {
+            this.ctx.logger.warn(`WhatsApp send attempt ${attempt} failed, retrying...`, {
               error: lastError.message,
             });
             
-            if (!whatsappClient.isClientReady()) {
-              logger.info('Client invalid after protocol error, reinitializing...');
+            if (!this.ctx.clients.whatsapp.isClientReady()) {
+              this.ctx.logger.info('Client invalid after protocol error, reinitializing...');
               await this.initializeClient();
             }
             
@@ -205,19 +193,20 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
       throw lastError ?? new Error('Failed to send message after retries');
     } catch (error) {
       const duration = Date.now() - startTime;
-      trackWhatsAppMessageSent(false);
-      trackOperationDuration('whatsapp.send', duration, { success: 'false' });
-      logger.error('Error sending WhatsApp message', error);
+      trackWhatsAppMessageSent(this.metrics, false);
+      trackOperationDuration(this.metrics, 'whatsapp.send', duration, { success: 'false' });
+      this.ctx.logger.error('Error sending WhatsApp message', error);
       
-      sendWhatsAppMessageFailedAlert(error, {
-        groupId: options?.recipients?.[0] ?? this.config.whatsapp.groupId,
+      this.alerting.sendWhatsAppMessageFailedAlert(error, {
+        groupId: options?.recipients?.[0] ?? this.ctx.config.whatsapp.groupId,
         retries: 3,
       });
 
       await logSentMessage(
+        this.ctx,
         undefined,
         'other',
-        options?.recipients?.[0] ?? this.config.whatsapp.groupId ?? 'unknown',
+        options?.recipients?.[0] ?? this.ctx.config.whatsapp.groupId ?? 'unknown',
         message,
         false,
         duration,
@@ -238,25 +227,25 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
     try {
       await this.initializeClient();
 
-      if (!whatsappClient.isClientReady()) {
+      if (!this.ctx.clients.whatsapp.isClientReady()) {
         throw new Error('WhatsApp client is not ready');
       }
 
-      const foundGroup = await whatsappClient.findGroupByName(groupName);
+      const foundGroup = await this.ctx.clients.whatsapp.findGroupByName(groupName);
       return foundGroup?.id ?? null;
     } catch (error) {
-      logger.error('Error finding group by name', error);
+      this.ctx.logger.error('Error finding group by name', error);
       throw error;
     }
   }
 
   async requiresAuth(): Promise<boolean> {
-    const needsRefresh = await authReminder.isRefreshNeeded();
+    const needsRefresh = await this.authReminder.isRefreshNeeded();
     if (needsRefresh) {
       return true;
     }
 
-    return whatsappClient.requiresAuth();
+    return this.ctx.clients.whatsapp.requiresAuth();
   }
 
   async getAuthStatus(): Promise<{
@@ -266,8 +255,8 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
     lastAuthDate: Date | null;
     daysSinceAuth: number | null;
   }> {
-    const authStatus = await authReminder.getAuthStatus();
-    const clientStatus = whatsappClient.getAuthStatus();
+    const authStatus = await this.authReminder.getAuthStatus();
+    const clientStatus = this.ctx.clients.whatsapp.getAuthStatus();
     
     return {
       isReady: clientStatus.isReady,
@@ -279,7 +268,7 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
   }
 
   isAvailable(): boolean {
-    return !!this.config.whatsapp.groupId;
+    return !!this.ctx.config.whatsapp.groupId;
   }
 
   getMetadata(): OutputChannelMetadata {
@@ -295,9 +284,9 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
 
   async destroy(): Promise<void> {
     try {
-      await whatsappClient.destroy();
+      await this.ctx.clients.whatsapp.destroy();
     } catch (error) {
-      logger.error('Error destroying WhatsApp client', error);
+      this.ctx.logger.error('Error destroying WhatsApp client', error);
     }
   }
 }

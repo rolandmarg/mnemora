@@ -3,7 +3,6 @@ const { Client, LocalAuth } = pkg;
 import qrcode from 'qrcode-terminal';
 import { existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { isLambdaEnvironment } from '../utils/env.util.js';
 
 class WhatsAppClient {
   private client: InstanceType<typeof Client> | null = null;
@@ -14,7 +13,11 @@ class WhatsAppClient {
   private authRequired: boolean = false;
 
   constructor() {
-    this.isLambda = isLambdaEnvironment();
+    this.isLambda = !!(
+      process.env.AWS_LAMBDA_FUNCTION_NAME ??
+      process.env.LAMBDA_TASK_ROOT ??
+      process.env.AWS_EXECUTION_ENV
+    );
     this.sessionPath = join(process.cwd(), '.wwebjs_auth');
     
     if (!this.isLambda && !existsSync(this.sessionPath)) {
@@ -29,7 +32,7 @@ class WhatsAppClient {
         if (state === 'CONNECTED' || state === 'OPENING') {
           return;
         }
-      } catch (error) {
+      } catch (_error) {
         this.client = null;
         this.isReady = false;
       }
@@ -253,7 +256,8 @@ class WhatsAppClient {
       try {
         await new Promise(resolve => setTimeout(resolve, 2000));
         await this.client.destroy();
-      } catch (_error) {
+      } catch {
+        // Ignore errors during cleanup
       } finally {
         this.client = null;
         this.isReady = false;

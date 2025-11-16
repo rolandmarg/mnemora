@@ -1,13 +1,16 @@
 import { CloudWatchLogsClient, PutLogEventsCommand, type InputLogEvent } from '@aws-sdk/client-cloudwatch-logs';
 import { config } from '../config.js';
-import { isLambdaEnvironment } from '../utils/env.util.js';
 
 class CloudWatchLogsClientWrapper {
   private cloudWatchClient: CloudWatchLogsClient | null = null;
   private readonly isLambda: boolean;
 
   constructor() {
-    this.isLambda = isLambdaEnvironment();
+    this.isLambda = !!(
+      process.env.AWS_LAMBDA_FUNCTION_NAME ??
+      process.env.LAMBDA_TASK_ROOT ??
+      process.env.AWS_EXECUTION_ENV
+    );
 
     if (this.isLambda && config.aws?.region) {
       this.cloudWatchClient = new CloudWatchLogsClient({

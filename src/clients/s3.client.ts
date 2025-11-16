@@ -11,7 +11,6 @@ import {
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { config } from '../config.js';
-import { isLambdaEnvironment } from '../utils/env.util.js';
 
 class S3ClientWrapper {
   private s3Client: S3Client | null = null;
@@ -19,7 +18,11 @@ class S3ClientWrapper {
   private readonly isLambda: boolean;
 
   constructor() {
-    this.isLambda = isLambdaEnvironment();
+    this.isLambda = !!(
+      process.env.AWS_LAMBDA_FUNCTION_NAME ??
+      process.env.LAMBDA_TASK_ROOT ??
+      process.env.AWS_EXECUTION_ENV
+    );
     this.bucketName = config.aws?.s3Bucket;
 
     if (this.isLambda && this.bucketName && config.aws?.region) {
@@ -151,7 +154,11 @@ export class FileStorage {
 
   constructor(basePath: string) {
     this.basePath = basePath;
-    this.isLambda = isLambdaEnvironment();
+    this.isLambda = !!(
+      process.env.AWS_LAMBDA_FUNCTION_NAME ??
+      process.env.LAMBDA_TASK_ROOT ??
+      process.env.AWS_EXECUTION_ENV
+    );
   }
 
   async readFile(filePath: string): Promise<Buffer | null> {
@@ -197,24 +204,20 @@ export class FileStorage {
       return;
     }
 
-    try {
-      const files = readdirSync(localPath);
-      await files.reduce(async (promise, file) => {
-        await promise;
-        const filePath = join(localPath, file);
-        const stat = statSync(filePath);
-        
-        if (stat.isDirectory()) {
-          await this.syncToS3(filePath);
-        } else {
-          const fileContent = readFileSync(filePath);
-          const s3Key = `${this.basePath}/${file}`;
-          await s3Client.upload(s3Key, fileContent);
-        }
-      }, Promise.resolve());
-    } catch (error) {
-      throw error;
-    }
+    const files = readdirSync(localPath);
+    await files.reduce(async (promise, file) => {
+      await promise;
+      const filePath = join(localPath, file);
+      const stat = statSync(filePath);
+      
+      if (stat.isDirectory()) {
+        await this.syncToS3(filePath);
+      } else {
+        const fileContent = readFileSync(filePath);
+        const s3Key = `${this.basePath}/${file}`;
+        await s3Client.upload(s3Key, fileContent);
+      }
+    }, Promise.resolve());
   }
 
   async syncFromS3(localPath: string): Promise<void> {
@@ -229,6 +232,10 @@ export class FileStorage {
     // Simplified implementation - full directory sync would require S3 ListObjectsV2
     // For now, individual file downloads are handled as needed
   }
+}
+
+export function createWhatsAppSessionStorage(): FileStorage {
+  return new FileStorage('.wwebjs_auth');
 }
 
 

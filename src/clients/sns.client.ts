@@ -12,7 +12,6 @@ import { SNSClient, PublishCommand, type PublishCommandInput } from '@aws-sdk/cl
 import { config } from '../config.js';
 
 // Internal modules - Utils
-import { isLambdaEnvironment } from '../utils/env.util.js';
 
 /**
  * SNS client wrapper
@@ -25,7 +24,11 @@ class SNSClientWrapper {
   private readonly isLambda: boolean;
 
   constructor() {
-    this.isLambda = isLambdaEnvironment();
+    this.isLambda = !!(
+      process.env.AWS_LAMBDA_FUNCTION_NAME ??
+      process.env.LAMBDA_TASK_ROOT ??
+      process.env.AWS_EXECUTION_ENV
+    );
     this.topicArn = process.env.SNS_TOPIC_ARN;
 
     if (this.isLambda && this.topicArn && config.aws?.region) {

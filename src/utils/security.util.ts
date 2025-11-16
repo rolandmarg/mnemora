@@ -1,5 +1,5 @@
-import { logger } from '../clients/logger.client.js';
 import { getCorrelationId } from './correlation.util.js';
+import type { AppContext } from '../app-context.js';
 
 export class SecurityError extends Error {
   constructor(message: string) {
@@ -9,49 +9,61 @@ export class SecurityError extends Error {
   }
 }
 
-export function isProduction(): boolean {
-  return process.env.NODE_ENV === 'production';
-}
-
-export function requireDevelopment(): void {
-  if (isProduction()) {
+export function requireDevelopment(ctx: AppContext): void {
+  if (ctx.isProduction) {
     const error = new SecurityError(
       'This operation is disabled in production environment. Set NODE_ENV=development to enable.'
     );
-    auditLog('security_violation', {
+    auditLog(ctx, 'security_violation', {
       action: 'requireDevelopment',
       error: error.message,
-      environment: process.env.NODE_ENV ?? 'development',
+      environment: ctx.environment,
     });
     throw error;
   }
 }
 
-export function auditLog(action: string, details: Record<string, unknown>): void {
+export function auditLog(ctx: AppContext, action: string, details: Record<string, unknown>): void {
   const correlationId = getCorrelationId();
   const timestamp = new Date().toISOString();
-  const environment = process.env.NODE_ENV ?? 'development';
   
-  logger.warn('Security audit log', {
+  ctx.logger.warn('Security audit log', {
     audit: true,
     action,
     timestamp,
-    environment,
+    environment: ctx.environment,
     correlationId,
     ...details,
   });
 }
 
-export function auditDeletionAttempt(method: string, params: Record<string, unknown>): void {
-  auditLog('deletion_attempt', {
-    method,
-    params,
-    blocked: true,
-  });
+export function auditDeletionAttempt(ctxOrMethod: AppContext | string, methodOrParams?: string | Record<string, unknown>, params?: Record<string, unknown>): void {
+  // Support both old signature (ctx, method, params) and new signature (method, params) for clients
+  if (typeof ctxOrMethod === 'string') {
+    const method = ctxOrMethod;
+    const methodParams = methodOrParams as Record<string, unknown> | undefined;
+    console.warn('Security audit log - deletion attempt', {
+      audit: true,
+      action: 'deletion_attempt',
+      method,
+      params: methodParams,
+      blocked: true,
+      timestamp: new Date().toISOString(),
+    });
+  } else {
+    const ctx = ctxOrMethod;
+    const method = methodOrParams as string;
+    const methodParams = params;
+    auditLog(ctx, 'deletion_attempt', {
+      method,
+      params: methodParams,
+      blocked: true,
+    });
+  }
 }
 
-export function auditManualSend(script: string, details: Record<string, unknown>): void {
-  auditLog('manual_send', {
+export function auditManualSend(ctx: AppContext, script: string, details: Record<string, unknown>): void {
+  auditLog(ctx, 'manual_send', {
     script,
     ...details,
   });

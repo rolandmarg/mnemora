@@ -1,26 +1,25 @@
-import sheetsClient from '../clients/google-sheets.client.js';
 import { BaseDataSource } from '../data-source/data-source.base.js';
 import { parseRowToBirthdays } from '../utils/birthday-helpers.util.js';
 import type { BirthdayRecord } from '../types/birthday.types.js';
 import type { ReadOptions, DataSourceMetadata } from '../data-source/data-source.interface.js';
-import type { AppConfig } from '../config.js';
+import type { AppContext } from '../app-context.js';
 
 export class SheetsDataSource extends BaseDataSource<BirthdayRecord> {
-  constructor(config: AppConfig) {
-    super(config);
+  constructor(private readonly ctx: AppContext) {
+    super(ctx.config);
   }
 
   async read(options?: ReadOptions): Promise<BirthdayRecord[]> {
     const skipHeaderRow = (options?.skipHeaderRow as boolean) ?? true;
-    const rows = await sheetsClient.readRows({ skipHeaderRow });
+    const rows = await this.ctx.clients.sheets.readRows({ skipHeaderRow });
     return rows.flatMap(row => parseRowToBirthdays(row));
   }
 
   isAvailable(): boolean {
     return !!(
-      this.config.google.clientEmail &&
-      this.config.google.privateKey &&
-      this.config.google.spreadsheetId
+      this.ctx.config.google.clientEmail &&
+      this.ctx.config.google.privateKey &&
+      this.ctx.config.google.spreadsheetId
     );
   }
 

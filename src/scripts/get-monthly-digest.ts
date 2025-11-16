@@ -1,26 +1,28 @@
-import birthdayService from '../services/birthday.service.js';
+import { BirthdayService } from '../services/birthday.service.js';
+import { appContext } from '../app-context.js';
 import { getFullName } from '../utils/name-helpers.util.js';
-import { logger } from '../clients/logger.client.js';
 
 async function getMonthlyDigest(): Promise<void> {
+  const birthdayService = new BirthdayService(appContext);
+  
   try {
-    logger.info('Getting monthly digest...');
+    appContext.logger.info('Getting monthly digest...');
     
     const { todaysBirthdays, monthlyDigest } = await birthdayService.getTodaysBirthdaysWithMonthlyDigest();
     
     if (todaysBirthdays.length > 0) {
-      logger.info('Today\'s birthdays', {
+      appContext.logger.info('Today\'s birthdays', {
         birthdays: todaysBirthdays.map(record => getFullName(record.firstName, record.lastName)),
       });
     }
     
     if (monthlyDigest) {
-      logger.info('Monthly digest', { monthlyDigest });
+      appContext.logger.info('Monthly digest', { monthlyDigest });
     }
     
-    logger.info('Completed successfully!');
+    appContext.logger.info('Completed successfully!');
   } catch (error) {
-    logger.error('Error getting monthly digest', error);
+    appContext.logger.error('Error getting monthly digest', error);
     process.exit(1);
   } finally {
     process.exit(0);

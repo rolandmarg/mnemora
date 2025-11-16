@@ -3,7 +3,6 @@ import type { InputLogEvent } from '@aws-sdk/client-cloudwatch-logs';
 import cloudWatchLogsClient from './cloudwatch-logs.client.js';
 import { config } from '../config.js';
 import { getCorrelationId } from '../utils/correlation.util.js';
-import { isLambdaEnvironment } from '../utils/env.util.js';
 import type { Logger } from '../types/logger.types.js';
 
 enum LogLevel {
@@ -67,7 +66,11 @@ class PinoLogger implements Logger {
 
   constructor(logger: pino.Logger) {
     this.logger = logger;
-    this.isLambda = isLambdaEnvironment();
+    this.isLambda = !!(
+      process.env.AWS_LAMBDA_FUNCTION_NAME ??
+      process.env.LAMBDA_TASK_ROOT ??
+      process.env.AWS_EXECUTION_ENV
+    );
     this.enableCloudWatch = this.isLambda && !!config.aws?.cloudWatchLogGroup && !!config.aws?.region;
 
     if (this.enableCloudWatch) {

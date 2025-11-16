@@ -1,16 +1,13 @@
-import calendarClient from '../clients/google-calendar.client.js';
 import { BaseDataSource } from '../data-source/data-source.base.js';
 import { extractNameFromEvent, isBirthdayEvent } from '../utils/event-helpers.util.js';
 import { extractNameParts, getFullName } from '../utils/name-helpers.util.js';
-import { parseDateFromString, fromDate, formatDateISO, today } from '../utils/date-helpers.util.js';
+import { parseDateFromString, formatDateISO, today } from '../utils/date-helpers.util.js';
 import { getDateRangeForBirthdays } from '../utils/birthday-helpers.util.js';
 import { auditDeletionAttempt, SecurityError } from '../utils/security.util.js';
-import { config } from '../config.js';
-import { logger } from '../clients/logger.client.js';
 import type { BirthdayRecord } from '../types/birthday.types.js';
 import type { Event } from '../types/event.types.js';
 import type { ReadOptions, WriteOptions, WriteResult, DeleteResult, DataSourceMetadata } from '../data-source/data-source.interface.js';
-import type { AppConfig } from '../config.js';
+import type { AppContext } from '../app-context.js';
 
 function eventToBirthdayRecord(event: Event): BirthdayRecord | null {
   const startDate = event.start?.date ?? event.start?.dateTime;
@@ -38,8 +35,8 @@ function eventToBirthdayRecord(event: Event): BirthdayRecord | null {
 }
 
 export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
-  constructor(config: AppConfig) {
-    super(config);
+  constructor(private readonly ctx: AppContext) {
+    super(ctx.config);
   }
 
   async read(options?: ReadOptions): Promise<BirthdayRecord[]> {
@@ -48,12 +45,12 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
     let events: Event[];
     
     if (startDate && endDate) {
-      events = await calendarClient.fetchEvents({ startDate, endDate });
+      events = await this.ctx.clients.calendar.fetchEvents({ startDate, endDate });
     } else if (startDate) {
-      events = await calendarClient.fetchEvents({ startDate, endDate: startDate });
+      events = await this.ctx.clients.calendar.fetchEvents({ startDate, endDate: startDate });
     } else {
       const todayDate = today();
-      events = await calendarClient.fetchEvents({ startDate: todayDate, endDate: todayDate });
+      events = await this.ctx.clients.calendar.fetchEvents({ startDate: todayDate, endDate: todayDate });
     }
 
     const birthdayEvents = events.filter(event => isBirthdayEvent(event));
@@ -65,7 +62,7 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
 
   async checkForDuplicates(birthday: BirthdayRecord): Promise<BirthdayRecord[]> {
     try {
-      const eventDate = fromDate(birthday.birthday);
+      const eventDate = new Date(birthday.birthday);
       const existingBirthdays = await this.read({
         startDate: eventDate,
         endDate: eventDate,
@@ -77,18 +74,18 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
         return firstNameMatch && lastNameMatch;
       });
     } catch (error) {
-      logger.error('Error checking for duplicates', error);
+      this.ctx.logger.error('Error checking for duplicates', error);
       return [];
     }
   }
 
   async delete(id: string): Promise<boolean> {
-    auditDeletionAttempt('CalendarDataSource.delete', { eventId: id });
+    auditDeletionAttempt(this.ctx, 'CalendarDataSource.delete', { eventId: id });
     throw new SecurityError('Deletion of birthday events is disabled for security reasons');
   }
 
   async deleteAll(options: ReadOptions): Promise<DeleteResult> {
-    auditDeletionAttempt('CalendarDataSource.deleteAll', { 
+    auditDeletionAttempt(this.ctx, 'CalendarDataSource.deleteAll', { 
       startDate: options.startDate?.toISOString(),
       endDate: options.endDate?.toISOString(),
     });
@@ -97,7 +94,7 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
 
   async write(data: BirthdayRecord[], _options?: WriteOptions): Promise<WriteResult> {
     const getLookupKey = (b: BirthdayRecord) => 
-      `${formatDateISO(fromDate(b.birthday))}|${b.firstName.toLowerCase()}|${(b.lastName ?? '').toLowerCase()}`;
+      `${formatDateISO(new Date(b.birthday))}|${b.firstName.toLowerCase()}|${(b.lastName ?? '').toLowerCase()}`;
     
     const dateRange = getDateRangeForBirthdays(data);
     const existingBirthdays = dateRange 
@@ -117,12 +114,12 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
         const lookupKey = getLookupKey(birthday);
         
         if (existingBirthdaysMap[lookupKey]?.length) {
-          logger.info(`Skipping duplicate birthday for ${fullName}`);
+          this.ctx.logger.info(`Skipping duplicate birthday for ${fullName}`);
           return { ...acc, skipped: acc.skipped + 1 };
         }
 
-        const dateString = formatDateISO(fromDate(birthday.birthday));
-        await calendarClient.insertEvent({
+        const dateString = formatDateISO(new Date(birthday.birthday));
+        await this.ctx.clients.calendar.insertEvent({
           summary: `${fullName}'s Birthday`,
           description: `Birthday of ${fullName}${birthday.year ? ` (born ${birthday.year})` : ''}`,
           start: { date: dateString, timeZone: 'UTC' },
@@ -130,16 +127,16 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
           recurrence: ['RRULE:FREQ=YEARLY;INTERVAL=1'],
         });
         
-        logger.info(`Birthday event created successfully`, {
+        this.ctx.logger.info(`Birthday event created successfully`, {
           title: `${fullName}'s Birthday`,
           date: dateString,
-          calendar: config.google.calendarId,
+          calendar: this.ctx.config.google.calendarId,
         });
         
         existingBirthdaysMap[lookupKey] = [birthday];
         return { ...acc, added: acc.added + 1 };
       } catch (error) {
-        logger.error(`Error writing birthday for ${birthday.firstName} ${birthday.lastName ?? ''}`, error);
+        this.ctx.logger.error(`Error writing birthday for ${birthday.firstName} ${birthday.lastName ?? ''}`, error);
         return { ...acc, errors: acc.errors + 1 };
       }
     }, Promise.resolve({ added: 0, skipped: 0, errors: 0 }));
@@ -149,9 +146,9 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
 
   isAvailable(): boolean {
     return !!(
-      this.config.google.clientEmail &&
-      this.config.google.privateKey &&
-      this.config.google.calendarId
+      this.ctx.config.google.clientEmail &&
+      this.ctx.config.google.privateKey &&
+      this.ctx.config.google.calendarId
     );
   }
 

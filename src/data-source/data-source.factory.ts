@@ -1,15 +1,15 @@
 import { CalendarDataSource } from '../sources/calendar.source.js';
 import { SheetsDataSource } from '../sources/sheets.source.js';
-import { config } from '../config.js';
+import type { AppContext } from '../app-context.js';
 
 export class DataSourceFactory {
 
-  static createCalendarDataSource(): CalendarDataSource {
-    return new CalendarDataSource(config);
+  static createCalendarDataSource(ctx: AppContext): CalendarDataSource {
+    return new CalendarDataSource(ctx);
   }
 
-  static createSheetsDataSource(): SheetsDataSource {
-    return new SheetsDataSource(config);
+  static createSheetsDataSource(ctx: AppContext): SheetsDataSource {
+    return new SheetsDataSource(ctx);
   }
 }
 

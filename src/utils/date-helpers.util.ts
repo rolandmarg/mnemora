@@ -5,34 +5,22 @@ function getTimezone(): string {
   return config.schedule.timezone;
 }
 
-/**
- * Get today's date in the configured timezone
- * 
- * @returns Date object representing today in the configured timezone
- */
+function createDateInTimezone(year: number, month: number, day: number): Date {
+  const tz = getTimezone();
+  const localDate = new Date(year, month - 1, day, 0, 0, 0, 0);
+  return fromZonedTime(localDate, tz);
+}
+
 export function today(): Date {
   const tz = getTimezone();
   const now = new Date();
-  // Get today's date in the configured timezone
   const zonedDate = toZonedTime(now, tz);
-  // Return a date representing today at midnight in the configured timezone
   return new Date(zonedDate.getFullYear(), zonedDate.getMonth(), zonedDate.getDate());
 }
 
-/**
- * Create a date from month (1-12) and day, optionally with year
- * If year is not provided, uses current year
- * Date is created in the configured timezone
- */
 function createDate(month: number, day: number, year?: number): Date {
-  const tz = getTimezone();
   const currentYear = year ?? today().getFullYear();
-  
-  // Create a date representing midnight in the configured timezone
-  const localDate = new Date(currentYear, month - 1, day, 0, 0, 0, 0);
-  
-  // Convert from the configured timezone to UTC
-  return fromZonedTime(localDate, tz);
+  return createDateInTimezone(currentYear, month, day);
 }
 
 /**
@@ -52,20 +40,12 @@ function createDateFromMonthName(monthName: string, day: number, year?: number):
 }
 
 export function parseDateFromString(dateString: string): Date {
-  const tz = getTimezone();
-  
   const dateOnlyMatch = dateString.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
   if (dateOnlyMatch) {
     const year = parseInt(dateOnlyMatch[1], 10);
     const month = parseInt(dateOnlyMatch[2], 10);
     const day = parseInt(dateOnlyMatch[3], 10);
-    
-    const localDate = new Date(year, month - 1, day, 0, 0, 0, 0);
-    const date = fromZonedTime(localDate, tz);
-    if (isNaN(date.getTime())) {
-      throw new Error(`Invalid date string: "${dateString}"`);
-    }
-    return date;
+    return createDateInTimezone(year, month, day);
   }
 
   const date = new Date(dateString);
@@ -110,14 +90,18 @@ export function parseDateString(dateStr: string): Date | null {
   return null;
 }
 
+function normalizeDate(date: Date): Date {
+  return new Date(date);
+}
+
 export function startOfDay(date: Date): Date {
-  const normalized = new Date(date);
+  const normalized = normalizeDate(date);
   normalized.setHours(0, 0, 0, 0);
   return normalized;
 }
 
 export function endOfDay(date: Date): Date {
-  const normalized = new Date(date);
+  const normalized = normalizeDate(date);
   normalized.setHours(23, 59, 59, 999);
   return normalized;
 }
@@ -166,8 +150,4 @@ export function formatDateRange(startDate: Date, endDate: Date): string {
 
 export function isFirstDayOfMonth(date: Date): boolean {
   return date.getDate() === 1;
-}
-
-export function fromDate(date: Date): Date {
-  return new Date(date);
 }

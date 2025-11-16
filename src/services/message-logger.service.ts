@@ -1,17 +1,14 @@
-import { logger } from '../clients/logger.client.js';
-import { createWhatsAppSessionStorage } from '../utils/storage.util.js';
+import { FileStorage } from '../clients/s3.client.js';
 import { formatDateISO } from '../utils/date-helpers.util.js';
-import { isLambdaEnvironment } from '../utils/env.util.js';
+import type { AppContext } from '../app-context.js';
 import type { MessageType, MessageRecord } from '../types/message.types.js';
 
 class MessageLoggerService {
-  private readonly storage: ReturnType<typeof createWhatsAppSessionStorage>;
-  private readonly isLambda: boolean;
+  private readonly storage: FileStorage;
   private readonly enabled: boolean;
 
-  constructor() {
-    this.isLambda = isLambdaEnvironment();
-    this.storage = createWhatsAppSessionStorage();
+  constructor(private readonly ctx: AppContext) {
+    this.storage = new FileStorage('.wwebjs_auth');
     this.enabled = true;
   }
 
@@ -20,7 +17,7 @@ class MessageLoggerService {
       return;
     }
 
-    logger.info('Message sent', {
+    this.ctx.logger.info('Message sent', {
       messageId: record.messageId,
       messageType: record.messageType,
       recipient: record.recipient,
@@ -34,7 +31,7 @@ class MessageLoggerService {
   }
 
   async persistMessage(record: MessageRecord): Promise<void> {
-    if (!this.enabled || !this.isLambda) {
+    if (!this.enabled || !this.ctx.isLambda) {
       this.logMessage(record);
       return;
     }
@@ -49,13 +46,13 @@ class MessageLoggerService {
       
       await this.storage.writeFile(key, recordJson);
       
-      logger.debug('Message persisted to S3', {
+      this.ctx.logger.debug('Message persisted to S3', {
         key,
         messageType: record.messageType,
         messageId: record.messageId,
       });
     } catch (error) {
-      logger.error('Error persisting message to S3', error, {
+      this.ctx.logger.error('Error persisting message to S3', error, {
         messageType: record.messageType,
         messageId: record.messageId,
       });
@@ -68,9 +65,8 @@ class MessageLoggerService {
   }
 }
 
-const messageLogger = new MessageLoggerService();
-
 export async function logSentMessage(
+  ctx: AppContext,
   messageId: string | undefined,
   messageType: MessageType,
   recipient: string,
@@ -92,6 +88,7 @@ export async function logSentMessage(
     metadata,
   };
 
+  const messageLogger = new MessageLoggerService(ctx);
   await messageLogger.logAndPersist(record);
 }
 
