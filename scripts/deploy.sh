@@ -55,6 +55,8 @@ echo "✅ Build complete"
 # Build with SAM
 echo ""
 echo "Building with SAM..."
+# SAM will detect changes in dist/ and package.json and rebuild accordingly
+# It will also install dependencies from package.json automatically
 sam build --template-file "$PROJECT_ROOT/infrastructure/template.yaml"
 echo "✅ SAM build complete"
 
