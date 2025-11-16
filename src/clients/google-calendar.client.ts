@@ -51,20 +51,18 @@ class GoogleCalendarClient {
 
     this.calendarId = calendarId;
 
-    const readOnlyAuth = new google.auth.JWT(
-      clientEmail,
-      undefined,
-      privateKey,
-      ['https://www.googleapis.com/auth/calendar.readonly']
-    );
+    const readOnlyAuth = new google.auth.JWT({
+      email: clientEmail,
+      key: privateKey,
+      scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+    });
     this.readOnlyCalendar = google.calendar({ version: 'v3', auth: readOnlyAuth });
 
-    const readWriteAuth = new google.auth.JWT(
-      clientEmail,
-      undefined,
-      privateKey,
-      ['https://www.googleapis.com/auth/calendar']
-    );
+    const readWriteAuth = new google.auth.JWT({
+      email: clientEmail,
+      key: privateKey,
+      scopes: ['https://www.googleapis.com/auth/calendar'],
+    });
     this.readWriteCalendar = google.calendar({ version: 'v3', auth: readWriteAuth });
   }
 

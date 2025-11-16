@@ -56,6 +56,7 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
 
   async send(message: string, options?: SendOptions): Promise<SendResult> {
     const startTime = Date.now();
+
     try {
       await this.authReminder.checkAndEmitReminder().catch(() => {});
       
@@ -66,7 +67,9 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
         });
       }
 
-      await this.initializeClient();
+      // Resolve group identifier from recipients or config (this also initializes the client)
+      const identifier = options?.recipients?.[0];
+      const resolvedGroupId = await this.resolveGroupId(identifier);
 
       if (!this.ctx.clients.whatsapp.isClientReady()) {
         return {
@@ -75,35 +78,14 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
         };
       }
 
-      let groupId = options?.recipients?.[0] ?? this.ctx.config.whatsapp.groupId;
-
-      if (groupId && !groupId.includes('@') && (groupId.includes(' ') || !/^\d+$/.test(groupId))) {
-        this.ctx.logger.info(`Searching for group by name: ${groupId}`);
-        const foundGroup = await this.ctx.clients.whatsapp.findGroupByName(groupId);
-        
-        if (foundGroup) {
-          groupId = foundGroup.id;
-          this.ctx.logger.info(`Found group ID: ${foundGroup.id}`);
-        } else {
-          const error = new Error(`Group "${groupId}" not found`);
-          this.alerting.sendWhatsAppGroupNotFoundAlert(groupId, {
-            searchedName: groupId,
-          });
-          return {
-            success: false,
-            error,
-          };
-        }
-      }
-
-      if (!groupId) {
+      if (!resolvedGroupId) {
         return {
           success: false,
           error: new Error('No WhatsApp group ID specified. Set WHATSAPP_GROUP_ID in .env or provide recipients in options'),
         };
       }
 
-      const chatId = groupId.includes('@g.us') ? groupId : `${groupId}@g.us`;
+      const chatId = resolvedGroupId.includes('@g.us') ? resolvedGroupId : `${resolvedGroupId}@g.us`;
       
       let lastError: Error | null = null;
       const maxRetries = 3;
@@ -181,10 +163,13 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
       const duration = Date.now() - startTime;
       trackWhatsAppMessageSent(this.metrics, false);
       trackOperationDuration(this.metrics, 'whatsapp.send', duration, { success: 'false' });
-      this.ctx.logger.error('Error sending WhatsApp message', error);
+      this.ctx.logger.error('Error sending WhatsApp message', {
+        error,
+        groupId: resolvedGroupId,
+      });
       
       this.alerting.sendWhatsAppMessageFailedAlert(error, {
-        groupId: options?.recipients?.[0] ?? this.ctx.config.whatsapp.groupId,
+        groupId: resolvedGroupId ?? options?.recipients?.[0] ?? this.ctx.config.whatsapp.groupId,
         retries: 3,
       });
 
@@ -192,7 +177,7 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
         this.ctx,
         undefined,
         'other',
-        options?.recipients?.[0] ?? this.ctx.config.whatsapp.groupId ?? 'unknown',
+        resolvedGroupId ?? options?.recipients?.[0] ?? this.ctx.config.whatsapp.groupId ?? 'unknown',
         message,
         false,
         duration,
@@ -223,6 +208,49 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
       this.ctx.logger.error('Error finding group by name', error);
       throw error;
     }
+  }
+
+  /**
+   * Resolves a group identifier (name or ID) to a groupId.
+   * Falls back to config.whatsapp.groupId if identifier is undefined.
+   * 
+   * @param identifier - Group name, group ID, or undefined
+   * @returns Resolved groupId string (normalized with @g.us suffix if needed)
+   * @throws Error if group not found or client not ready
+   */
+  async resolveGroupId(identifier: string | undefined): Promise<string> {
+    await this.initializeClient();
+
+    if (!this.ctx.clients.whatsapp.isClientReady()) {
+      throw new Error('WhatsApp client is not ready');
+    }
+
+    // Fall back to config if identifier is undefined
+    const inputIdentifier = identifier ?? this.ctx.config.whatsapp.groupId;
+
+    if (!inputIdentifier) {
+      throw new Error('No WhatsApp group ID specified. Set WHATSAPP_GROUP_ID in .env or provide identifier');
+    }
+
+    // If it looks like a group ID (contains @g.us or is just digits), normalize and return it
+    if (inputIdentifier.includes('@g.us') || /^\d+$/.test(inputIdentifier)) {
+      return inputIdentifier.includes('@g.us') ? inputIdentifier : `${inputIdentifier}@g.us`;
+    }
+
+    // Otherwise, treat it as a group name and search for it
+    this.ctx.logger.info(`Searching for group by name: ${inputIdentifier}`);
+    const foundGroup = await this.ctx.clients.whatsapp.findGroupByName(inputIdentifier);
+
+    if (!foundGroup) {
+      const error = new Error(`Group "${inputIdentifier}" not found`);
+      this.alerting.sendWhatsAppGroupNotFoundAlert(inputIdentifier, {
+        searchedName: inputIdentifier,
+      });
+      throw error;
+    }
+
+    this.ctx.logger.info(`Found group ID: ${foundGroup.id}`);
+    return foundGroup.id;
   }
 
   async requiresAuth(): Promise<boolean> {

@@ -26,7 +26,7 @@ async function sendTestMessageWhatsApp(): Promise<void> {
   let whatsappChannel: ReturnType<typeof OutputChannelFactory.createWhatsAppOutputChannel> | null = null;
   let exitCode = 0;
 
-  const groupName = process.argv[2] || 'Bday bot testing';
+  const groupName = process.argv[2] || 'test bot';
   const message = process.argv[3] || '🎂 🎉 Test message from birthday bot!';
   auditManualSend(appContext, 'send-test-message-whatsapp.ts', {
     blocked: false,
@@ -38,7 +38,6 @@ async function sendTestMessageWhatsApp(): Promise<void> {
   try {
 
     console.log('\n🚀 Starting WhatsApp Test Message Script\n');
-    console.log(`📱 Group: ${groupName}`);
     console.log(`💬 Message: ${message}\n`);
     
     appContext.logger.info('Sending test message to WhatsApp', { groupName, message });
@@ -54,26 +53,46 @@ async function sendTestMessageWhatsApp(): Promise<void> {
       return;
     }
 
+    // Resolve group identifier early, before logging
+    let resolvedGroupId: string;
+    try {
+      resolvedGroupId = await whatsappChannel.resolveGroupId(groupName);
+      console.log(`📱 Group: ${resolvedGroupId}\n`);
+      appContext.logger.info('Group identifier resolved', {
+        groupId: resolvedGroupId,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.log(`❌ Failed to resolve group identifier: ${errorMessage}\n`);
+      appContext.logger.error('Failed to resolve group identifier', error);
+      exitCode = 1;
+      return;
+    }
+
     console.log('📤 Sending message to WhatsApp group...\n');
-    appContext.logger.info('Sending message to WhatsApp group...');
+    appContext.logger.info('Sending message to WhatsApp group...', {
+      groupId: resolvedGroupId,
+    });
     
     const result = await whatsappChannel.send(message, {
-      recipients: [groupName],
+      recipients: [resolvedGroupId],
     });
     
     if (result.success) {
       console.log('✅ Message sent to WhatsApp successfully!');
       console.log(`   Message ID: ${result.messageId}`);
-      console.log(`   Recipient: ${result.recipient}\n`);
+      console.log(`   Recipient: ${resolvedGroupId}\n`);
       appContext.logger.info('Message sent to WhatsApp successfully', {
         messageId: result.messageId,
         recipient: result.recipient,
+        groupId: resolvedGroupId,
       });
     } else {
       console.log('❌ Failed to send message to WhatsApp');
       console.log(`   Error: ${result.error?.message}\n`);
       appContext.logger.error('Failed to send message to WhatsApp', {
         error: result.error?.message,
+        groupId: resolvedGroupId,
       });
       exitCode = 1;
     }

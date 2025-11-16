@@ -33,15 +33,12 @@ async function sendMonthlyDigestWhatsApp(): Promise<void> {
   auditManualSend(appContext, 'send-monthly-digest-whatsapp.ts', {
     blocked: false,
     environment: appContext.environment,
-    groupName: groupName || 'from-config',
+    groupName,
   });
 
   try {
     
     console.log('\n🚀 Starting WhatsApp Monthly Digest Script\n');
-    if (groupName) {
-      console.log(`📱 Target Group: ${groupName}\n`);
-    }
     
     appContext.logger.info('Getting monthly digest...');
     
@@ -68,28 +65,47 @@ async function sendMonthlyDigestWhatsApp(): Promise<void> {
     console.log('📱 Initializing WhatsApp connection...\n');
     whatsappChannel = OutputChannelFactory.createWhatsAppOutputChannel(appContext);
     
-    if (!whatsappChannel.isAvailable() && !groupName) {
+    if (!whatsappChannel.isAvailable()) {
       console.log('❌ WhatsApp channel is not available.');
-      console.log('   Please set WHATSAPP_GROUP_ID in your .env file or provide group name as argument\n');
-      appContext.logger.error('WhatsApp channel is not available. Please set WHATSAPP_GROUP_ID in .env or provide group name');
+      console.log('   Please set WHATSAPP_GROUP_ID in your .env file\n');
+      appContext.logger.error('WhatsApp channel is not available. Please set WHATSAPP_GROUP_ID in .env');
+      exitCode = 1;
+      return;
+    }
+
+    // Resolve group identifier early, before logging
+    let resolvedGroupId: string;
+    try {
+      resolvedGroupId = await whatsappChannel.resolveGroupId(groupName);
+      console.log(`📱 Target Group: ${resolvedGroupId}\n`);
+      appContext.logger.info('Group identifier resolved', {
+        groupId: resolvedGroupId,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.log(`❌ Failed to resolve group identifier: ${errorMessage}\n`);
+      appContext.logger.error('Failed to resolve group identifier', error);
       exitCode = 1;
       return;
     }
 
     console.log('📤 Sending monthly digest to WhatsApp group...\n');
-    appContext.logger.info('Sending monthly digest to WhatsApp group...', { groupName });
+    appContext.logger.info('Sending monthly digest to WhatsApp group...', {
+      groupId: resolvedGroupId,
+    });
     
-    const result = await whatsappChannel.send(monthlyDigest, groupName ? {
-      recipients: [groupName],
-    } : undefined);
+    const result = await whatsappChannel.send(monthlyDigest, {
+      recipients: [resolvedGroupId],
+    });
     
     if (result.success) {
       console.log('✅ Monthly digest sent to WhatsApp successfully!');
       console.log(`   Message ID: ${result.messageId}`);
-      console.log(`   Recipient: ${result.recipient}\n`);
+      console.log(`   Recipient: ${resolvedGroupId}\n`);
       appContext.logger.info('Monthly digest sent to WhatsApp successfully', {
         messageId: result.messageId,
         recipient: result.recipient,
+        groupId: resolvedGroupId,
       });
       appContext.logger.info('Completed successfully!');
     } else {
@@ -97,6 +113,7 @@ async function sendMonthlyDigestWhatsApp(): Promise<void> {
       console.log(`   Error: ${result.error?.message}\n`);
       appContext.logger.error('Failed to send monthly digest to WhatsApp', {
         error: result.error?.message,
+        groupId: resolvedGroupId,
       });
       exitCode = 1;
     }

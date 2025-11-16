@@ -88,6 +88,21 @@ class WhatsAppClient {
       } catch (error) {
         this.isInitializing = false;
         this.client = null;
+        
+        // Improve error message for Chromium download issues
+        if (error instanceof Error) {
+          const errorMessage = error.message.toLowerCase();
+          if (errorMessage.includes('browser') && (errorMessage.includes('not found') || errorMessage.includes('chromium'))) {
+            // Replace npm install suggestions with yarn install
+            const improvedError = new Error(
+              error.message.replace(/npm install/g, 'yarn install') +
+              '\n\n💡 Tip: Run `yarn install` to download the required Chromium browser.'
+            );
+            reject(improvedError);
+            return;
+          }
+        }
+        
         reject(error);
       }
     });
@@ -168,8 +183,10 @@ class WhatsAppClient {
     });
 
     this.client.on('authenticated', () => {
-      console.log('\n✅ QR code scanned successfully!');
-      console.log('🔐 Authenticating with WhatsApp...\n');
+      if (this.authRequired) {
+        console.log('\n✅ QR code scanned successfully!');
+        console.log('🔐 Authenticating with WhatsApp...\n');
+      }
       this.authRequired = false;
     });
 
@@ -201,6 +218,21 @@ class WhatsAppClient {
       clearInitTimeout();
       this.isInitializing = false;
       this.client = null;
+      
+      // Improve error message for Chromium download issues
+      if (error instanceof Error) {
+        const errorMessage = error.message.toLowerCase();
+        if (errorMessage.includes('browser') && (errorMessage.includes('not found') || errorMessage.includes('chromium'))) {
+          // Replace npm install suggestions with yarn install
+          const improvedError = new Error(
+            error.message.replace(/npm install/g, 'yarn install') +
+            '\n\n💡 Tip: Run `yarn install` to download the required Chromium browser.'
+          );
+          reject(improvedError);
+          return;
+        }
+      }
+      
       reject(error);
     });
   }
