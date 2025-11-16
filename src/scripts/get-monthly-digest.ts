@@ -8,7 +8,7 @@ async function getMonthlyDigest(): Promise<void> {
   try {
     appContext.logger.info('Getting monthly digest...');
     
-    const { todaysBirthdays, monthlyDigest } = await birthdayService.getTodaysBirthdaysWithMonthlyDigest();
+    const { todaysBirthdays, monthlyBirthdays } = await birthdayService.getTodaysBirthdaysWithMonthlyDigest();
     
     if (todaysBirthdays.length > 0) {
       appContext.logger.info('Today\'s birthdays', {
@@ -16,7 +16,8 @@ async function getMonthlyDigest(): Promise<void> {
       });
     }
     
-    if (monthlyDigest) {
+    if (monthlyBirthdays && monthlyBirthdays.length > 0) {
+      const monthlyDigest = birthdayService.formatMonthlyDigest(monthlyBirthdays);
       appContext.logger.info('Monthly digest', { monthlyDigest });
     }
     

@@ -45,13 +45,15 @@ async function sendMonthlyDigestWhatsApp(): Promise<void> {
     
     appContext.logger.info('Getting monthly digest...');
     
-    const { todaysBirthdays, monthlyDigest } = await birthdayService.getTodaysBirthdaysWithMonthlyDigest();
+    const { todaysBirthdays, monthlyBirthdays } = await birthdayService.getTodaysBirthdaysWithMonthlyDigest();
     
-    if (!monthlyDigest) {
-      console.log('⚠️  No monthly digest available\n');
-      appContext.logger.warn('No monthly digest available');
+    if (!monthlyBirthdays || monthlyBirthdays.length === 0) {
+      console.log('⚠️  No monthly birthdays available\n');
+      appContext.logger.warn('No monthly birthdays available');
       process.exit(0);
     }
+
+    const monthlyDigest = birthdayService.formatMonthlyDigest(monthlyBirthdays);
 
     console.log('📅 Monthly Digest:');
     console.log(monthlyDigest);
@@ -60,6 +62,7 @@ async function sendMonthlyDigestWhatsApp(): Promise<void> {
     appContext.logger.info('Monthly digest generated', { 
       digestLength: monthlyDigest.length,
       todaysBirthdaysCount: todaysBirthdays.length,
+      monthlyBirthdaysCount: monthlyBirthdays.length,
     });
 
     console.log('📱 Initializing WhatsApp connection...\n');

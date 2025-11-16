@@ -24,15 +24,15 @@ function getBirthdayEmoji(index: number): string {
   return BIRTHDAY_EMOJIS[index % BIRTHDAY_EMOJIS.length];
 }
 
-function getRandomEmoji(index: number): string {
-  const randomIndex = (index * 7 + 13) % BIRTHDAY_EMOJIS.length;
+function getRandomEmoji(_index: number): string {
+  const randomIndex = Math.floor(Math.random() * BIRTHDAY_EMOJIS.length);
   return BIRTHDAY_EMOJIS[randomIndex];
 }
 
 function getPersonalBirthdayMessage(name: string, index: number): string {
   const birthdayEmoji = getBirthdayEmoji(index);
   const randomEmoji = getRandomEmoji(index);
-  return `${birthdayEmoji} ${randomEmoji} ${name}`;
+  return `${birthdayEmoji} ${name} ${randomEmoji}`;
 }
 
 class BirthdayService {
@@ -95,9 +95,42 @@ class BirthdayService {
     }
   }
 
+  formatMonthlyDigest(monthlyBirthdays: BirthdayRecord[]): string {
+    if (monthlyBirthdays.length === 0) {
+      const todayDate = today();
+      const monthName = formatDateMonthYear(todayDate);
+      return `📅 No birthdays scheduled for ${monthName}.`;
+    }
+
+    const sortedRecords = [...monthlyBirthdays].sort((a, b) => 
+      a.birthday.getTime() - b.birthday.getTime()
+    );
+    
+    const birthdaysByDate = sortedRecords.reduce<Record<string, { name: string; randomEmoji: string }[]>>((acc, record, index) => {
+      const dateKey = formatDateShort(record.birthday);
+      const fullName = getFullName(record.firstName, record.lastName);
+      const randomEmoji = getRandomEmoji(index);
+      (acc[dateKey] ??= []).push({ name: fullName, randomEmoji });
+      return acc;
+    }, {});
+
+    const sortedDates = Object.keys(birthdaysByDate);
+    const maxDateWidth = Math.max(...sortedDates.map(date => `🎂 ${date}: `.length));
+
+    const monthlyDigest = sortedDates.map(date => {
+      const people = birthdaysByDate[date];
+      const namesWithEmojis = people.map(p => `${p.name} ${p.randomEmoji}`).join(', ');
+      const datePrefix = `🎂 ${date}: `;
+      const paddedDatePrefix = datePrefix.padEnd(maxDateWidth);
+      return `${paddedDatePrefix}${namesWithEmojis}`;
+    }).join('\n');
+
+    return monthlyDigest;
+  }
+
   async getTodaysBirthdaysWithOptionalDigest(): Promise<{
     todaysBirthdays: BirthdayRecord[];
-    monthlyDigest?: string;
+    monthlyBirthdays?: BirthdayRecord[];
   }> {
     const todayDate = today();
     const isFirstDay = isFirstDayOfMonth(todayDate);
@@ -106,7 +139,7 @@ class BirthdayService {
       const result = await this.getTodaysBirthdaysWithMonthlyDigest();
       return {
         todaysBirthdays: result.todaysBirthdays,
-        monthlyDigest: result.monthlyDigest,
+        monthlyBirthdays: result.monthlyBirthdays,
       };
     }
 
@@ -118,7 +151,7 @@ class BirthdayService {
 
   async getTodaysBirthdaysWithMonthlyDigest(): Promise<{
     todaysBirthdays: BirthdayRecord[];
-    monthlyDigest: string;
+    monthlyBirthdays: BirthdayRecord[];
   }> {
     const startTime = Date.now();
     try {
@@ -134,44 +167,12 @@ class BirthdayService {
         return recordStart.getTime() === todayStart.getTime();
       });
 
-      const monthName = formatDateMonthYear(todayDate);
-      
-      if (monthRecords.length === 0) {
-        return {
-          todaysBirthdays: [],
-          monthlyDigest: `📅 No birthdays scheduled for ${monthName}.`,
-        };
-      }
-
-      const sortedRecords = [...monthRecords].sort((a, b) => 
-        a.birthday.getTime() - b.birthday.getTime()
-      );
-      
-      const birthdaysByDate = sortedRecords.reduce<Record<string, { name: string; randomEmoji: string }[]>>((acc, record, index) => {
-        const dateKey = formatDateShort(record.birthday);
-        const fullName = getFullName(record.firstName, record.lastName);
-        const randomEmoji = getRandomEmoji(index);
-        (acc[dateKey] ??= []).push({ name: fullName, randomEmoji });
-        return acc;
-      }, {});
-
-      const sortedDates = Object.keys(birthdaysByDate);
-      const maxDateWidth = Math.max(...sortedDates.map(date => `🎂 ${date}: `.length));
-
-      const monthlyDigest = sortedDates.map(date => {
-        const people = birthdaysByDate[date];
-        const namesWithEmojis = people.map(p => `${p.name} ${p.randomEmoji}`).join(', ');
-        const datePrefix = `🎂 ${date}: `;
-        const paddedDatePrefix = datePrefix.padEnd(maxDateWidth);
-        return `${paddedDatePrefix}${namesWithEmojis}`;
-      }).join('\n');
-
       trackBirthdayFetch(this.metrics, monthRecords.length);
       trackOperationDuration(this.metrics, 'getTodaysBirthdaysWithMonthlyDigest', Date.now() - startTime);
 
       return {
         todaysBirthdays,
-        monthlyDigest,
+        monthlyBirthdays: monthRecords,
       };
     } catch (error) {
       trackApiCall(this.metrics, 'calendar', false);

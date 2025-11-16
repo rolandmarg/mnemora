@@ -113,9 +113,10 @@ async function manualSend(): Promise<void> {
 
     appContext.logger.info('Running manual send...');
     
-    const { todaysBirthdays, monthlyDigest } = await birthdayService.getTodaysBirthdaysWithMonthlyDigest();
+    const { todaysBirthdays, monthlyBirthdays } = await birthdayService.getTodaysBirthdaysWithMonthlyDigest();
     
-    if (monthlyDigest) {
+    if (monthlyBirthdays && monthlyBirthdays.length > 0) {
+      const monthlyDigest = birthdayService.formatMonthlyDigest(monthlyBirthdays);
       appContext.logger.info('Sending monthly digest to WhatsApp group...');
       try {
         whatsappChannel = OutputChannelFactory.createWhatsAppOutputChannel(appContext);

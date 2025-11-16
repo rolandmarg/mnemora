@@ -157,10 +157,11 @@ class BirthdayOrchestratorService {
 
       this.ctx.logger.info('Running birthday check...');
       
-      const { todaysBirthdays, monthlyDigest } = await this.birthdayService.getTodaysBirthdaysWithOptionalDigest();
+      const { todaysBirthdays, monthlyBirthdays } = await this.birthdayService.getTodaysBirthdaysWithOptionalDigest();
       
       // Send monthly digest if it's the first day of the month
-      if (monthlyDigest) {
+      if (monthlyBirthdays) {
+        const monthlyDigest = this.birthdayService.formatMonthlyDigest(monthlyBirthdays);
         this.ctx.logger.info('First day of month detected - generating monthly digest');
         this.ctx.logger.info('Monthly digest', { monthlyDigest });
         
@@ -294,7 +295,7 @@ class BirthdayOrchestratorService {
       
       await this.lastRunTracker.updateLastRunDate();
 
-      const monthlyDigestSent = !!monthlyDigest && whatsappChannel?.isAvailable();
+      const monthlyDigestSent = !!monthlyBirthdays && whatsappChannel?.isAvailable();
       await this.monitoring.recordDailyExecution(true, monthlyDigestSent);
 
       const executionDuration = Date.now() - executionStartTime;
