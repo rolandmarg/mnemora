@@ -1,8 +1,8 @@
-import { BaseDataSource } from '../data-source/data-source.base.js';
-import { parseRowToBirthdays } from '../utils/birthday-helpers.util.js';
-import type { BirthdayRecord } from '../types/birthday.types.js';
-import type { ReadOptions, DataSourceMetadata } from '../data-source/data-source.interface.js';
-import type { AppContext } from '../app-context.js';
+import { BaseDataSource } from '../data-source.base.js';
+import { parseRowToBirthdays } from '../../utils/birthday-helpers.util.js';
+import type { BirthdayRecord } from '../../types/birthday.types.js';
+import type { ReadOptions, DataSourceMetadata } from '../data-source.interface.js';
+import type { AppContext } from '../../app-context.js';
 
 export class SheetsDataSource extends BaseDataSource<BirthdayRecord> {
   constructor(private readonly ctx: AppContext) {

@@ -14,17 +14,17 @@
 // (none)
 
 // Internal modules - Base
-import { BaseOutputChannel } from '../output-channel/output-channel.base.js';
+import { BaseOutputChannel } from '../output-channel.base.js';
 
 // Internal modules - Services
-import { AlertingService } from '../services/alerting.service.js';
-import { MetricsCollector, trackWhatsAppMessageSent, trackWhatsAppAuthRequired, trackOperationDuration } from '../services/metrics.service.js';
-import { AuthReminderService } from '../services/auth-reminder.service.js';
-import { logSentMessage } from '../services/message-logger.service.js';
+import { AlertingService } from '../../services/alerting.service.js';
+import { MetricsCollector, trackWhatsAppMessageSent, trackWhatsAppAuthRequired, trackOperationDuration } from '../../services/metrics.service.js';
+import { AuthReminderService } from '../../services/auth-reminder.service.js';
+import { logSentMessage } from '../../services/message-logger.service.js';
 
 // Internal modules - Types
-import type { SendOptions, SendResult, OutputChannelMetadata } from '../output-channel/output-channel.interface.js';
-import type { AppContext } from '../app-context.js';
+import type { SendOptions, SendResult, OutputChannelMetadata } from '../output-channel.interface.js';
+import type { AppContext } from '../../app-context.js';
 
 /**
  * WhatsApp output channel implementation using whatsapp-web.js

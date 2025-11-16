@@ -172,7 +172,7 @@ Complete documentation of all execution flows, decision trees, and error scenari
 
 ### Flow Steps
 
-1. **Check Session** (`src/channels/whatsapp.channel.ts::initializeClient()`)
+1. **Check Session** (`src/output-channel/implementations/whatsapp.channel.ts::initializeClient()`)
    - Check if session exists in S3 (Lambda) or local filesystem
    - If session exists: Try to use saved session
    - If no session: Require authentication

@@ -68,7 +68,7 @@ Guide for migrating from `whatsapp-web.js` to WhatsApp Cloud API.
 
 ### Step 6: Implement WhatsApp Cloud API Channel
 
-Update `src/channels/whatsapp-cloud-api.channel.ts`:
+Update `src/output-channel/implementations/whatsapp-cloud-api.channel.ts`:
 
 ```typescript
 import { BaseOutputChannel } from '../output-channel/output-channel.base.js';

@@ -220,13 +220,13 @@ See [docs/operations/DEPLOYMENT.md](./docs/operations/DEPLOYMENT.md) for detaile
 
 ```
 src/
-├── data-source/       # Data source abstraction (interface, base, factory)
-├── output-channel/    # Output channel abstraction (interface, base, factory)
-├── channels/          # Output channels (Console, SMS, WhatsApp, Email)
+├── data-source/       # Data source abstraction and implementations
+│   └── implementations/  # Data sources (Calendar, Sheets)
+├── output-channel/    # Output channel abstraction and implementations
+│   └── implementations/  # Output channels (Console, SMS, WhatsApp, Email)
 ├── clients/           # External API clients (Google Calendar, Google Sheets)
 ├── scripts/           # CLI scripts
 ├── services/          # Business logic (BirthdayService)
-├── sources/           # Data sources (Calendar, Sheets)
 ├── utils/             # Utility functions
 ├── config.ts          # Configuration loader
 └── index.ts           # Main entry point

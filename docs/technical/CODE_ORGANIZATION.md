@@ -35,11 +35,21 @@ import { getFullName } from './utils/name-helpers.js';
 
 ```
 src/
-├── data-source/       # Data source abstraction (interface, base, factory)
-├── output-channel/    # Output channel abstraction (interface, base, factory)
+├── data-source/       # Data source abstraction and implementations
+│   ├── data-source.interface.ts
+│   ├── data-source.base.ts
+│   ├── data-source.factory.ts
+│   └── implementations/  # Concrete data source implementations
+│       ├── calendar.source.ts
+│       └── sheets.source.ts
+├── output-channel/    # Output channel abstraction and implementations
+│   ├── output-channel.interface.ts
+│   ├── output-channel.base.ts
+│   ├── output-channel.factory.ts
+│   └── implementations/  # Concrete output channel implementations
+│       ├── console.channel.ts
+│       └── whatsapp.channel.ts
 ├── services/          # Business logic (orchestration)
-├── sources/           # Data sources (read/write)
-├── channels/          # Output channels (send messages)
 ├── clients/           # External API clients (low-level)
 ├── utils/             # Utility functions (helpers)
 ├── scripts/           # CLI scripts (manual operations)

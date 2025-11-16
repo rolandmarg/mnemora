@@ -1,5 +1,5 @@
-import { BaseOutputChannel } from '../output-channel/output-channel.base.js';
-import type { SendOptions, SendResult, OutputChannelMetadata } from '../output-channel/output-channel.interface.js';
+import { BaseOutputChannel } from '../output-channel.base.js';
+import type { SendOptions, SendResult, OutputChannelMetadata } from '../output-channel.interface.js';
 
 export class ConsoleOutputChannel extends BaseOutputChannel {
   async send(message: string, _options?: SendOptions): Promise<SendResult> {

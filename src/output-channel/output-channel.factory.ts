@@ -1,5 +1,5 @@
-import { ConsoleOutputChannel } from '../channels/console.channel.js';
-import { WhatsAppOutputChannel } from '../channels/whatsapp.channel.js';
+import { ConsoleOutputChannel } from './implementations/console.channel.js';
+import { WhatsAppOutputChannel } from './implementations/whatsapp.channel.js';
 import type { AppContext } from '../app-context.js';
 
 export class OutputChannelFactory {
