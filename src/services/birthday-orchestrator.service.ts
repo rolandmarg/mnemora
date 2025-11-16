@@ -2,7 +2,7 @@
  * Birthday Orchestrator Service
  * 
  * Orchestrates the daily birthday check process, including:
- * - Checking for missed days and sending recovery messages
+ * - Checking for missed 1st-of-month dates and recovering monthly digests
  * - Sending monthly digest on the first of the month
  * - Sending today's birthday messages
  * - Managing execution lifecycle (metrics, monitoring, cleanup)
@@ -25,7 +25,7 @@ import {
 import { AlertingService } from './alerting.service.js';
 import { LastRunTrackerService } from './last-run-tracker.service.js';
 import { getFullName } from '../utils/name-helpers.util.js';
-import { startOfDay, isFirstDayOfMonth } from '../utils/date-helpers.util.js';
+import { isFirstDayOfMonth, startOfMonth, endOfMonth } from '../utils/date-helpers.util.js';
 import { initializeCorrelationId } from '../utils/correlation.util.js';
 import type { AppContext } from '../app-context.js';
 
@@ -87,14 +87,17 @@ class BirthdayOrchestratorService {
       return;
     }
 
-    trackMissedDaysDetected(this.metrics, missedDates.length);
-
-    const lastMissedDate = missedDates[missedDates.length - 1];
-    const dateStr = lastMissedDate.toISOString().split('T')[0];
+    const missedFirstOfMonths = missedDates.filter(date => isFirstDayOfMonth(date));
     
-    this.ctx.logger.info(`Found ${missedDates.length} missed day(s), sending messages for most recent: ${dateStr}`, {
-      missedDates: missedDates.map(d => d.toISOString().split('T')[0]),
-      sendingFor: dateStr,
+    if (missedFirstOfMonths.length === 0) {
+      this.ctx.logger.info(`Found ${missedDates.length} missed day(s), but no missed 1st-of-month dates to recover`);
+      return;
+    }
+
+    trackMissedDaysDetected(this.metrics, missedFirstOfMonths.length);
+
+    this.ctx.logger.info(`Found ${missedFirstOfMonths.length} missed 1st-of-month date(s) to recover`, {
+      missedFirstOfMonths: missedFirstOfMonths.map(d => d.toISOString().split('T')[0]),
     });
 
     let whatsappChannel: ReturnType<typeof OutputChannelFactory.createWhatsAppOutputChannel> | null = null;
@@ -102,41 +105,59 @@ class BirthdayOrchestratorService {
     try {
       whatsappChannel = OutputChannelFactory.createWhatsAppOutputChannel(this.ctx);
       if (!whatsappChannel.isAvailable()) {
-        this.ctx.logger.info('WhatsApp channel not available, skipping missed days');
+        this.ctx.logger.info('WhatsApp channel not available, skipping missed monthly digest recovery');
         return;
       }
 
-      const startDate = startOfDay(lastMissedDate);
-      const endDate = startOfDay(lastMissedDate);
-      const birthdays = await this.birthdayService.getBirthdays(startDate, endDate);
+      for (const missedFirst of missedFirstOfMonths) {
+        const dateStr = missedFirst.toISOString().split('T')[0];
+        try {
+          const monthStart = startOfMonth(missedFirst);
+          const monthEnd = endOfMonth(missedFirst);
+          const monthlyBirthdays = await this.birthdayService.getBirthdays(monthStart, monthEnd);
 
-      if (birthdays.length === 0) {
-        this.ctx.logger.info(`No birthdays on most recent missed date: ${dateStr}`);
-        return;
+          if (monthlyBirthdays.length === 0) {
+            this.ctx.logger.info(`No birthdays found for missed monthly digest: ${dateStr}`);
+            continue;
+          }
+
+          const monthlyDigest = this.birthdayService.formatMonthlyDigest(monthlyBirthdays);
+          
+          this.ctx.logger.info(`Sending monthly digest for missed 1st-of-month: ${dateStr}`, {
+            monthlyBirthdaysCount: monthlyBirthdays.length,
+          });
+
+          const result = await whatsappChannel.send(monthlyDigest);
+          
+          if (result.success) {
+            trackMonthlyDigestSent(this.metrics);
+            this.ctx.logger.info('Missed monthly digest sent successfully', { date: dateStr });
+            
+            await this.logMessage(result.messageId, 'monthly-digest', whatsappChannel, monthlyDigest, true);
+            
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          } else {
+            this.ctx.logger.warn('Failed to send missed monthly digest', {
+              date: dateStr,
+              error: result.error?.message,
+            });
+            this.alerting.sendMonthlyDigestFailedAlert(result.error, {
+              date: dateStr,
+              isRecovery: true,
+            });
+          }
+        } catch (error) {
+          this.ctx.logger.error(`Error recovering monthly digest for ${dateStr}`, error);
+          this.alerting.sendMissedDaysRecoveryFailedAlert(error, {
+            missedDate: dateStr,
+            stage: 'monthly-digest-recovery',
+          });
+        }
       }
-
-      this.ctx.logger.info(`Sending ${birthdays.length} birthday message(s) for most recent missed date`, {
-        date: dateStr,
-      });
-
-      const birthdayMessages = this.birthdayService.formatTodaysBirthdayMessages(birthdays);
-      await birthdayMessages.reduce(async (promise, message) => {
-        await promise;
-        if (!whatsappChannel) {
-          return;
-        }
-        const result = await whatsappChannel.send(message);
-        if (result.success) {
-          trackBirthdaySent(this.metrics, 1);
-          this.ctx.logger.info('Missed birthday message sent', { date: dateStr });
-        }
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }, Promise.resolve());
     } catch (error) {
-      this.ctx.logger.error('Error processing missed days', error);
+      this.ctx.logger.error('Error processing missed monthly digest recovery', error);
       this.alerting.sendMissedDaysRecoveryFailedAlert(error, {
-        missedDate: dateStr,
-        stage: 'processing',
+        stage: 'initialization',
       });
     } finally {
       await this.cleanupWhatsAppClient(whatsappChannel);

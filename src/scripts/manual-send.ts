@@ -3,7 +3,7 @@ import { OutputChannelFactory } from '../output-channel/output-channel.factory.j
 import { LastRunTrackerService } from '../services/last-run-tracker.service.js';
 import { appContext } from '../app-context.js';
 import { getFullName } from '../utils/name-helpers.util.js';
-import { startOfDay } from '../utils/date-helpers.util.js';
+import { isFirstDayOfMonth, startOfMonth, endOfMonth } from '../utils/date-helpers.util.js';
 import { requireDevelopment, auditManualSend, SecurityError } from '../utils/security.util.js';
 
 async function checkAndSendMissedDays(): Promise<void> {
@@ -16,11 +16,15 @@ async function checkAndSendMissedDays(): Promise<void> {
     return;
   }
 
-  const lastMissedDate = missedDates[missedDates.length - 1];
+  const missedFirstOfMonths = missedDates.filter(date => isFirstDayOfMonth(date));
   
-  appContext.logger.info(`Found ${missedDates.length} missed day(s), sending messages for most recent: ${lastMissedDate.toISOString().split('T')[0]}`, {
-    missedDates: missedDates.map(d => d.toISOString().split('T')[0]),
-    sendingFor: lastMissedDate.toISOString().split('T')[0],
+  if (missedFirstOfMonths.length === 0) {
+    appContext.logger.info(`Found ${missedDates.length} missed day(s), but no missed 1st-of-month dates to recover`);
+    return;
+  }
+
+  appContext.logger.info(`Found ${missedFirstOfMonths.length} missed 1st-of-month date(s) to recover`, {
+    missedFirstOfMonths: missedFirstOfMonths.map(d => d.toISOString().split('T')[0]),
   });
 
   let whatsappChannel: ReturnType<typeof OutputChannelFactory.createWhatsAppOutputChannel> | null = null;
@@ -28,42 +32,45 @@ async function checkAndSendMissedDays(): Promise<void> {
   try {
     whatsappChannel = OutputChannelFactory.createWhatsAppOutputChannel(appContext);
     if (!whatsappChannel.isAvailable()) {
-      appContext.logger.info('WhatsApp channel not available, skipping missed days');
+      appContext.logger.info('WhatsApp channel not available, skipping missed monthly digest recovery');
       return;
     }
 
-    try {
-      const startDate = startOfDay(lastMissedDate);
-      const endDate = startOfDay(lastMissedDate);
-      const birthdays = await birthdayService.getBirthdays(startDate, endDate);
+    for (const missedFirst of missedFirstOfMonths) {
+      const dateStr = missedFirst.toISOString().split('T')[0];
+      try {
+        const monthStart = startOfMonth(missedFirst);
+        const monthEnd = endOfMonth(missedFirst);
+        const monthlyBirthdays = await birthdayService.getBirthdays(monthStart, monthEnd);
 
-      if (birthdays.length > 0) {
-        appContext.logger.info(`Sending ${birthdays.length} birthday message(s) for most recent missed date`, {
-          date: lastMissedDate.toISOString().split('T')[0],
+        if (monthlyBirthdays.length === 0) {
+          appContext.logger.info(`No birthdays found for missed monthly digest: ${dateStr}`);
+          continue;
+        }
+
+        const monthlyDigest = birthdayService.formatMonthlyDigest(monthlyBirthdays);
+        
+        appContext.logger.info(`Sending monthly digest for missed 1st-of-month: ${dateStr}`, {
+          monthlyBirthdaysCount: monthlyBirthdays.length,
         });
 
-        const birthdayMessages = birthdayService.formatTodaysBirthdayMessages(birthdays);
-        await birthdayMessages.reduce(async (promise, message) => {
-          await promise;
-          if (!whatsappChannel) {
-            return;
-          }
-          const result = await whatsappChannel.send(message);
-          if (result.success) {
-            appContext.logger.info('Missed birthday message sent', {
-              date: lastMissedDate.toISOString().split('T')[0],
-            });
-          }
+        const result = await whatsappChannel.send(monthlyDigest);
+        
+        if (result.success) {
+          appContext.logger.info('Missed monthly digest sent successfully', { date: dateStr });
           await new Promise(resolve => setTimeout(resolve, 1000));
-        }, Promise.resolve());
-      } else {
-        appContext.logger.info(`No birthdays on most recent missed date: ${lastMissedDate.toISOString().split('T')[0]}`);
+        } else {
+          appContext.logger.warn('Failed to send missed monthly digest', {
+            date: dateStr,
+            error: result.error?.message,
+          });
+        }
+      } catch (error) {
+        appContext.logger.error(`Error recovering monthly digest for ${dateStr}`, error);
       }
-    } catch (error) {
-      appContext.logger.error(`Error processing missed date: ${lastMissedDate.toISOString()}`, error);
     }
   } catch (error) {
-    appContext.logger.error('Error checking missed days', error);
+    appContext.logger.error('Error processing missed monthly digest recovery', error);
   } finally {
     if (whatsappChannel && 'destroy' in whatsappChannel && typeof whatsappChannel.destroy === 'function') {
       try {
