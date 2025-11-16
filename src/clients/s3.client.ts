@@ -195,20 +195,29 @@ export class FileStorage {
       return;
     }
 
-    const files = readdirSync(localPath);
-    await files.reduce(async (promise, file) => {
-      await promise;
-      const filePath = join(localPath, file);
-      const stat = statSync(filePath);
+    if (!existsSync(localPath)) {
+      return;
+    }
+
+    const syncDirectory = async (dirPath: string, relativePath: string = ''): Promise<void> => {
+      const files = readdirSync(dirPath);
       
-      if (stat.isDirectory()) {
-        await this.syncToS3(filePath);
-      } else {
-        const fileContent = readFileSync(filePath);
-        const s3Key = `${this.basePath}/${file}`;
-        await s3Client.upload(s3Key, fileContent);
+      for (const file of files) {
+        const filePath = join(dirPath, file);
+        const stat = statSync(filePath);
+        const currentRelativePath = relativePath ? `${relativePath}/${file}` : file;
+        
+        if (stat.isDirectory()) {
+          await syncDirectory(filePath, currentRelativePath);
+        } else {
+          const fileContent = readFileSync(filePath);
+          const s3Key = `${this.basePath}/${currentRelativePath}`;
+          await s3Client.upload(s3Key, fileContent);
+        }
       }
-    }, Promise.resolve());
+    };
+
+    await syncDirectory(localPath);
   }
 
   async syncFromS3(localPath: string): Promise<void> {
@@ -220,8 +229,34 @@ export class FileStorage {
       mkdirSync(localPath, { recursive: true });
     }
 
-    // Simplified implementation - full directory sync would require S3 ListObjectsV2
-    // For now, individual file downloads are handled as needed
+    // List all objects in S3 with the basePath prefix
+    const s3Keys = await s3Client.listObjects(this.basePath);
+    
+    for (const s3Key of s3Keys) {
+      // Extract relative path from S3 key (remove basePath prefix)
+      const relativePath = s3Key.startsWith(`${this.basePath}/`) 
+        ? s3Key.slice(this.basePath.length + 1)
+        : s3Key;
+      
+      // Skip if it's just the base path itself
+      if (!relativePath || relativePath === this.basePath) {
+        continue;
+      }
+      
+      const localFilePath = join(localPath, relativePath);
+      const localFileDir = join(localFilePath, '..');
+      
+      // Create directory structure if needed
+      if (!existsSync(localFileDir)) {
+        mkdirSync(localFileDir, { recursive: true });
+      }
+      
+      // Download file from S3
+      const fileContent = await s3Client.download(s3Key);
+      if (fileContent) {
+        writeFileSync(localFilePath, fileContent);
+      }
+    }
   }
 }
 

@@ -88,7 +88,7 @@ aws lambda invoke \
   --function-name mnemora-birthday-bot-prod \
   --region us-west-1 \
   --payload '{}' \
-  response.json
+  /dev/stdout | cat
 
 # View function configuration
 aws lambda get-function-configuration \
@@ -324,15 +324,12 @@ sam deploy
 ### Manually Trigger Birthday Check
 
 ```bash
-# Invoke Lambda manually
+# Invoke Lambda manually (outputs to console)
 aws lambda invoke \
   --function-name mnemora-birthday-bot-prod \
   --region us-west-1 \
   --payload '{}' \
-  response.json
-
-# Check response
-cat response.json
+  /dev/stdout | cat
 ```
 
 ### Backup WhatsApp Session

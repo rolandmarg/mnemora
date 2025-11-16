@@ -15,11 +15,22 @@ class WhatsAppClient {
 
   constructor() {
     this.isLambda = isLambda();
-    this.sessionPath = join(process.cwd(), '.wwebjs_auth');
+    // Use /tmp in Lambda (writable), process.cwd() locally
+    this.sessionPath = this.isLambda 
+      ? join('/tmp', '.wwebjs_auth')
+      : join(process.cwd(), '.wwebjs_auth');
     
-    if (!this.isLambda && !existsSync(this.sessionPath)) {
+    // Create directory if it doesn't exist
+    if (!existsSync(this.sessionPath)) {
       mkdirSync(this.sessionPath, { recursive: true });
     }
+  }
+
+  /**
+   * Get the session path. Useful for external session management (e.g., S3 sync)
+   */
+  getSessionPath(): string {
+    return this.sessionPath;
   }
 
   async initialize(): Promise<void> {

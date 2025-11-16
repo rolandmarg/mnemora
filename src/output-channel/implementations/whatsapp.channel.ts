@@ -14,6 +14,7 @@ import { BaseOutputChannel } from '../output-channel.base.js';
 import { AlertingService } from '../../services/alerting.service.js';
 import { MetricsCollector, trackWhatsAppMessageSent, trackWhatsAppAuthRequired, trackOperationDuration } from '../../services/metrics.service.js';
 import { AuthReminderService } from '../../services/auth-reminder.service.js';
+import { WhatsAppSessionManagerService } from '../../services/whatsapp-session-manager.service.js';
 import { logSentMessage } from '../../services/message-logger.service.js';
 import type { SendOptions, SendResult, OutputChannelMetadata } from '../output-channel.interface.js';
 import type { AppContext } from '../../app-context.js';
@@ -22,16 +23,37 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
   private readonly alerting: AlertingService;
   private readonly metrics: MetricsCollector;
   private readonly authReminder: AuthReminderService;
+  private readonly sessionManager: WhatsAppSessionManagerService;
 
   constructor(private readonly ctx: AppContext) {
     super();
     this.alerting = new AlertingService(ctx);
     this.metrics = new MetricsCollector(ctx);
     this.authReminder = new AuthReminderService(ctx);
+    this.sessionManager = new WhatsAppSessionManagerService(ctx);
+  }
+
+  /**
+   * Get the WhatsApp session path. Helper to avoid repetition.
+   */
+  private getSessionPath(): string {
+    return this.ctx.clients.whatsapp.getSessionPath();
+  }
+
+  /**
+   * Sync session to S3 if in Lambda. Helper to avoid repetition.
+   */
+  private async syncSessionToS3(): Promise<void> {
+    const sessionPath = this.getSessionPath();
+    await this.sessionManager.syncSessionToS3(sessionPath).catch(() => {});
   }
 
   private async initializeClient(): Promise<void> {
     try {
+      // Sync session from S3 before initialization (Lambda only)
+      const sessionPath = this.getSessionPath();
+      await this.sessionManager.syncSessionFromS3(sessionPath);
+      
       await this.ctx.clients.whatsapp.initialize();
       
       if (this.ctx.clients.whatsapp.requiresAuth()) {
@@ -44,6 +66,8 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
       
       if (this.ctx.clients.whatsapp.isClientReady()) {
         await this.authReminder.recordAuthentication().catch(() => {});
+        // Sync session to S3 after successful initialization (Lambda only)
+        await this.syncSessionToS3();
       }
     } catch (error) {
       this.ctx.logger.error('Failed to initialize WhatsApp client', error);
@@ -124,6 +148,9 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
               from: result.from,
             }
           ).catch(() => {});
+
+          // Sync session to S3 after successful message send (Lambda only)
+          await this.syncSessionToS3();
 
           return {
             success: true,
@@ -299,6 +326,9 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
 
   async destroy(): Promise<void> {
     try {
+      // Sync session to S3 before destroying (Lambda only)
+      await this.syncSessionToS3();
+      
       await this.ctx.clients.whatsapp.destroy();
     } catch (error) {
       this.ctx.logger.error('Error destroying WhatsApp client', error);

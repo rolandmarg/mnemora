@@ -29,7 +29,10 @@
     "package:lambda": "sam build --template-file infrastructure/template.yaml --config-file infrastructure/samconfig.toml",
     "deploy": "./scripts/deploy.sh",
     "deploy:lambda": "./scripts/deploy.sh",
-    "invoke:local": "sam local invoke BirthdayBotFunction --event events/event.json"
+    "invoke:local": "sam local invoke BirthdayBotFunction --event events/event.json",
+    "invoke:lambda": "aws lambda invoke --function-name mnemora-birthday-bot-prod --payload '{}' /dev/stdout | cat",
+    "auth:qr": "./scripts/get-qr-code.sh",
+    "fetch-logs": "tsx src/scripts/fetch-logs.ts"
   },
   "keywords": [
     "calendar",
