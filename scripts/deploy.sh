@@ -64,7 +64,7 @@ echo "Deploying to AWS..."
 echo "This may take 5-10 minutes..."
 echo ""
 
-sam deploy --template-file "$PROJECT_ROOT/infrastructure/template.yaml" --config-file "$PROJECT_ROOT/infrastructure/samconfig.toml" --resolve-s3
+sam deploy --template-file "$PROJECT_ROOT/infrastructure/template.yaml" --config-file "$PROJECT_ROOT/infrastructure/samconfig.toml"
 
 echo ""
 echo "=========================================="
