@@ -4,6 +4,7 @@ import qrcode from 'qrcode-terminal';
 import { existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { isLambda } from '../utils/runtime.util.js';
+import chromium from '@sparticuz/chromium';
 
 class WhatsAppClient {
   private client: InstanceType<typeof Client> | null = null;
@@ -20,9 +21,16 @@ class WhatsAppClient {
       ? join('/tmp', '.wwebjs_auth')
       : join(process.cwd(), '.wwebjs_auth');
     
-    // Create directory if it doesn't exist
+    // Create directory structure if it doesn't exist
+    // LocalAuth creates a 'session' subdirectory, so we need to pre-create it
     if (!existsSync(this.sessionPath)) {
       mkdirSync(this.sessionPath, { recursive: true });
+    }
+    
+    // Pre-create the session subdirectory that LocalAuth expects
+    const sessionSubdir = join(this.sessionPath, 'session');
+    if (!existsSync(sessionSubdir)) {
+      mkdirSync(sessionSubdir, { recursive: true });
     }
   }
 
@@ -67,32 +75,56 @@ class WhatsAppClient {
 
     this.isInitializing = true;
 
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       try {
         if (this.client) {
           this.client.destroy().catch(() => {});
           this.client = null;
         }
 
+        // Configure Puppeteer for Lambda (use Chromium) or local (use default)
+        const puppeteerConfig: {
+          headless: boolean;
+          args: string[];
+          timeout: number;
+          executablePath?: string;
+        } = {
+          headless: true, // NO browser window - QR code in terminal only
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--disable-gpu',
+            '--no-first-run',
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding',
+          ],
+          timeout: 90000, // 90 second timeout for browser launch
+        };
+
+        // Use Chromium in Lambda environment
+        if (this.isLambda) {
+          // Set Chromium path and args for Lambda
+          puppeteerConfig.executablePath = await chromium.executablePath();
+          puppeteerConfig.args = [
+            ...chromium.args,
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--disable-gpu',
+            '--no-first-run',
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding',
+          ];
+        }
+
         this.client = new Client({
           authStrategy: new LocalAuth({
             dataPath: this.sessionPath,
           }),
-          puppeteer: {
-            headless: true, // NO browser window - QR code in terminal only
-            args: [
-              '--no-sandbox',
-              '--disable-setuid-sandbox',
-              '--disable-dev-shm-usage',
-              '--disable-accelerated-2d-canvas',
-              '--disable-gpu',
-              '--no-first-run',
-              '--disable-background-timer-throttling',
-              '--disable-backgrounding-occluded-windows',
-              '--disable-renderer-backgrounding',
-            ],
-            timeout: 90000, // 90 second timeout for browser launch
-          },
+          puppeteer: puppeteerConfig,
         });
         
         this.setupClientEvents(resolve, reject);
