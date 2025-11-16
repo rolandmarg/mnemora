@@ -26,8 +26,9 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "build:lambda": "yarn build",
-    "package:lambda": "sam build",
-    "deploy:lambda": "sam deploy --guided",
+    "package:lambda": "sam build --template-file infrastructure/template.yaml --config-file infrastructure/samconfig.toml",
+    "deploy": "./scripts/deploy.sh",
+    "deploy:lambda": "./scripts/deploy.sh",
     "invoke:local": "sam local invoke BirthdayBotFunction --event events/event.json"
   },
   "keywords": [

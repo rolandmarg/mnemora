@@ -32,18 +32,13 @@ if ! aws sts get-caller-identity &>/dev/null; then
 fi
 echo "✅ AWS credentials configured"
 
-# Check permissions
+# Check permissions (warning only - SAM will fail with clear error if permissions are missing)
 echo ""
 echo "Checking AWS permissions..."
-if aws cloudformation list-stacks --max-results 1 &>/dev/null; then
+if aws cloudformation list-stacks --max-items 1 &>/dev/null; then
     echo "✅ CloudFormation permissions: OK"
 else
-    echo "❌ CloudFormation permissions: DENIED"
-    echo ""
-    echo "You need to grant permissions first!"
-    echo "Run: ./scripts/grant-permissions.sh"
-    echo "Or follow instructions in: GRANT_PERMISSIONS.md"
-    exit 1
+    echo "⚠️  Could not verify CloudFormation permissions (this is OK - SAM will check during deployment)"
 fi
 
 # Build application
@@ -55,7 +50,7 @@ echo "✅ Build complete"
 # Build with SAM
 echo ""
 echo "Building with SAM..."
-sam build --template-file infrastructure/template.yaml --config-file infrastructure/samconfig.toml
+sam build --template-file infrastructure/template.yaml
 echo "✅ SAM build complete"
 
 # Deploy
@@ -72,7 +67,7 @@ echo "✅ DEPLOYMENT COMPLETE!"
 echo "=========================================="
 echo ""
 echo "Next steps:"
-echo "1. Check your email (rmargve@gmail.com) for SNS subscription confirmation"
+echo "1. Check your email (mnemoraapp@gmail.com) for SNS subscription confirmation"
 echo "2. Click the confirmation link in the email"
 echo "3. Check CloudWatch Logs for WhatsApp QR code (first run)"
 echo "4. Scan QR code with WhatsApp mobile app"

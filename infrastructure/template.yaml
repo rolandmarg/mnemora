@@ -123,8 +123,8 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub 'mnemora-birthday-bot-${Environment}'
-      CodeUri: .
-      Handler: dist/lambda/handler.handler
+      CodeUri: ../dist/
+      Handler: lambda/handler.handler
       Runtime: nodejs20.x
       Timeout: 900
       MemorySize: 512
@@ -198,7 +198,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub 'mnemora-daily-summary-${Environment}'
-      CodeUri: dist/
+      CodeUri: ../dist/
       Handler: lambda/daily-summary-handler.handler
       Runtime: nodejs20.x
       Timeout: 60

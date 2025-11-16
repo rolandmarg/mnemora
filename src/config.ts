@@ -44,12 +44,39 @@ export interface AppConfig {
   environment: string;
 }
 
+/**
+ * Processes the Google private key from environment variable.
+ * Handles both base64-encoded keys (from CloudFormation) and raw PEM keys (from .env).
+ */
+function processPrivateKey(rawKey: string | undefined): string | undefined {
+  if (!rawKey) {
+    return undefined;
+  }
+
+  // First, replace escaped newlines (for .env files)
+  let key = rawKey.replace(/\\n/g, '\n');
+
+  // If the key doesn't start with "-----BEGIN", it's likely base64-encoded
+  // This happens when passed through CloudFormation parameters
+  if (!key.startsWith('-----BEGIN')) {
+    try {
+      // Decode base64 to get the actual PEM key
+      key = Buffer.from(key, 'base64').toString('utf-8');
+    } catch (error) {
+      // If decoding fails, assume it's already in the correct format
+      console.warn('Failed to decode private key as base64, using as-is');
+    }
+  }
+
+  return key;
+}
+
 export const config: AppConfig = {
   google: {
     calendarId: process.env.GOOGLE_CALENDAR_ID || 'primary',
     spreadsheetId: process.env.GOOGLE_SPREADSHEET_ID,
     clientEmail: process.env.GOOGLE_CLIENT_EMAIL,
-    privateKey: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    privateKey: processPrivateKey(process.env.GOOGLE_PRIVATE_KEY),
     projectId: process.env.GOOGLE_PROJECT_ID,
   },
   whatsapp: {
