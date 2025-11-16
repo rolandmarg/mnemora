@@ -176,6 +176,13 @@ class BirthdayOrchestratorService {
       // First, check for and send missed days
       await this.checkAndSendMissedDays();
 
+      // Sync from Sheets to Calendar (optional - continues even if sync fails)
+      try {
+        await this.birthdayService.trySyncFromSheets();
+      } catch (error) {
+        this.ctx.logger.warn('Unexpected error during Sheets sync', error);
+      }
+
       this.ctx.logger.info('Running birthday check...');
       
       const { todaysBirthdays, monthlyBirthdays } = await this.birthdayService.getTodaysBirthdaysWithOptionalDigest();

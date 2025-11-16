@@ -292,6 +292,31 @@ class BirthdayService {
     }
   }
 
+  async trySyncFromSheets(): Promise<void> {
+    try {
+      if (!this.sheetsSource.isAvailable()) {
+        this.ctx.logger.info('Sheets not configured, skipping sync');
+        return;
+      }
+
+      this.ctx.logger.info('Attempting to sync birthdays from Sheets to Calendar...');
+
+      const sheetBirthdays = await this.readFromSheets();
+      const writeResult = await this.syncToCalendar(sheetBirthdays);
+
+      this.ctx.logger.info('Successfully synced birthdays from Sheets to Calendar', {
+        added: writeResult.added,
+        skipped: writeResult.skipped,
+        errors: writeResult.errors,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.ctx.logger.warn('Failed to sync from Sheets to Calendar', {
+        error: errorMessage,
+      });
+    }
+  }
+
   async getAllBirthdaysForYear(year?: number): Promise<BirthdayRecord[]> {
     try {
       const todayDate = today();
