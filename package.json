@@ -25,7 +25,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "build:lambda": "yarn build",
+    "build:lambda": "yarn build && cp package.json dist/ && cd dist && yarn install --production && cd ..",
     "package:lambda": "sam build --template-file infrastructure/template.yaml --config-file infrastructure/samconfig.toml",
     "deploy": "./scripts/deploy.sh",
     "deploy:lambda": "./scripts/deploy.sh",

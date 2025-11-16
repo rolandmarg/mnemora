@@ -49,7 +49,7 @@ fi
 # Build application
 echo ""
 echo "Building application..."
-yarn build
+yarn build:lambda
 echo "✅ Build complete"
 
 # Build with SAM
