@@ -4,7 +4,7 @@ import qrcode from 'qrcode-terminal';
 import { existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { isLambda } from '../utils/runtime.util.js';
-import chromium from '@sparticuz/chromium';
+import puppeteer from 'puppeteer';
 
 class WhatsAppClient {
   private client: InstanceType<typeof Client> | null = null;
@@ -104,20 +104,33 @@ class WhatsAppClient {
           timeout: 90000, // 90 second timeout for browser launch
         };
 
-        // Use Chromium in Lambda environment
+        // Use Puppeteer's bundled Chromium in Lambda environment
+        // Puppeteer bundles Chromium, so we use its executablePath
         if (this.isLambda) {
-          // Set Chromium path and args for Lambda
-          puppeteerConfig.executablePath = await chromium.executablePath();
-          puppeteerConfig.args = [
-            ...chromium.args,
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--disable-gpu',
-            '--no-first-run',
-            '--disable-background-timer-throttling',
-            '--disable-backgrounding-occluded-windows',
-            '--disable-renderer-backgrounding',
-          ];
+          try {
+            // Puppeteer's bundled Chromium should work in Lambda
+            const chromiumPath = puppeteer.executablePath();
+            if (chromiumPath) {
+              puppeteerConfig.executablePath = chromiumPath;
+            }
+            // Lambda-specific args for headless Chrome
+            puppeteerConfig.args = [
+              '--no-sandbox',
+              '--disable-setuid-sandbox',
+              '--disable-dev-shm-usage',
+              '--disable-accelerated-2d-canvas',
+              '--disable-gpu',
+              '--no-first-run',
+              '--single-process', // Important for Lambda
+              '--disable-background-timer-throttling',
+              '--disable-backgrounding-occluded-windows',
+              '--disable-renderer-backgrounding',
+            ];
+          } catch (error) {
+            // If Puppeteer's Chromium isn't available, log and continue
+            // whatsapp-web.js will try to use default Puppeteer behavior
+            console.warn('Could not get Puppeteer Chromium path, using default:', error);
+          }
         }
 
         this.client = new Client({
