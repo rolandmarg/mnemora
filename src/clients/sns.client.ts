@@ -1,29 +1,14 @@
-/**
- * SNS Client
- * 
- * Low-level client for AWS SNS operations
- * Handles publishing messages to SNS topics
- */
-
-// External dependencies
 import { SNSClient, PublishCommand, type PublishCommandInput } from '@aws-sdk/client-sns';
+import { appContext } from '../app-context.js';
 
-// Internal modules - Config
-import { config } from '../config.js';
-
-// Internal modules - Utils
-
-/**
- * SNS client wrapper
- * 
- * Provides low-level operations for interacting with AWS SNS
- */
 class SNSClientWrapper {
   private snsClient: SNSClient | null = null;
   private readonly topicArn: string | undefined;
   private readonly isLambda: boolean;
 
   constructor() {
+    const config = appContext.config;
+    
     this.isLambda = !!(
       process.env.AWS_LAMBDA_FUNCTION_NAME ??
       process.env.LAMBDA_TASK_ROOT ??

@@ -23,7 +23,7 @@ export function requireDevelopment(ctx: AppContext): void {
   }
 }
 
-export function auditLog(ctx: AppContext, action: string, details: Record<string, unknown>): void {
+function auditLog(ctx: AppContext, action: string, details: Record<string, unknown>): void {
   const correlationId = getCorrelationId();
   const timestamp = new Date().toISOString();
   
@@ -37,29 +37,12 @@ export function auditLog(ctx: AppContext, action: string, details: Record<string
   });
 }
 
-export function auditDeletionAttempt(ctxOrMethod: AppContext | string, methodOrParams?: string | Record<string, unknown>, params?: Record<string, unknown>): void {
-  // Support both old signature (ctx, method, params) and new signature (method, params) for clients
-  if (typeof ctxOrMethod === 'string') {
-    const method = ctxOrMethod;
-    const methodParams = methodOrParams as Record<string, unknown> | undefined;
-    console.warn('Security audit log - deletion attempt', {
-      audit: true,
-      action: 'deletion_attempt',
-      method,
-      params: methodParams,
-      blocked: true,
-      timestamp: new Date().toISOString(),
-    });
-  } else {
-    const ctx = ctxOrMethod;
-    const method = methodOrParams as string;
-    const methodParams = params;
-    auditLog(ctx, 'deletion_attempt', {
-      method,
-      params: methodParams,
-      blocked: true,
-    });
-  }
+export function auditDeletionAttempt(ctx: AppContext, method: string, params?: Record<string, unknown>): void {
+  auditLog(ctx, 'deletion_attempt', {
+    method,
+    params,
+    blocked: true,
+  });
 }
 
 export function auditManualSend(ctx: AppContext, script: string, details: Record<string, unknown>): void {

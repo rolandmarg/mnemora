@@ -1,5 +1,5 @@
 import { google, type sheets_v4 } from 'googleapis';
-import { config } from '../config.js';
+import { appContext } from '../app-context.js';
 
 class GoogleSheetsClient {
   private readonly sheets: sheets_v4.Sheets;
@@ -7,6 +7,8 @@ class GoogleSheetsClient {
   private cachedSheetName: string | null = null;
 
   constructor() {
+    const config = appContext.config;
+    
     if (!config.google.clientEmail || !config.google.privateKey) {
       throw new Error('Google Sheets credentials not configured. Please set GOOGLE_CLIENT_EMAIL and GOOGLE_PRIVATE_KEY in .env');
     }

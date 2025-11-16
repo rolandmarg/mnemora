@@ -1,8 +1,5 @@
 import pino from 'pino';
-import type { InputLogEvent } from '@aws-sdk/client-cloudwatch-logs';
-import cloudWatchLogsClient from './cloudwatch-logs.client.js';
-import { config } from '../config.js';
-import { getCorrelationId } from '../utils/correlation.util.js';
+import { getCorrelationId } from './correlation.util.js';
 import type { Logger } from '../types/logger.types.js';
 
 enum LogLevel {
@@ -58,27 +55,9 @@ function getRequestContext(): Record<string, unknown> {
 
 class PinoLogger implements Logger {
   private logger: pino.Logger;
-  private logGroupName: string | null = null;
-  private logBuffer: InputLogEvent[] = [];
-  private readonly isLambda: boolean;
-  private readonly enableCloudWatch: boolean;
-  private flushInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor(logger: pino.Logger) {
     this.logger = logger;
-    this.isLambda = !!(
-      process.env.AWS_LAMBDA_FUNCTION_NAME ??
-      process.env.LAMBDA_TASK_ROOT ??
-      process.env.AWS_EXECUTION_ENV
-    );
-    this.enableCloudWatch = this.isLambda && !!config.aws?.cloudWatchLogGroup && !!config.aws?.region;
-
-    if (this.enableCloudWatch) {
-      this.logGroupName = config.aws.cloudWatchLogGroup ?? null;
-      this.flushInterval = setInterval(() => {
-        this.flushLogs().catch(() => {});
-      }, 5000);
-    }
   }
 
   private enrichLogData(data: Record<string, unknown>): Record<string, unknown> {
@@ -88,75 +67,34 @@ class PinoLogger implements Logger {
     };
   }
 
-  private async sendToCloudWatch(level: string, message: string, data: Record<string, unknown>): Promise<void> {
-    if (!this.enableCloudWatch || !cloudWatchLogsClient.isAvailable() || !this.logGroupName) {
-      return;
-    }
-
-    const logEvent: InputLogEvent = {
-      message: JSON.stringify({
-        level,
-        message,
-        ...this.enrichLogData(data),
-        timestamp: new Date().toISOString(),
-      }),
-      timestamp: Date.now(),
-    };
-
-    this.logBuffer.push(logEvent);
-
-    if (this.logBuffer.length >= 100) {
-      await this.flushLogs();
-    }
-  }
-
-  private async flushLogs(): Promise<void> {
-    if (!this.enableCloudWatch || !cloudWatchLogsClient.isAvailable() || !this.logGroupName || this.logBuffer.length === 0) {
-      return;
-    }
-
-    try {
-      this.logBuffer = [];
-    } catch (error) {
-      console.error('Failed to send logs to CloudWatch', error);
-    }
-  }
-
   trace(message: string, ...args: unknown[]): void {
     const data = this.enrichLogData({ args });
     this.logger.trace(data, message);
-    this.sendToCloudWatch('trace', message, data).catch(() => {});
   }
 
   debug(message: string, ...args: unknown[]): void {
     const data = this.enrichLogData({ args });
     this.logger.debug(data, message);
-    this.sendToCloudWatch('debug', message, data).catch(() => {});
   }
 
   info(message: string, ...args: unknown[]): void {
     const data = this.enrichLogData({ args });
     this.logger.info(data, message);
-    this.sendToCloudWatch('info', message, data).catch(() => {});
   }
 
   warn(message: string, ...args: unknown[]): void {
     const data = this.enrichLogData({ args });
     this.logger.warn(data, message);
-    this.sendToCloudWatch('warn', message, data).catch(() => {});
   }
 
   error(message: string, error?: Error | unknown, ...args: unknown[]): void {
     const data = this.enrichLogData({ args });
     if (error instanceof Error) {
       this.logger.error({ ...data, err: error }, message);
-      this.sendToCloudWatch('error', message, { ...data, err: error.message, errStack: error.stack }).catch(() => {});
     } else if (error !== undefined) {
       this.logger.error({ ...data, error }, message);
-      this.sendToCloudWatch('error', message, { ...data, error }).catch(() => {});
     } else {
       this.logger.error(data, message);
-      this.sendToCloudWatch('error', message, data).catch(() => {});
     }
   }
 
@@ -164,13 +102,10 @@ class PinoLogger implements Logger {
     const data = this.enrichLogData({ args });
     if (error instanceof Error) {
       this.logger.fatal({ ...data, err: error }, message);
-      this.sendToCloudWatch('fatal', message, { ...data, err: error.message, errStack: error.stack }).catch(() => {});
     } else if (error !== undefined) {
       this.logger.fatal({ ...data, error }, message);
-      this.sendToCloudWatch('fatal', message, { ...data, error }).catch(() => {});
     } else {
       this.logger.fatal(data, message);
-      this.sendToCloudWatch('fatal', message, data).catch(() => {});
     }
   }
 
@@ -183,11 +118,7 @@ class PinoLogger implements Logger {
   }
 
   async flush(): Promise<void> {
-    if (this.flushInterval) {
-      clearInterval(this.flushInterval);
-      this.flushInterval = null;
-    }
-    await this.flushLogs();
+    return Promise.resolve();
   }
 }
 

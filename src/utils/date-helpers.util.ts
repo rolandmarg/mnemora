@@ -23,10 +23,6 @@ function createDate(month: number, day: number, year?: number): Date {
   return createDateInTimezone(currentYear, month, day);
 }
 
-/**
- * Create a date from month name, day, and optionally year
-
- */
 function createDateFromMonthName(monthName: string, day: number, year?: number): Date | null {
   const monthNames = ['january', 'february', 'march', 'april', 'may', 'june',
                       'july', 'august', 'september', 'october', 'november', 'december'];

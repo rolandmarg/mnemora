@@ -10,7 +10,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
-import { config } from '../config.js';
+import { appContext } from '../app-context.js';
 
 class S3ClientWrapper {
   private s3Client: S3Client | null = null;
@@ -18,6 +18,8 @@ class S3ClientWrapper {
   private readonly isLambda: boolean;
 
   constructor() {
+    const config = appContext.config;
+    
     this.isLambda = !!(
       process.env.AWS_LAMBDA_FUNCTION_NAME ??
       process.env.LAMBDA_TASK_ROOT ??
@@ -128,9 +130,6 @@ class S3ClientWrapper {
     return keys;
   }
 
-  /**
-   * Delete object from S3
-   */
   async delete(key: string): Promise<void> {
     if (!this.s3Client || !this.bucketName) {
       throw new Error('S3 client not initialized. Check AWS_S3_BUCKET and AWS_REGION environment variables.');
@@ -233,9 +232,4 @@ export class FileStorage {
     // For now, individual file downloads are handled as needed
   }
 }
-
-export function createWhatsAppSessionStorage(): FileStorage {
-  return new FileStorage('.wwebjs_auth');
-}
-
 

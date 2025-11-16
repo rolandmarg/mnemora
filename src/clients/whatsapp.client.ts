@@ -96,9 +96,6 @@ class WhatsAppClient {
     });
   }
 
-  /**
-   * Setup client event handlers for authentication flow
-   */
   private setupClientEvents(resolve: () => void, reject: (error: Error) => void): void {
     if (!this.client) {
       reject(new Error('Failed to create WhatsApp client'));
@@ -196,7 +193,6 @@ class WhatsAppClient {
       reject(new Error(`WhatsApp authentication failed: ${msg}`));
     });
 
-    // Disconnected event
     this.client.on('disconnected', (_reason: string) => {
       this.isReady = false;
       this.client = null;

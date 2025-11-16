@@ -1,10 +1,9 @@
-import { logger } from './clients/logger.client.js';
+import { logger } from './utils/logger.util.js';
 import { config } from './config.js';
 import s3Client from './clients/s3.client.js';
 import snsClient from './clients/sns.client.js';
 import whatsappClient from './clients/whatsapp.client.js';
 import cloudWatchMetricsClient from './clients/cloudwatch.client.js';
-import cloudWatchLogsClient from './clients/cloudwatch-logs.client.js';
 import calendarClient from './clients/google-calendar.client.js';
 import sheetsClient from './clients/google-sheets.client.js';
 import type { Logger } from './types/logger.types.js';
@@ -21,7 +20,6 @@ export interface AppContext {
     sns: typeof snsClient;
     whatsapp: typeof whatsappClient;
     cloudWatch: typeof cloudWatchMetricsClient;
-    cloudWatchLogs: typeof cloudWatchLogsClient;
     calendar: typeof calendarClient;
     sheets: typeof sheetsClient;
   };
@@ -53,7 +51,6 @@ export function createAppContext(): AppContext {
       sns: snsClient,
       whatsapp: whatsappClient,
       cloudWatch: cloudWatchMetricsClient,
-      cloudWatchLogs: cloudWatchLogsClient,
       calendar: calendarClient,
       sheets: sheetsClient,
     },

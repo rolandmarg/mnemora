@@ -1,30 +1,12 @@
-// External dependencies
 import { google, type calendar_v3 } from 'googleapis';
-
-// Internal modules - Config
-import { config } from '../config.js';
-
-// Internal modules - Utils
 import { auditDeletionAttempt, SecurityError } from '../utils/security.util.js';
 import { startOfDay, endOfDay } from '../utils/date-helpers.util.js';
-
-// Internal modules - Types
+import { appContext } from '../app-context.js';
 import type { Event, DeletionResult } from '../types/event.types.js';
 
-/**
- * Calendar client type
- */
 type CalendarClient = calendar_v3.Calendar;
-
-/**
- * Calendar event type - internal to calendar implementation
- * Only used within this client file
- */
 type CalendarEvent = calendar_v3.Schema$Event;
 
-/**
- * Convert CalendarEvent (Google Calendar API type) to Event (application type)
- */
 function calendarEventToEvent(calendarEvent: CalendarEvent): Event {
   return {
     id: calendarEvent.id ?? undefined,
@@ -58,6 +40,8 @@ class GoogleCalendarClient {
   private readonly calendarId: string;
 
   constructor() {
+    const config = appContext.config;
+    
     if (!config.google.clientEmail || !config.google.privateKey) {
       throw new Error('Google Calendar credentials not configured. Please set GOOGLE_CLIENT_EMAIL and GOOGLE_PRIVATE_KEY in .env');
     }
@@ -85,15 +69,6 @@ class GoogleCalendarClient {
     this.readWriteCalendar = google.calendar({ version: 'v3', auth: readWriteAuth });
   }
 
-  // ============================================================================
-  // READ-ONLY OPERATIONS
-  // These methods use the read-only calendar client
-  // ============================================================================
-
-  /**
-   * Fetch events from calendar with common options
-   * Uses read-only calendar client (read-only scope)
-   */
   async fetchEvents(options: EventListOptions): Promise<Event[]> {
     const { startDate, endDate, maxResults } = options;
     const start = startOfDay(startDate);
@@ -112,12 +87,12 @@ class GoogleCalendarClient {
   }
 
   async deleteEvent(eventId: string): Promise<boolean> {
-    auditDeletionAttempt('GoogleCalendarClient.deleteEvent', { eventId });
+    auditDeletionAttempt(appContext, 'GoogleCalendarClient.deleteEvent', { eventId });
     throw new SecurityError('Deletion of calendar events is disabled for security reasons');
   }
 
   async deleteAllEvents(events: Event[]): Promise<DeletionResult> {
-    auditDeletionAttempt('GoogleCalendarClient.deleteAllEvents', {
+    auditDeletionAttempt(appContext, 'GoogleCalendarClient.deleteAllEvents', {
       eventCount: events.length,
       eventIds: events.map(e => e.id).filter(Boolean),
     });

@@ -10,16 +10,8 @@
  * This service is reusable by both local execution and Lambda handler.
  */
 
-// External dependencies
-// (none)
-
-// Internal modules - Services
 import { BirthdayService } from './birthday.service.js';
-
-// Internal modules - Factories
 import { OutputChannelFactory } from '../output-channel/output-channel.factory.js';
-
-// Internal modules - Services
 import { MonitoringService } from './monitoring.service.js';
 import { logSentMessage } from './message-logger.service.js';
 import {
@@ -32,21 +24,11 @@ import {
 } from './metrics.service.js';
 import { AlertingService } from './alerting.service.js';
 import { LastRunTrackerService } from './last-run-tracker.service.js';
-
-// Internal modules - Utils
 import { getFullName } from '../utils/name-helpers.util.js';
 import { startOfDay, isFirstDayOfMonth } from '../utils/date-helpers.util.js';
 import { initializeCorrelationId } from '../utils/correlation.util.js';
-
-// Internal modules - Types
 import type { AppContext } from '../app-context.js';
 
-/**
- * Birthday Orchestrator Service
- * 
- * Manages the orchestration of daily birthday checks, including missed days recovery,
- * monthly digest sending, and today's birthday messages.
- */
 class BirthdayOrchestratorService {
   private readonly birthdayService: BirthdayService;
   private readonly monitoring: MonitoringService;
@@ -61,9 +43,7 @@ class BirthdayOrchestratorService {
     this.alerting = new AlertingService(ctx);
     this.lastRunTracker = new LastRunTrackerService(ctx);
   }
-  /**
-   * Get WhatsApp group ID from channel
-   */
+
   private getGroupId(channel: ReturnType<typeof OutputChannelFactory.createWhatsAppOutputChannel> | null): string {
     if (!channel?.isAvailable()) {
       return 'unknown';
