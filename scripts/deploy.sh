@@ -55,8 +55,10 @@ echo "✅ Build complete"
 # Build with SAM
 echo ""
 echo "Building with SAM..."
+# Tell SAM to use yarn instead of npm (since we're using yarn.lock)
+export NODEJS_PACKAGE_MANAGER=yarn
 # SAM will detect changes in dist/ and package.json and rebuild accordingly
-# It will also install dependencies from package.json automatically
+# It will also install dependencies from package.json using yarn automatically
 sam build --template-file "$PROJECT_ROOT/infrastructure/template.yaml"
 echo "✅ SAM build complete"
 
@@ -66,7 +68,9 @@ echo "Deploying to AWS..."
 echo "This may take 5-10 minutes..."
 echo ""
 
-sam deploy --template-file "$PROJECT_ROOT/infrastructure/template.yaml" --config-file "$PROJECT_ROOT/infrastructure/samconfig.toml"
+sam deploy \
+  --template-file "$PROJECT_ROOT/infrastructure/template.yaml" \
+  --config-file "$PROJECT_ROOT/infrastructure/samconfig.toml"
 
 echo ""
 echo "=========================================="
