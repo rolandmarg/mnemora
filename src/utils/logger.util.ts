@@ -1,5 +1,7 @@
 import pino from 'pino';
 import { getCorrelationId } from './correlation.util.js';
+import { config } from '../config.js';
+import { isLambda, getLambdaFunctionName, getLambdaFunctionVersion, getLambdaRequestId, getXRayTraceId } from './runtime.util.js';
 import type { Logger } from '../types/logger.types.js';
 
 enum LogLevel {
@@ -9,17 +11,6 @@ enum LogLevel {
   WARN = 40,
   ERROR = 50,
   FATAL = 60,
-}
-
-function getXRayTraceId(): string | undefined {
-  const traceId = process.env._X_AMZN_TRACE_ID;
-  if (traceId) {
-    const match = traceId.match(/Root=([^;]+)/);
-    if (match) {
-      return match[1];
-    }
-  }
-  return undefined;
 }
 
 function getRequestContext(): Record<string, unknown> {
@@ -35,10 +26,11 @@ function getRequestContext(): Record<string, unknown> {
     context.traceId = traceId;
   }
 
-  if (process.env.AWS_LAMBDA_FUNCTION_NAME) {
-    context.functionName = process.env.AWS_LAMBDA_FUNCTION_NAME;
-    context.functionVersion = process.env.AWS_LAMBDA_FUNCTION_VERSION;
-    context.requestId = process.env.AWS_REQUEST_ID;
+  const functionName = getLambdaFunctionName();
+  if (functionName) {
+    context.functionName = functionName;
+    context.functionVersion = getLambdaFunctionVersion();
+    context.requestId = getLambdaRequestId();
   }
 
   if (process.memoryUsage) {
@@ -127,8 +119,8 @@ function createLogger(options?: {
   pretty?: boolean;
   context?: Record<string, unknown>;
 }): Logger {
-  const level = options?.level ?? (process.env.LOG_LEVEL ?? 'info');
-  const pretty = options?.pretty ?? (process.env.NODE_ENV === 'development');
+  const level = options?.level ?? config.logging.level;
+  const pretty = options?.pretty ?? config.logging.pretty;
   
   let levelString: string;
   if (typeof level === 'string') {
@@ -145,12 +137,8 @@ function createLogger(options?: {
     levelString = levelMap[level] ?? 'info';
   }
   
-  const isLambda = !!(
-    process.env.AWS_LAMBDA_FUNCTION_NAME ??
-    process.env.LAMBDA_TASK_ROOT ??
-    process.env.AWS_EXECUTION_ENV
-  );
-  const shouldUsePretty = pretty && !isLambda;
+  const isLambdaEnv = isLambda();
+  const shouldUsePretty = pretty && !isLambdaEnv;
 
   const pinoOptions: pino.LoggerOptions = {
     level: levelString,

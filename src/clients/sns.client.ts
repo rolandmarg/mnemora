@@ -1,5 +1,6 @@
 import { SNSClient, PublishCommand, type PublishCommandInput } from '@aws-sdk/client-sns';
-import { appContext } from '../app-context.js';
+import { config } from '../config.js';
+import { isLambda } from '../utils/runtime.util.js';
 
 class SNSClientWrapper {
   private snsClient: SNSClient | null = null;
@@ -7,18 +8,13 @@ class SNSClientWrapper {
   private readonly isLambda: boolean;
 
   constructor() {
-    const config = appContext.config;
-    
-    this.isLambda = !!(
-      process.env.AWS_LAMBDA_FUNCTION_NAME ??
-      process.env.LAMBDA_TASK_ROOT ??
-      process.env.AWS_EXECUTION_ENV
-    );
-    this.topicArn = process.env.SNS_TOPIC_ARN;
+    this.isLambda = isLambda();
+    this.topicArn = config.aws.snsTopicArn;
 
-    if (this.isLambda && this.topicArn && config.aws?.region) {
+    const region = config.aws.region;
+    if (this.isLambda && this.topicArn && region) {
       this.snsClient = new SNSClient({
-        region: config.aws.region,
+        region,
       });
     }
   }

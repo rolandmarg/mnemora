@@ -1,5 +1,6 @@
 import { logger } from './utils/logger.util.js';
 import { config } from './config.js';
+import { isLambda as detectLambda } from './utils/runtime.util.js';
 import s3Client from './clients/s3.client.js';
 import snsClient from './clients/sns.client.js';
 import whatsappClient from './clients/whatsapp.client.js';
@@ -32,13 +33,9 @@ export function createAppContext(): AppContext {
     return appContextInstance;
   }
 
-  const isLambda = !!(
-    process.env.AWS_LAMBDA_FUNCTION_NAME ??
-    process.env.LAMBDA_TASK_ROOT ??
-    process.env.AWS_EXECUTION_ENV
-  );
-  const environment = process.env.NODE_ENV ?? 'development';
-  const isProduction = process.env.NODE_ENV === 'production';
+  const isLambda = detectLambda();
+  const environment = config.environment;
+  const isProduction = config.environment === 'production';
 
   appContextInstance = {
     logger,

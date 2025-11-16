@@ -76,7 +76,7 @@ class AuthReminderService {
       });
 
       this.ctx.clients.cloudWatch.putMetricData(
-        process.env.METRICS_NAMESPACE ?? 'Mnemora/BirthdayBot',
+        this.ctx.config.metrics.namespace,
         [{
           MetricName: 'whatsapp.auth.refresh_needed',
           Value: 1,

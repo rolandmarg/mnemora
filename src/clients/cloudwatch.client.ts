@@ -1,22 +1,18 @@
 import { CloudWatchClient, PutMetricDataCommand, type MetricDatum } from '@aws-sdk/client-cloudwatch';
-import { appContext } from '../app-context.js';
+import { config } from '../config.js';
+import { isLambda } from '../utils/runtime.util.js';
 
 class CloudWatchMetricsClient {
   private cloudWatchClient: CloudWatchClient | null = null;
   private readonly isLambda: boolean;
 
   constructor() {
-    const config = appContext.config;
-    
-    this.isLambda = !!(
-      process.env.AWS_LAMBDA_FUNCTION_NAME ??
-      process.env.LAMBDA_TASK_ROOT ??
-      process.env.AWS_EXECUTION_ENV
-    );
+    this.isLambda = isLambda();
 
-    if (this.isLambda && config.aws?.region) {
+    const region = config.aws.region;
+    if (this.isLambda && region) {
       this.cloudWatchClient = new CloudWatchClient({
-        region: config.aws.region,
+        region,
       });
     }
   }

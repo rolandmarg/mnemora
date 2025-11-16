@@ -21,8 +21,9 @@ export interface ScheduleConfig {
 }
 
 export interface AWSConfig {
-  region: string | undefined;
+  region: string;
   s3Bucket: string | undefined;
+  snsTopicArn: string | undefined;
   cloudWatchLogGroup: string | undefined;
   enableXRay: boolean;
 }
@@ -32,6 +33,15 @@ export interface AppConfig {
   whatsapp: WhatsAppConfig;
   schedule: ScheduleConfig;
   aws: AWSConfig;
+  metrics: {
+    namespace: string;
+    enabled: boolean;
+  };
+  logging: {
+    level: string;
+    pretty: boolean;
+  };
+  environment: string;
 }
 
 export const config: AppConfig = {
@@ -51,10 +61,20 @@ export const config: AppConfig = {
     timezone: process.env.TIMEZONE || process.env.TZ || 'America/Los_Angeles',
   },
   aws: {
-    region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION,
+    region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-west-1',
     s3Bucket: process.env.AWS_S3_BUCKET,
+    snsTopicArn: process.env.SNS_TOPIC_ARN,
     cloudWatchLogGroup: process.env.AWS_CLOUDWATCH_LOG_GROUP,
     enableXRay: process.env.AWS_XRAY_ENABLED !== 'false',
   },
+  metrics: {
+    namespace: process.env.METRICS_NAMESPACE || 'Mnemora/BirthdayBot',
+    enabled: process.env.ENABLE_CLOUDWATCH_METRICS !== 'false',
+  },
+  logging: {
+    level: process.env.LOG_LEVEL || 'info',
+    pretty: process.env.NODE_ENV === 'development',
+  },
+  environment: process.env.NODE_ENV || 'development',
 };
 

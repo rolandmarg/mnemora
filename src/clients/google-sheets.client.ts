@@ -1,5 +1,5 @@
 import { google, type sheets_v4 } from 'googleapis';
-import { appContext } from '../app-context.js';
+import { config } from '../config.js';
 
 class GoogleSheetsClient {
   private readonly sheets: sheets_v4.Sheets;
@@ -7,22 +7,24 @@ class GoogleSheetsClient {
   private cachedSheetName: string | null = null;
 
   constructor() {
-    const config = appContext.config;
+    const clientEmail = config.google.clientEmail;
+    const privateKey = config.google.privateKey;
+    const spreadsheetId = config.google.spreadsheetId;
     
-    if (!config.google.clientEmail || !config.google.privateKey) {
+    if (!clientEmail || !privateKey) {
       throw new Error('Google Sheets credentials not configured. Please set GOOGLE_CLIENT_EMAIL and GOOGLE_PRIVATE_KEY in .env');
     }
 
-    if (!config.google.spreadsheetId) {
+    if (!spreadsheetId) {
       throw new Error('Google Sheets spreadsheet ID not configured. Please set GOOGLE_SPREADSHEET_ID in .env');
     }
 
-    this.spreadsheetId = config.google.spreadsheetId;
+    this.spreadsheetId = spreadsheetId;
 
     const auth = new google.auth.JWT(
-      config.google.clientEmail,
+      clientEmail,
       undefined,
-      config.google.privateKey,
+      privateKey,
       ['https://www.googleapis.com/auth/spreadsheets.readonly']
     );
     this.sheets = google.sheets({ version: 'v4', auth });

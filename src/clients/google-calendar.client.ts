@@ -2,6 +2,7 @@ import { google, type calendar_v3 } from 'googleapis';
 import { auditDeletionAttempt, SecurityError } from '../utils/security.util.js';
 import { startOfDay, endOfDay } from '../utils/date-helpers.util.js';
 import { appContext } from '../app-context.js';
+import { config } from '../config.js';
 import type { Event, DeletionResult } from '../types/event.types.js';
 
 type CalendarClient = calendar_v3.Calendar;
@@ -40,30 +41,28 @@ class GoogleCalendarClient {
   private readonly calendarId: string;
 
   constructor() {
-    const config = appContext.config;
+    const clientEmail = config.google.clientEmail;
+    const privateKey = config.google.privateKey;
+    const calendarId = config.google.calendarId;
     
-    if (!config.google.clientEmail || !config.google.privateKey) {
+    if (!clientEmail || !privateKey) {
       throw new Error('Google Calendar credentials not configured. Please set GOOGLE_CLIENT_EMAIL and GOOGLE_PRIVATE_KEY in .env');
     }
 
-    if (!config.google.calendarId) {
-      throw new Error('Calendar ID not configured. Please set GOOGLE_CALENDAR_ID in .env');
-    }
-
-    this.calendarId = config.google.calendarId;
+    this.calendarId = calendarId;
 
     const readOnlyAuth = new google.auth.JWT(
-      config.google.clientEmail,
+      clientEmail,
       undefined,
-      config.google.privateKey,
+      privateKey,
       ['https://www.googleapis.com/auth/calendar.readonly']
     );
     this.readOnlyCalendar = google.calendar({ version: 'v3', auth: readOnlyAuth });
 
     const readWriteAuth = new google.auth.JWT(
-      config.google.clientEmail,
+      clientEmail,
       undefined,
-      config.google.privateKey,
+      privateKey,
       ['https://www.googleapis.com/auth/calendar']
     );
     this.readWriteCalendar = google.calendar({ version: 'v3', auth: readWriteAuth });

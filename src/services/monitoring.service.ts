@@ -40,7 +40,7 @@ class MonitoringService {
       }
 
       this.ctx.clients.cloudWatch.putMetricData(
-        process.env.METRICS_NAMESPACE ?? 'Mnemora/BirthdayBot',
+        this.ctx.config.metrics.namespace,
         [{
           MetricName: 'monitoring.daily_execution',
           Value: success ? 1 : 0,
@@ -52,7 +52,7 @@ class MonitoringService {
 
       if (monthlyDigestSent) {
         this.ctx.clients.cloudWatch.putMetricData(
-          process.env.METRICS_NAMESPACE ?? 'Mnemora/BirthdayBot',
+          this.ctx.config.metrics.namespace,
           [{
             MetricName: 'monitoring.monthly_digest_sent',
             Value: 1,

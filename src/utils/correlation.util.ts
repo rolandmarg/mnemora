@@ -1,15 +1,13 @@
 import { randomUUID } from 'crypto';
+import { getXRayTraceId } from './runtime.util.js';
 
 class CorrelationContext {
   private static storage = new Map<string, string>();
 
   static getCorrelationId(): string | undefined {
-    const traceId = process.env._X_AMZN_TRACE_ID;
+    const traceId = getXRayTraceId();
     if (traceId) {
-      const match = traceId.match(/Root=([^;]+)/);
-      if (match) {
-        return match[1];
-      }
+      return traceId;
     }
 
     return this.storage.get('correlationId');

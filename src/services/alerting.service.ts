@@ -1,5 +1,6 @@
 import { FileStorage } from '../clients/s3.client.js';
 import { getCorrelationId } from '../utils/correlation.util.js';
+import { getLambdaFunctionName } from '../utils/runtime.util.js';
 import { AlertSeverity, AlertType } from '../types/alerting.types.js';
 import type { AppContext } from '../app-context.js';
 import type { AlertState, AlertDetails } from '../types/alerting.types.js';
@@ -13,8 +14,8 @@ function getCloudWatchLogsUrl(ctx: AppContext): string | undefined {
     return undefined;
   }
 
-  const functionName = process.env.AWS_LAMBDA_FUNCTION_NAME;
-  const region = ctx.config.aws?.region ?? process.env.AWS_REGION ?? 'us-east-1';
+  const functionName = getLambdaFunctionName();
+  const region = ctx.config.aws.region;
   const requestId = getCorrelationId();
 
   if (functionName && requestId) {
@@ -31,7 +32,7 @@ export class AlertingService {
   private readonly deduplicationWindowMs = 60 * 60 * 1000;
 
   constructor(private readonly ctx: AppContext) {
-    this.topicArn = process.env.SNS_TOPIC_ARN;
+    this.topicArn = ctx.config.aws.snsTopicArn;
     this.storage = new FileStorage('.wwebjs_auth');
   }
 

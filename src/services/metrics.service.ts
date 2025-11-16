@@ -10,8 +10,8 @@ class MetricsCollector {
   private readonly batchSize: number = 20;
 
   constructor(private readonly ctx: AppContext) {
-    this.namespace = process.env.METRICS_NAMESPACE ?? 'Mnemora/BirthdayBot';
-    this.enabled = process.env.ENABLE_CLOUDWATCH_METRICS !== 'false' && ctx.isLambda;
+    this.namespace = ctx.config.metrics.namespace;
+    this.enabled = ctx.config.metrics.enabled && ctx.isLambda;
   }
 
   addMetric(

@@ -10,7 +10,8 @@ import {
 } from '@aws-sdk/client-s3';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
-import { appContext } from '../app-context.js';
+import { config } from '../config.js';
+import { isLambda } from '../utils/runtime.util.js';
 
 class S3ClientWrapper {
   private s3Client: S3Client | null = null;
@@ -18,18 +19,13 @@ class S3ClientWrapper {
   private readonly isLambda: boolean;
 
   constructor() {
-    const config = appContext.config;
-    
-    this.isLambda = !!(
-      process.env.AWS_LAMBDA_FUNCTION_NAME ??
-      process.env.LAMBDA_TASK_ROOT ??
-      process.env.AWS_EXECUTION_ENV
-    );
-    this.bucketName = config.aws?.s3Bucket;
+    this.isLambda = isLambda();
+    this.bucketName = config.aws.s3Bucket;
 
-    if (this.isLambda && this.bucketName && config.aws?.region) {
+    const region = config.aws.region;
+    if (this.isLambda && this.bucketName && region) {
       this.s3Client = new S3Client({
-        region: config.aws.region,
+        region,
       });
     }
   }
@@ -153,11 +149,7 @@ export class FileStorage {
 
   constructor(basePath: string) {
     this.basePath = basePath;
-    this.isLambda = !!(
-      process.env.AWS_LAMBDA_FUNCTION_NAME ??
-      process.env.LAMBDA_TASK_ROOT ??
-      process.env.AWS_EXECUTION_ENV
-    );
+    this.isLambda = isLambda();
   }
 
   async readFile(filePath: string): Promise<Buffer | null> {
