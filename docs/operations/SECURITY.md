@@ -27,7 +27,6 @@ This document explains the security safeguards implemented in Mnemora to prevent
 
 #### Protected Scripts:
 - `manual-send.ts` - Blocked in production
-- `send-test-message-whatsapp.ts` - Blocked in production
 - `send-monthly-digest-whatsapp.ts` - Blocked in production
 
 #### Environment Detection:

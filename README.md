@@ -96,7 +96,6 @@ yarn delete-events --all                     # Delete all birthday events
 yarn delete-events --all --date-range "2024-01-01" "2024-12-31"  # Delete in date range
 yarn manual-send                             # Manually send monthly digest + today's birthdays
 yarn send-monthly-digest-whatsapp            # Send monthly digest to WhatsApp group
-yarn send-test-message-whatsapp "Group Name" "Message"  # Send test message to WhatsApp
 ```
 
 ### Local Scheduling Setup (macOS)
@@ -265,7 +264,6 @@ See [docs/TODO.md](./docs/TODO.md) for planned enhancements including:
 - **[docs/operations/ALERTING_GUIDE.md](./docs/operations/ALERTING_GUIDE.md)** - Alert types, severity levels, and remediation
 - **[docs/operations/SECURITY.md](./docs/operations/SECURITY.md)** - Security safeguards and best practices
 - **[docs/operations/PLAYBOOKS.md](./docs/operations/PLAYBOOKS.md)** - AWS deployment playbooks and quick reference
-- **[docs/operations/GET_QR_CODE.md](./docs/operations/GET_QR_CODE.md)** - How to get WhatsApp QR code from AWS Lambda
 - **[docs/operations/MIGRATION_GUIDE.md](./docs/operations/MIGRATION_GUIDE.md)** - WhatsApp Cloud API migration
 
 ### Project Management

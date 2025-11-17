@@ -543,32 +543,6 @@ aws logs filter-log-events \
   --output text
 ```
 
-### Get QR Code from Logs
-
-```bash
-#!/bin/bash
-# Save as: scripts/get-qr-code.sh
-
-REGION="us-west-1"
-
-echo "Searching for QR code in logs..."
-QR_CODE=$(aws logs filter-log-events \
-  --log-group-name /aws/lambda/mnemora-birthday-bot-prod \
-  --region $REGION \
-  --filter-pattern "QR_CODE" \
-  --max-items 1 \
-  --query 'events[0].message' \
-  --output text | grep -oP 'qrCode["\s:]+"\K[^"]+')
-
-if [ -n "$QR_CODE" ]; then
-  echo "QR Code found!"
-  echo "Generate QR code at: https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=$QR_CODE"
-  echo "Or scan this value: $QR_CODE"
-else
-  echo "No QR code found. Trigger Lambda to generate one."
-fi
-```
-
 ### Monitor Deployment
 
 ```bash

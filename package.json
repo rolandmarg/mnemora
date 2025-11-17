@@ -15,7 +15,6 @@
     "get-todays-birthdays-with-digest": "tsx src/scripts/get-todays-birthdays-with-digest.ts",
     "get-all-birthdays": "tsx src/scripts/get-all-birthdays.ts",
     "send-monthly-digest-whatsapp": "tsx src/scripts/send-monthly-digest-whatsapp.ts",
-    "send-test-message-whatsapp": "tsx src/scripts/send-test-message-whatsapp.ts",
     "manual-send": "tsx src/scripts/manual-send.ts",
     "install-cron": "./scripts/install-cron.sh",
     "uninstall-cron": "./scripts/uninstall-cron.sh",
@@ -31,9 +30,7 @@
     "deploy:lambda": "./scripts/deploy.sh",
     "deploy:force": "rm -rf .aws-sam && ./scripts/deploy.sh --force-upload",
     "invoke:local": "sam local invoke BirthdayBotFunction --event events/event.json",
-    "invoke:lambda": "aws lambda invoke --function-name mnemora-birthday-bot-prod --payload '{}' /dev/stdout | cat",
-    "auth:qr": "./scripts/get-qr-code.sh",
-    "fetch-logs": "tsx src/scripts/fetch-logs.ts"
+    "invoke:lambda": "aws lambda invoke --function-name mnemora-birthday-bot-prod --payload '{}' /dev/stdout | cat"
   },
   "keywords": [
     "calendar",

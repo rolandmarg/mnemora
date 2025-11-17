@@ -71,10 +71,8 @@ class GoogleCalendarClient {
     const start = startOfDay(startDate);
     const end = endOfDay(endDate);
     
-    // For all-day events, Google Calendar stores them as dates (YYYY-MM-DD format)
-    // Extract the LOCAL date components (year, month, day) from the date
-    // Then create UTC dates to ensure we query the correct day
-    // This avoids timezone shifts when converting to ISO strings
+    // Extract local date components and create UTC date range
+    // Query from start of target day to start of next day to catch all all-day events
     const startYear = start.getFullYear();
     const startMonth = start.getMonth();
     const startDay = start.getDate();
@@ -82,10 +80,8 @@ class GoogleCalendarClient {
     const endMonth = end.getMonth();
     const endDay = end.getDate();
     
-    // Create UTC dates from the local date components
-    // This ensures we query for the correct calendar day regardless of timezone
     const timeMinUTC = new Date(Date.UTC(startYear, startMonth, startDay, 0, 0, 0, 0));
-    const timeMaxUTC = new Date(Date.UTC(endYear, endMonth, endDay, 23, 59, 59, 999));
+    const timeMaxUTC = new Date(Date.UTC(endYear, endMonth, endDay + 1, 0, 0, 0, 0));
 
     const calendarEvents = await this.readOnlyCalendar.events.list({
       calendarId: this.calendarId,
@@ -96,7 +92,21 @@ class GoogleCalendarClient {
       ...(maxResults && { maxResults }),
     }).then(response => response.data.items ?? []);
 
-    return calendarEvents.map(calendarEventToEvent);
+    // Filter events to only include those that actually match the target date
+    // For all-day events (date-only), check if the date matches
+    // For timed events, they're already filtered by the API query
+    const filteredEvents = calendarEvents.filter(event => {
+      if (event.start?.date) {
+        // All-day event: check if the date string matches our target date
+        const eventDate = event.start.date;
+        const targetDate = `${startYear}-${String(startMonth + 1).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
+        return eventDate === targetDate;
+      }
+      // Timed event: already filtered by API query
+      return true;
+    });
+
+    return filteredEvents.map(calendarEventToEvent);
   }
 
   async deleteEvent(eventId: string): Promise<boolean> {

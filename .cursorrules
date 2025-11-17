@@ -12,18 +12,28 @@ Mnemora is a TypeScript bot that fetches Google Calendar birthdays and sends Wha
 ```
 src/
 ├── services/          # Core business logic services
-│   ├── calendar.ts    # Google Calendar integration (read-only)
-│   ├── whatsapp.ts    # WhatsApp messaging service
-│   └── birthday.ts    # Birthday checking and digest logic
+│   ├── birthday.service.ts    # Birthday checking and digest logic
+│   ├── birthday-orchestrator.service.ts  # Main orchestration service
+│   └── [other services]
 ├── scripts/           # CLI scripts for manual operations
-│   ├── add-birthday.ts
 │   ├── delete-events.ts
-│   └── check-all-events.ts
+│   ├── get-todays-birthdays.ts
+│   ├── get-monthly-digest.ts
+│   ├── get-todays-birthdays-with-digest.ts
+│   ├── get-all-birthdays.ts
+│   ├── manual-send.ts
+│   └── send-monthly-digest-whatsapp.ts
+├── clients/           # External API clients
+│   ├── google-calendar.client.ts
+│   ├── google-sheets.client.ts
+│   ├── whatsapp.client.ts
+│   └── [other clients]
 ├── utils/             # Shared utility functions
-│   ├── cli.ts         # CLI interaction utilities
-│   ├── date.ts        # Date manipulation utilities
-│   ├── calendar-auth.ts # Calendar authentication
-│   └── event-formatter.ts # Event formatting utilities
+│   ├── date-helpers.util.ts    # Date manipulation utilities
+│   ├── birthday-helpers.util.ts
+│   ├── name-helpers.util.ts
+│   ├── event-helpers.util.ts
+│   └── [other utilities]
 ├── types/             # TypeScript type definitions
 │   └── qrcode-terminal.d.ts
 ├── config.ts          # Configuration loader
@@ -69,24 +79,33 @@ You are an expert in TypeScript, Node.js.
 
 ## Utilities Available
 
-### CLI Utilities (`src/utils/cli.ts`)
-- `createQuestionInterface()` - Creates readline interface
-- `askQuestion(rl, question)` - Prompts for user input
-- `askConfirmation(rl, question)` - Prompts for yes/no confirmation
-
-### Date Utilities (`src/utils/date.ts`)
+### Date Utilities (`src/utils/date-helpers.util.ts`)
 - `startOfDay(date)` - Normalize to start of day (00:00:00)
 - `endOfDay(date)` - Normalize to end of day (23:59:59.999)
 - `formatDateISO(date)` - Format as YYYY-MM-DD
-- `getDateRange(startDate, endDate)` - Get normalized date range
+- `startOfMonth(date)` - Get start of month
+- `endOfMonth(date)` - Get end of month
+- `startOfYear(date)` - Get start of year
+- `endOfYear(date)` - Get end of year
+- `isFirstDayOfMonth(date)` - Check if date is first day of month
+- `formatDateShort(date, includeYear?)` - Format date as short string
+- `formatDateMonthYear(date)` - Format date as month and year
+- `parseDateFromString(dateString)` - Parse date from string
+- `parseDateString(dateStr)` - Parse date string with various formats
+- `today()` - Get today's date in configured timezone
 
-### Calendar Auth (`src/utils/calendar-auth.ts`)
-- `createReadOnlyCalendarClient()` - Calendar client with read-only permissions
-- `createReadWriteCalendarClient()` - Calendar client with read-write permissions
+### Birthday Utilities (`src/utils/birthday-helpers.util.ts`)
+- `parseRowToBirthdays(row)` - Parse spreadsheet row to birthday records
+- `getDateRangeForBirthdays(birthdays)` - Get date range for birthday records
 
-### Event Formatter (`src/utils/event-formatter.ts`)
-- `formatEvent(event)` - Format event for display
-- `formatEventForDuplicate(event)` - Format event for duplicate checking
+### Name Utilities (`src/utils/name-helpers.util.ts`)
+- `getFullName(firstName, lastName?)` - Get full name
+- `sanitizeNames(firstName, lastName?)` - Sanitize name strings
+- `extractNameParts(fullName)` - Extract first and last name from full name
+
+### Event Utilities (`src/utils/event-helpers.util.ts`)
+- `isBirthdayEvent(event)` - Check if event is a birthday event
+- `extractNameFromEvent(event)` - Extract name from event
 
 ## Common Patterns
 
@@ -95,12 +114,12 @@ You are an expert in TypeScript, Node.js.
 2. Use utilities from `src/utils/` when possible
 3. Add script to `package.json` scripts section
 4. Add debug configuration to `.vscode/launch.json`
-5. Use `createReadWriteCalendarClient()` for write operations
-6. Use `createQuestionInterface()` for interactive prompts
+5. Use `calendarClient` from `src/clients/google-calendar.client.ts` for calendar operations
+6. Use `appContext` from `src/app-context.ts` for application context
 
 ### Calendar Operations
-- **Read operations**: Use `calendarService` from `src/services/calendar.ts`
-- **Write operations**: Use `createReadWriteCalendarClient()` from utils
+- **Read operations**: Use `calendarClient` from `src/clients/google-calendar.client.ts`
+- **Write operations**: Use `calendarClient` with appropriate methods
 - Always use `startOfDay()` and `endOfDay()` for date ranges
 - Use `config.google.calendarId` for calendar ID (defaults to 'primary')
 
@@ -141,9 +160,13 @@ You are an expert in TypeScript, Node.js.
 - `yarn type-check` - Type check without building
 - `yarn lint` - Run ESLint to check code quality
 - `yarn lint:fix` - Run ESLint and auto-fix issues
-- `yarn add-birthday` - Add birthday to calendar
+- `yarn get-todays-birthdays` - Get today's birthdays
+- `yarn get-monthly-digest` - Get monthly digest
+- `yarn get-todays-birthdays-with-digest` - Get today's birthdays + monthly digest
+- `yarn get-all-birthdays` - Read from Sheets, sync to Calendar, display all
 - `yarn delete-events` - Delete events interactively
-- `yarn check-all-events` - Check all calendar events
+- `yarn manual-send` - Manually send monthly digest + today's birthdays
+- `yarn send-monthly-digest-whatsapp` - Send monthly digest to WhatsApp group
 
 ## When Adding New Features
 
@@ -157,8 +180,8 @@ You are an expert in TypeScript, Node.js.
 ## Important Notes
 
 - All imports must use `.js` extension (TypeScript ESM requirement)
-- Calendar service uses read-only permissions by default
-- Use `createReadWriteCalendarClient()` for write operations
 - Always normalize dates with `startOfDay()` and `endOfDay()`
 - Scripts should handle their own process.exit() calls
-- Use `askConfirmation()` for yes/no prompts in interactive scripts
+- Use `appContext` from `src/app-context.ts` for application context and logger
+- Use `BirthdayService` from `src/services/birthday.service.ts` for birthday operations
+- Use `OutputChannelFactory` from `src/output-channel/output-channel.factory.js` for output channels
