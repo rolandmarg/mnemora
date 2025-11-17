@@ -1,12 +1,90 @@
-import { fromZonedTime, toZonedTime } from 'date-fns-tz';
 import { config } from '../config.js';
 
 function getTimezone(): string {
   return config.schedule.timezone;
 }
 
+/**
+ * Convert a date in a specific timezone to UTC Date
+ * Replaces date-fns-tz's fromZonedTime using native JavaScript Intl API
+ */
+function fromZonedTime(date: Date, timeZone: string): Date {
+  // Get the date/time components as they appear in the target timezone
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+  
+  const parts = formatter.formatToParts(date);
+  const year = parseInt(parts.find(p => p.type === 'year')?.value || '0', 10);
+  const month = parseInt(parts.find(p => p.type === 'month')?.value || '0', 10) - 1;
+  const day = parseInt(parts.find(p => p.type === 'day')?.value || '0', 10);
+  const hour = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
+  const minute = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10);
+  const second = parseInt(parts.find(p => p.type === 'second')?.value || '0', 10);
+  
+  // Create an ISO string representing this time
+  const isoString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}`;
+  
+  // Create a date as if this ISO string were in UTC
+  const utcCandidate = new Date(isoString + 'Z');
+  
+  // Now format that UTC candidate back to the target timezone to see what it actually represents
+  const tzParts = formatter.formatToParts(utcCandidate);
+  const tzYear = parseInt(tzParts.find(p => p.type === 'year')?.value || '0', 10);
+  const tzMonth = parseInt(tzParts.find(p => p.type === 'month')?.value || '0', 10) - 1;
+  const tzDay = parseInt(tzParts.find(p => p.type === 'day')?.value || '0', 10);
+  const tzHour = parseInt(tzParts.find(p => p.type === 'hour')?.value || '0', 10);
+  const tzMinute = parseInt(tzParts.find(p => p.type === 'minute')?.value || '0', 10);
+  const tzSecond = parseInt(tzParts.find(p => p.type === 'second')?.value || '0', 10);
+  
+  // Calculate the offset: how much we need to adjust
+  const tzDate = new Date(tzYear, tzMonth, tzDay, tzHour, tzMinute, tzSecond);
+  const localDate = new Date(year, month, day, hour, minute, second);
+  const offsetMs = localDate.getTime() - tzDate.getTime();
+  
+  // Apply the offset to get the correct UTC time
+  return new Date(utcCandidate.getTime() - offsetMs);
+}
+
+/**
+ * Convert UTC date to a date in a specific timezone
+ * Replaces date-fns-tz's toZonedTime using native JavaScript
+ */
+function toZonedTime(date: Date, timeZone: string): Date {
+  // Format the UTC date as if it were in the target timezone
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+  
+  const parts = formatter.formatToParts(date);
+  const year = parseInt(parts.find(p => p.type === 'year')?.value || '0', 10);
+  const month = parseInt(parts.find(p => p.type === 'month')?.value || '0', 10) - 1;
+  const day = parseInt(parts.find(p => p.type === 'day')?.value || '0', 10);
+  const hour = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
+  const minute = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10);
+  const second = parseInt(parts.find(p => p.type === 'second')?.value || '0', 10);
+  
+  // Return a date object with these components (as if they were local time)
+  return new Date(year, month, day, hour, minute, second);
+}
+
 function createDateInTimezone(year: number, month: number, day: number): Date {
   const tz = getTimezone();
+  // Create a date at midnight in the target timezone
   const localDate = new Date(year, month - 1, day, 0, 0, 0, 0);
   return fromZonedTime(localDate, tz);
 }

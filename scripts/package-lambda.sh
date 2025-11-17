@@ -26,16 +26,41 @@ for FUNCTION_DIR in .aws-sam/build/*Function; do
     # Remove sharp (optional peer dependency, not needed for Lambda)
     rm -rf "$FUNCTION_DIR/node_modules/@img" "$FUNCTION_DIR/node_modules/sharp" 2>/dev/null || true
     
-    # Remove unused date-fns locales (keep only en-US)
-    if [ -d "$FUNCTION_DIR/node_modules/date-fns/locale" ]; then
-      find "$FUNCTION_DIR/node_modules/date-fns/locale" -mindepth 1 -maxdepth 1 -type d ! -name "en-US" -exec rm -rf {} + 2>/dev/null || true
-    fi
-    
     # Remove unused googleapis APIs (keep only calendar, sheets, and common)
     if [ -d "$FUNCTION_DIR/node_modules/googleapis/build/src/apis" ]; then
       find "$FUNCTION_DIR/node_modules/googleapis/build/src/apis" -mindepth 1 -maxdepth 1 -type d ! -name "calendar" ! -name "sheets" ! -name "common" -exec rm -rf {} + 2>/dev/null || true
     fi
+    
+    # Remove source maps and other unnecessary files
+    find "$FUNCTION_DIR/node_modules" -name "*.map" -delete 2>/dev/null || true
+    find "$FUNCTION_DIR/node_modules" -name "*.md" -delete 2>/dev/null || true
+    find "$FUNCTION_DIR/node_modules" -name "CHANGELOG*" -delete 2>/dev/null || true
+    find "$FUNCTION_DIR/node_modules" -name "LICENSE*" -delete 2>/dev/null || true
+    find "$FUNCTION_DIR/node_modules" -type d -name "test" -o -name "tests" -o -name "__tests__" | xargs rm -rf 2>/dev/null || true
+    
+    # Check size after cleanup
+    SIZE_MB=$(du -sm "$FUNCTION_DIR" 2>/dev/null | cut -f1)
+    SIZE_HUMAN=$(du -sh "$FUNCTION_DIR" 2>/dev/null | cut -f1)
+    echo "      Size: $SIZE_HUMAN (${SIZE_MB}MB)"
+    
+    if [ "$SIZE_MB" -gt 250 ]; then
+      echo "      ❌ ERROR: Package size (${SIZE_MB}MB) exceeds 250MB limit!"
+      exit 1
+    elif [ "$SIZE_MB" -gt 200 ]; then
+      echo "      ⚠️  WARNING: Package size (${SIZE_MB}MB) is close to 250MB limit"
+    else
+      echo "      ✅ Package size is within limits"
+    fi
+    
+    # Show breakdown of largest directories (sorted by size, largest first)
+    echo "      Top dependencies:"
+    du -sm "$FUNCTION_DIR/node_modules"/* 2>/dev/null | sort -rn | head -5 | while read -r size_mb path; do
+      size_human=$(du -sh "$path" 2>/dev/null | cut -f1)
+      name=$(basename "$path")
+      printf "        %6s  %s\n" "$size_human" "$name"
+    done
   fi
 done
+echo ""
 echo "✅ Cleanup complete"
 
