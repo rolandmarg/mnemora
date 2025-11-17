@@ -127,16 +127,24 @@ async function sendMonthlyDigestWhatsApp(): Promise<void> {
     if (whatsappChannel) {
       try {
         appContext.logger.info('Waiting for session to be saved...');
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        // Wait longer to allow Baileys to finish background operations
+        await new Promise(resolve => setTimeout(resolve, 5000));
         
         if ('destroy' in whatsappChannel && typeof whatsappChannel.destroy === 'function') {
           await whatsappChannel.destroy();
         }
       } catch (error) {
-        appContext.logger.error('Error during cleanup', error);
+        // Ignore connection closed errors during cleanup - they're expected
+        // when Baileys is still processing background operations
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (!errorMessage.includes('Connection Closed') && !errorMessage.includes('Connection closed')) {
+          appContext.logger.error('Error during cleanup', error);
+        }
       }
     }
     
+    // Give a moment for any final cleanup before exiting
+    await new Promise(resolve => setTimeout(resolve, 1000));
     process.exit(exitCode);
   }
 }

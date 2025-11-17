@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { FileStorage } from '../clients/s3.client.js';
+import { StorageService } from './storage.service.js';
 import { today, startOfDay } from '../utils/date-helpers.util.js';
 import type { AppContext } from '../app-context.js';
 
@@ -8,11 +8,9 @@ const LAST_RUN_FILE = join(process.cwd(), 'logs', 'last-run.txt');
 const S3_LAST_RUN_KEY = 'last-run.txt';
 
 class LastRunTrackerService {
-  private readonly storage: FileStorage;
+  private readonly storage = StorageService.getAppStorage();
 
-  constructor(private readonly ctx: AppContext) {
-    this.storage = new FileStorage('.wwebjs_auth');
-  }
+  constructor(private readonly ctx: AppContext) {}
 
   async getLastRunDate(): Promise<Date | null> {
     try {

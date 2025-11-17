@@ -1,14 +1,13 @@
-import { FileStorage } from '../clients/s3.client.js';
+import { StorageService } from './storage.service.js';
 import { formatDateISO } from '../utils/date-helpers.util.js';
 import type { AppContext } from '../app-context.js';
 import type { MessageType, MessageRecord } from '../types/message.types.js';
 
 class MessageLoggerService {
-  private readonly storage: FileStorage;
+  private readonly storage = StorageService.getAppStorage();
   private readonly enabled: boolean;
 
   constructor(private readonly ctx: AppContext) {
-    this.storage = new FileStorage('.wwebjs_auth');
     this.enabled = true;
   }
 

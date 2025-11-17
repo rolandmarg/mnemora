@@ -1,5 +1,5 @@
-import { FileStorage } from '../clients/s3.client.js';
 import { AlertingService } from './alerting.service.js';
+import { StorageService } from './storage.service.js';
 import type { AppContext } from '../app-context.js';
 import { today, isFirstDayOfMonth } from '../utils/date-helpers.util.js';
 
@@ -11,11 +11,9 @@ interface ExecutionRecord {
 }
 
 class MonitoringService {
-  private readonly storage: FileStorage;
+  private readonly storage = StorageService.getAppStorage();
 
-  constructor(private readonly ctx: AppContext) {
-    this.storage = new FileStorage('.wwebjs_auth');
-  }
+  constructor(private readonly ctx: AppContext) {}
 
   async recordDailyExecution(success: boolean, monthlyDigestSent: boolean = false): Promise<void> {
     const todayDate = today();

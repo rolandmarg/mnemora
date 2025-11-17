@@ -1,14 +1,12 @@
-import { FileStorage } from '../clients/s3.client.js';
+import { StorageService } from './storage.service.js';
 import type { AppContext } from '../app-context.js';
 
 class AuthReminderService {
-  private readonly storage: FileStorage;
+  private readonly storage = StorageService.getAppStorage();
   private readonly reminderDays: number = 7;
   private readonly authKey: string = 'whatsapp-auth.json';
 
-  constructor(private readonly ctx: AppContext) {
-    this.storage = new FileStorage('.wwebjs_auth');
-  }
+  constructor(private readonly ctx: AppContext) {}
 
   async recordAuthentication(): Promise<void> {
     const now = new Date();

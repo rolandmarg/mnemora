@@ -1,7 +1,7 @@
-import { FileStorage } from '../clients/s3.client.js';
 import { getCorrelationId } from '../utils/correlation.util.js';
 import { getLambdaFunctionName } from '../utils/runtime.util.js';
 import { AlertSeverity, AlertType } from '../types/alerting.types.js';
+import { StorageService } from './storage.service.js';
 import type { AppContext } from '../app-context.js';
 import type { AlertState, AlertDetails } from '../types/alerting.types.js';
 
@@ -27,13 +27,12 @@ function getCloudWatchLogsUrl(ctx: AppContext): string | undefined {
 
 export class AlertingService {
   private readonly topicArn: string | undefined;
-  private readonly storage: FileStorage;
+  private readonly storage = StorageService.getAppStorage();
   private readonly alertStateKey = 'alerts/active-alerts.json';
   private readonly deduplicationWindowMs = 60 * 60 * 1000;
 
   constructor(private readonly ctx: AppContext) {
     this.topicArn = ctx.config.aws.snsTopicArn;
-    this.storage = new FileStorage('.wwebjs_auth');
   }
 
   private async loadActiveAlerts(): Promise<ActiveAlerts> {
@@ -459,7 +458,7 @@ export class AlertingService {
     remediationSteps: [
       'Check Lambda memory and timeout settings',
       'Verify S3 session storage is accessible',
-      'Check for browser/Puppeteer errors in logs',
+      'Check for connection errors in logs',
       'Try re-authenticating WhatsApp',
       'Check if session files are corrupted',
     ],

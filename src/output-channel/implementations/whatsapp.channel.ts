@@ -1,7 +1,7 @@
 /**
  * WhatsApp Output Channel
  * 
- * Implementation using whatsapp-web.js to send messages to WhatsApp groups
+ * Implementation using Baileys to send messages to WhatsApp groups
  * 
  * Login flow:
  * 1. Displays QR code in terminal
@@ -315,9 +315,9 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
 
   getMetadata(): OutputChannelMetadata {
     return {
-      name: 'WhatsApp (Web.js)',
+      name: 'WhatsApp (Baileys)',
       type: 'whatsapp',
-      description: 'Sends WhatsApp messages via whatsapp-web.js',
+      description: 'Sends WhatsApp messages via Baileys',
       supportsSingleRecipient: true,
       supportsMultipleRecipients: false,
       capabilities: ['whatsapp', 'group-messaging', 'qr-authentication'],

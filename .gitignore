@@ -41,6 +41,7 @@ build/
 # WhatsApp session data
 .wwebjs_auth/
 .wwebjs_cache/
+auth_info/
 
 # Test coverage
 coverage/

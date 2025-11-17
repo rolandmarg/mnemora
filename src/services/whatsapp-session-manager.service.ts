@@ -6,17 +6,16 @@
  * while keeping the WhatsApp client infrastructure-agnostic.
  */
 
-import { FileStorage } from '../clients/s3.client.js';
+import { StorageService } from './storage.service.js';
 import { isLambda } from '../utils/runtime.util.js';
 import type { AppContext } from '../app-context.js';
 
 export class WhatsAppSessionManagerService {
-  private readonly storage: FileStorage;
+  private readonly storage = StorageService.getSessionStorage();
   private readonly isLambda: boolean;
 
   constructor(private readonly ctx: AppContext) {
     this.isLambda = isLambda();
-    this.storage = new FileStorage('.wwebjs_auth');
   }
 
   /**

@@ -1,36 +1,36 @@
-import pkg from 'whatsapp-web.js';
-const { Client, LocalAuth } = pkg;
+import makeWASocket, {
+  DisconnectReason,
+  useMultiFileAuthState,
+  WASocket,
+  fetchLatestBaileysVersion,
+  makeCacheableSignalKeyStore,
+  ConnectionState,
+} from '@whiskeysockets/baileys';
 import qrcode from 'qrcode-terminal';
-import { existsSync, mkdirSync } from 'fs';
+import { existsSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { isLambda } from '../utils/runtime.util.js';
-import puppeteer from 'puppeteer';
 
 class WhatsAppClient {
-  private client: InstanceType<typeof Client> | null = null;
+  private sock: WASocket | null = null;
   private isReady: boolean = false;
   private isInitializing: boolean = false;
   private readonly sessionPath: string;
   private readonly isLambda: boolean;
   private authRequired: boolean = false;
+  private saveCreds: (() => Promise<void>) | null = null;
 
   constructor() {
     this.isLambda = isLambda();
     // Use /tmp in Lambda (writable), process.cwd() locally
+    // Baileys uses 'auth_info' directory by default
     this.sessionPath = this.isLambda 
-      ? join('/tmp', '.wwebjs_auth')
-      : join(process.cwd(), '.wwebjs_auth');
+      ? join('/tmp', 'auth_info')
+      : join(process.cwd(), 'auth_info');
     
     // Create directory structure if it doesn't exist
-    // LocalAuth creates a 'session' subdirectory, so we need to pre-create it
     if (!existsSync(this.sessionPath)) {
       mkdirSync(this.sessionPath, { recursive: true });
-    }
-    
-    // Pre-create the session subdirectory that LocalAuth expects
-    const sessionSubdir = join(this.sessionPath, 'session');
-    if (!existsSync(sessionSubdir)) {
-      mkdirSync(sessionSubdir, { recursive: true });
     }
   }
 
@@ -42,14 +42,14 @@ class WhatsAppClient {
   }
 
   async initialize(): Promise<void> {
-    if (this.isReady && this.client) {
+    if (this.isReady && this.sock) {
       try {
-        const state = await this.client.getState();
-        if (state === 'CONNECTED' || state === 'OPENING') {
+        const state = this.sock.user;
+        if (state) {
           return;
         }
       } catch (_error) {
-        this.client = null;
+        this.sock = null;
         this.isReady = false;
       }
     }
@@ -57,7 +57,7 @@ class WhatsAppClient {
     if (this.isInitializing) {
       return new Promise((resolve, reject) => {
         const checkReady = setInterval(() => {
-          if (this.isReady && this.client) {
+          if (this.isReady && this.sock) {
             clearInterval(checkReady);
             resolve();
           } else if (!this.isInitializing) {
@@ -77,96 +77,51 @@ class WhatsAppClient {
 
     return new Promise(async (resolve, reject) => {
       try {
-        if (this.client) {
-          this.client.destroy().catch(() => {});
-          this.client = null;
+        if (this.sock) {
+          this.sock.end(undefined);
+          this.sock = null;
         }
 
-        // Configure Puppeteer for Lambda (use Chromium) or local (use default)
-        const puppeteerConfig: {
-          headless: boolean;
-          args: string[];
-          timeout: number;
-          executablePath?: string;
-        } = {
-          headless: true, // NO browser window - QR code in terminal only
-          args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--disable-gpu',
-            '--no-first-run',
-            '--disable-background-timer-throttling',
-            '--disable-backgrounding-occluded-windows',
-            '--disable-renderer-backgrounding',
-          ],
-          timeout: 90000, // 90 second timeout for browser launch
-        };
+        // Load auth state
+        const { state, saveCreds } = await useMultiFileAuthState(this.sessionPath);
+        this.saveCreds = saveCreds;
 
-        // Use Puppeteer's bundled Chromium in Lambda environment
-        // Puppeteer bundles Chromium, so we use its executablePath
-        if (this.isLambda) {
-          try {
-            // Puppeteer's bundled Chromium should work in Lambda
-            const chromiumPath = puppeteer.executablePath();
-            if (chromiumPath) {
-              puppeteerConfig.executablePath = chromiumPath;
-            }
-            // Lambda-specific args for headless Chrome
-            puppeteerConfig.args = [
-              '--no-sandbox',
-              '--disable-setuid-sandbox',
-              '--disable-dev-shm-usage',
-              '--disable-accelerated-2d-canvas',
-              '--disable-gpu',
-              '--no-first-run',
-              '--single-process', // Important for Lambda
-              '--disable-background-timer-throttling',
-              '--disable-backgrounding-occluded-windows',
-              '--disable-renderer-backgrounding',
-            ];
-          } catch (error) {
-            // If Puppeteer's Chromium isn't available, log and continue
-            // whatsapp-web.js will try to use default Puppeteer behavior
-            console.warn('Could not get Puppeteer Chromium path, using default:', error);
-          }
-        }
-
-        this.client = new Client({
-          authStrategy: new LocalAuth({
-            dataPath: this.sessionPath,
-          }),
-          puppeteer: puppeteerConfig,
-        });
+        // Fetch latest version
+        const { version } = await fetchLatestBaileysVersion();
         
-        this.setupClientEvents(resolve, reject);
+        // Create socket
+        // Note: Some decryption errors from libsignal (the underlying encryption library)
+        // may appear in console output. These are expected and non-fatal - they occur
+        // when Baileys receives messages it can't decrypt (usually from before session
+        // was established or from other devices). They don't affect message sending.
+        this.sock = makeWASocket({
+          version,
+          auth: {
+            creds: state.creds,
+            keys: makeCacheableSignalKeyStore(state.keys),
+          },
+          // Don't use printQRInTerminal (deprecated) - we handle QR manually for consistency
+        });
+
+        // Save credentials when they update
+        this.sock.ev.on('creds.update', async () => {
+          if (this.saveCreds) {
+            await this.saveCreds();
+          }
+        });
+
+        this.setupSocketEvents(resolve, reject);
       } catch (error) {
         this.isInitializing = false;
-        this.client = null;
-        
-        // Improve error message for Chromium download issues
-        if (error instanceof Error) {
-          const errorMessage = error.message.toLowerCase();
-          if (errorMessage.includes('browser') && (errorMessage.includes('not found') || errorMessage.includes('chromium'))) {
-            // Replace npm install suggestions with yarn install
-            const improvedError = new Error(
-              error.message.replace(/npm install/g, 'yarn install') +
-              '\n\n💡 Tip: Run `yarn install` to download the required Chromium browser.'
-            );
-            reject(improvedError);
-            return;
-          }
-        }
-        
-        reject(error);
+        this.sock = null;
+        reject(error instanceof Error ? error : new Error(String(error)));
       }
     });
   }
 
-  private setupClientEvents(resolve: () => void, reject: (error: Error) => void): void {
-    if (!this.client) {
-      reject(new Error('Failed to create WhatsApp client'));
+  private setupSocketEvents(resolve: () => void, reject: (error: Error) => void): void {
+    if (!this.sock) {
+      reject(new Error('Failed to create WhatsApp socket'));
       return;
     }
 
@@ -174,9 +129,9 @@ class WhatsAppClient {
     let initTimeout: ReturnType<typeof setTimeout> | null = setTimeout(() => {
       if (!this.isReady) {
         this.isInitializing = false;
-        if (this.client) {
-          this.client.destroy().catch(() => {});
-          this.client = null;
+        if (this.sock) {
+          this.sock.end(undefined);
+          this.sock = null;
         }
         reject(new Error('WhatsApp client initialization timeout - please try again'));
       }
@@ -189,119 +144,189 @@ class WhatsAppClient {
       }
     };
 
-    this.client.on('qr', (qr: string) => {
-      clearInitTimeout();
-      this.authRequired = true;
-      
-      if (this.isLambda) {
-        console.log(JSON.stringify({
-          level: 'warn',
-          message: '🔐 WHATSAPP AUTHENTICATION REQUIRED - QR CODE IN LOGS',
-          qrCode: qr,
-          instructions: [
-            '1. Open CloudWatch Logs and find this log entry',
-            '2. Copy the qrCode value from the log',
-            '3. Open WhatsApp on your phone',
-            '4. Go to Settings > Linked Devices',
-            '5. Tap "Link a Device"',
-            '6. Use a QR code generator to display the code and scan it',
-            `7. Or use: https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`,
-          ],
-          qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`,
-          note: 'Lambda will timeout, but session will be saved to S3. Next invocation will use saved session.',
-        }));
+    // Handle connection updates (QR, connection state, errors)
+    this.sock.ev.on('connection.update', (update: Partial<ConnectionState>) => {
+      const { connection, lastDisconnect, qr } = update;
+
+      // Handle QR code - consistent handling for both local and Lambda
+      if (qr) {
+        clearInitTimeout();
+        this.authRequired = true;
         
-        console.log(JSON.stringify({
-          level: 'info',
-          message: 'QR_CODE_FOR_SCANNING',
-          qrCode: qr,
-          format: 'base64',
-        }));
-      } else {
-        console.log(`\n${'='.repeat(60)}`);
-        console.log('🔐 WHATSAPP AUTHENTICATION REQUIRED');
-        console.log('='.repeat(60));
-        console.log('\n📱 Please scan the QR code below with your WhatsApp mobile app:');
-        console.log('   1. Open WhatsApp on your phone');
-        console.log('   2. Go to Settings > Linked Devices');
-        console.log('   3. Tap "Link a Device"');
-        console.log('   4. Scan the QR code below\n');
-        console.log('-'.repeat(60));
-        qrcode.generate(qr, { small: true });
-        console.log('-'.repeat(60));
-        console.log('\n⏳ Waiting for you to scan the QR code...');
-        console.log('💡 Keep this terminal open while scanning\n');
-      }
-    });
-
-    this.client.on('loading_screen', (percent: string, message: string) => {
-      console.log(`⏳ Loading: ${percent}% - ${message}`);
-    });
-
-    this.client.on('authenticated', () => {
-      if (this.authRequired) {
-        console.log('\n✅ QR code scanned successfully!');
-        console.log('🔐 Authenticating with WhatsApp...\n');
-      }
-      this.authRequired = false;
-    });
-
-    this.client.on('ready', () => {
-      clearInitTimeout();
-      this.isReady = true;
-      this.isInitializing = false;
-      this.authRequired = false;
-      console.log('✅ WhatsApp client is ready!');
-      resolve();
-    });
-
-    this.client.on('auth_failure', (msg: string) => {
-      clearInitTimeout();
-      this.isInitializing = false;
-      this.client = null;
-      this.isReady = false;
-      reject(new Error(`WhatsApp authentication failed: ${msg}`));
-    });
-
-    this.client.on('disconnected', (_reason: string) => {
-      this.isReady = false;
-      this.client = null;
-    });
-
-    this.client.on('error', (_error: unknown) => {});
-
-    this.client.initialize().catch((error) => {
-      clearInitTimeout();
-      this.isInitializing = false;
-      this.client = null;
-      
-      // Improve error message for Chromium download issues
-      if (error instanceof Error) {
-        const errorMessage = error.message.toLowerCase();
-        if (errorMessage.includes('browser') && (errorMessage.includes('not found') || errorMessage.includes('chromium'))) {
-          // Replace npm install suggestions with yarn install
-          const improvedError = new Error(
-            error.message.replace(/npm install/g, 'yarn install') +
-            '\n\n💡 Tip: Run `yarn install` to download the required Chromium browser.'
-          );
-          reject(improvedError);
-          return;
+        // Common instructions
+        const instructions = [
+          '1. Open WhatsApp on your phone',
+          '2. Go to Settings > Linked Devices',
+          '3. Tap "Link a Device"',
+          '4. Scan the QR code below',
+        ];
+        
+        // Generate QR code (same method for both environments)
+        // qrcode-terminal is lightweight, has no dependencies, and works well for Lambda
+        try {
+          if (this.isLambda) {
+            // Lambda: Log QR code and instructions as JSON for CloudWatch
+            console.log(JSON.stringify({
+              level: 'warn',
+              message: '🔐 WHATSAPP AUTHENTICATION REQUIRED - QR CODE IN LOGS',
+              qrCode: qr,
+              instructions: [
+                ...instructions,
+                '5. Open CloudWatch Logs and find this log entry',
+                '6. Copy the qrCode value from the log',
+                '7. Use a QR code generator to display the code and scan it',
+                `8. Or use: https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`,
+              ],
+              qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`,
+              note: 'Lambda will timeout, but session will be saved to S3. Next invocation will use saved session.',
+            }));
+            
+            console.log(JSON.stringify({
+              level: 'info',
+              message: 'QR_CODE_FOR_SCANNING',
+              qrCode: qr,
+              format: 'string',
+            }));
+            
+            // Display QR code in terminal (may work in some Lambda environments)
+            console.log('\nQR Code (terminal display):');
+            qrcode.generate(qr, { small: true });
+          } else {
+            // Local: Display QR code in terminal with instructions
+            console.log('\n\n');
+            console.log(`\n${'='.repeat(60)}`);
+            console.log('🔐 WHATSAPP AUTHENTICATION REQUIRED');
+            console.log('='.repeat(60));
+            console.log('\n📱 Please scan the QR code below with your WhatsApp mobile app:');
+            instructions.forEach(instruction => console.log(`   ${instruction}`));
+            console.log('\n');
+            console.log('-'.repeat(60));
+            console.log(''); // Extra blank line before QR code
+            qrcode.generate(qr, { small: true });
+            console.log(''); // Extra blank line after QR code
+            console.log('-'.repeat(60));
+            console.log('\n⏳ Waiting for you to scan the QR code...');
+            console.log('💡 Keep this terminal open while scanning\n');
+          }
+        } catch (error) {
+          console.error('Error generating QR code:', error);
+          console.log('\nQR Code string (fallback):', qr);
+          console.log('Please use a QR code generator with the string above');
+          console.log(`Or use: https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`);
         }
       }
-      
-      reject(error);
+
+      // Handle connection open
+      if (connection === 'open') {
+        clearInitTimeout();
+        this.isReady = true;
+        this.isInitializing = false;
+        this.authRequired = false;
+        console.log('✅ WhatsApp client is ready!');
+        resolve();
+      }
+
+      // Handle connection close
+      if (connection === 'close') {
+        const error = lastDisconnect?.error;
+        // Extract status code from Baileys error (which uses Boom error structure)
+        const statusCode = error && 
+          typeof error === 'object' && 
+          'output' in error && 
+          typeof (error as { output?: { statusCode?: number } }).output === 'object'
+          ? (error as { output: { statusCode?: number } }).output?.statusCode
+          : undefined;
+        
+        // Handle 401 errors (logged out or device_removed) - both require clearing session and new QR code
+        if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
+          // Logged out or device removed - clear session and reinitialize to get new QR code
+          const isDeviceRemoved = error && 'data' in error && 
+            typeof (error as { data?: unknown }).data === 'object' &&
+            JSON.stringify((error as { data?: unknown }).data).includes('device_removed');
+          
+          console.log(isDeviceRemoved 
+            ? '🔄 Device was removed from WhatsApp - clearing session and requesting new QR code...'
+            : '🔄 Session logged out - clearing session and requesting new QR code...');
+          
+          clearInitTimeout();
+          this.isInitializing = false;
+          this.isReady = false;
+          
+          // Clean up current socket
+          if (this.sock) {
+            this.sock.end(undefined);
+            this.sock = null;
+          }
+          
+          // Clear the session directory
+          try {
+            if (existsSync(this.sessionPath)) {
+              rmSync(this.sessionPath, { recursive: true, force: true });
+              console.log('✅ Session cleared');
+            }
+          } catch (clearError) {
+            console.error('Error clearing session:', clearError);
+          }
+          
+          // Reinitialize to get a new QR code
+          setTimeout(async () => {
+            try {
+              await this.initialize();
+              resolve();
+            } catch (reinitError) {
+              reject(reinitError instanceof Error ? reinitError : new Error(String(reinitError)));
+            }
+          }, 1000);
+        } else if (statusCode === DisconnectReason.badSession) {
+          console.error('Bad session, deleting and restarting...');
+          // Session will be recreated on next init
+          this.isReady = false;
+        } else if (statusCode === DisconnectReason.connectionReplaced) {
+          console.error('Connection replaced by another device');
+          this.isReady = false;
+          this.sock = null;
+        } else if (statusCode === DisconnectReason.restartRequired) {
+          // After successful pairing, Baileys requires a restart
+          // Close current socket and reinitialize with saved credentials
+          console.log('🔄 Restart required after pairing - reinitializing connection...');
+          clearInitTimeout();
+          this.isInitializing = false;
+          this.isReady = false;
+          
+          // Clean up current socket
+          if (this.sock) {
+            this.sock.end(undefined);
+            this.sock = null;
+          }
+          
+          // Reinitialize with saved credentials (will use existing auth state)
+          // Use setTimeout to avoid stack overflow and allow event loop to process
+          setTimeout(async () => {
+            try {
+              await this.initialize();
+              resolve();
+            } catch (reinitError) {
+              reject(reinitError instanceof Error ? reinitError : new Error(String(reinitError)));
+            }
+          }, 1000);
+        } else {
+          // Other close reasons (connectionClosed, connectionLost, timedOut)
+          // Will reconnect automatically, just mark as not ready
+          this.isReady = false;
+        }
+      }
     });
   }
 
-  getClient(): InstanceType<typeof Client> {
-    if (!this.client || !this.isReady) {
+  getClient(): WASocket {
+    if (!this.sock || !this.isReady) {
       throw new Error('WhatsApp client is not initialized. Call initialize() first.');
     }
-    return this.client;
+    return this.sock;
   }
 
   isClientReady(): boolean {
-    return this.isReady && this.client !== null;
+    return this.isReady && this.sock !== null;
   }
 
   requiresAuth(): boolean {
@@ -309,38 +334,72 @@ class WhatsAppClient {
   }
 
   async findGroupByName(groupName: string): Promise<{ id: string; name: string } | null> {
-    const client = this.getClient();
-    const chats = await client.getChats();
-    const group = chats.find(chat => chat.isGroup && chat.name === groupName);
+    const sock = this.getClient();
     
-    if (group) {
-      return {
-        id: group.id._serialized,
-        name: group.name ?? groupName,
-      };
+    try {
+      const groups = await sock.groupFetchAllParticipating();
+      
+      for (const [groupId, group] of Object.entries(groups)) {
+        const groupData = group as { subject?: string };
+        if (groupData.subject === groupName) {
+          return {
+            id: groupId,
+            name: groupData.subject ?? groupName,
+          };
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      throw new Error(`Failed to find group: ${error instanceof Error ? error.message : String(error)}`);
     }
-    
-    return null;
   }
 
   async sendMessage(chatId: string, message: string): Promise<{ id: string; from: string }> {
-    const client = this.getClient();
-    const result = await client.sendMessage(chatId, message);
-    return {
-      id: result.id._serialized,
-      from: result.from ?? chatId,
-    };
+    const sock = this.getClient();
+    
+    try {
+      // Ensure chatId has @g.us suffix for groups
+      const normalizedChatId = chatId.includes('@g.us') ? chatId : `${chatId}@g.us`;
+      
+      const result = await sock.sendMessage(normalizedChatId, { text: message });
+      
+      if (!result) {
+        throw new Error('Failed to send message: no result returned');
+      }
+      
+      return {
+        id: result.key.id ?? '',
+        from: result.key.remoteJid ?? normalizedChatId,
+      };
+    } catch (error) {
+      throw new Error(`Failed to send message: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   async destroy(): Promise<void> {
-    if (this.client) {
+    if (this.sock) {
       try {
+        // Wait longer for any pending operations (retry requests, etc.)
         await new Promise(resolve => setTimeout(resolve, 2000));
-        await this.client.destroy();
-      } catch {
-        // Ignore errors during cleanup
+        
+        // End the connection gracefully
+        this.sock.end(undefined);
+        
+        // Wait for connection to close
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } catch (error) {
+        // Ignore connection closed errors during cleanup - they're expected
+        // when Baileys is still processing background operations
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (!errorMessage.includes('Connection Closed') && 
+            !errorMessage.includes('Connection closed') &&
+            !errorMessage.includes('Precondition Required')) {
+          // Only log unexpected errors
+          console.error('Unexpected error during WhatsApp client cleanup:', errorMessage);
+        }
       } finally {
-        this.client = null;
+        this.sock = null;
         this.isReady = false;
         this.isInitializing = false;
       }
@@ -358,4 +417,3 @@ class WhatsAppClient {
 
 const whatsappClient = new WhatsAppClient();
 export default whatsappClient;
-
