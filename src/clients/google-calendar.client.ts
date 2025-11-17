@@ -69,12 +69,28 @@ class GoogleCalendarClient {
   async fetchEvents(options: EventListOptions): Promise<Event[]> {
     const { startDate, endDate, maxResults } = options;
     const start = startOfDay(startDate);
-    const end = endOfDay(endDate); 
+    const end = endOfDay(endDate);
+    
+    // For all-day events, Google Calendar stores them as dates (YYYY-MM-DD format)
+    // Extract the LOCAL date components (year, month, day) from the date
+    // Then create UTC dates to ensure we query the correct day
+    // This avoids timezone shifts when converting to ISO strings
+    const startYear = start.getFullYear();
+    const startMonth = start.getMonth();
+    const startDay = start.getDate();
+    const endYear = end.getFullYear();
+    const endMonth = end.getMonth();
+    const endDay = end.getDate();
+    
+    // Create UTC dates from the local date components
+    // This ensures we query for the correct calendar day regardless of timezone
+    const timeMinUTC = new Date(Date.UTC(startYear, startMonth, startDay, 0, 0, 0, 0));
+    const timeMaxUTC = new Date(Date.UTC(endYear, endMonth, endDay, 23, 59, 59, 999));
 
     const calendarEvents = await this.readOnlyCalendar.events.list({
       calendarId: this.calendarId,
-      timeMin: start.toISOString(),
-      timeMax: end.toISOString(),
+      timeMin: timeMinUTC.toISOString(),
+      timeMax: timeMaxUTC.toISOString(),
       singleEvents: true,
       orderBy: 'startTime',
       ...(maxResults && { maxResults }),

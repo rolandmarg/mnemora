@@ -20,20 +20,11 @@ import type { WriteResult } from '../data-source/data-source.interface.js';
 
 const BIRTHDAY_EMOJIS = ['🎂', '🎉', '🎈', '🎁', '🎊', '🥳', '🎀', '🎆', '🎇', '✨', '🌟', '💫', '🎪', '🎭', '🎨', '🎵', '🎶', '🎸', '🎹', '🎺', '🎻', '🥁', '🎤', '🎧', '🎬', '🎮', '🎯', '🎲', '🎰', '🎳'];
 
-function getBirthdayEmoji(index: number): string {
-  return BIRTHDAY_EMOJIS[index % BIRTHDAY_EMOJIS.length];
-}
-
 function getRandomEmoji(_index: number): string {
   const randomIndex = Math.floor(Math.random() * BIRTHDAY_EMOJIS.length);
   return BIRTHDAY_EMOJIS[randomIndex];
 }
 
-function getPersonalBirthdayMessage(name: string, index: number): string {
-  const birthdayEmoji = getBirthdayEmoji(index);
-  const randomEmoji = getRandomEmoji(index);
-  return `${birthdayEmoji} ${name} ${randomEmoji}`;
-}
 
 class BirthdayService {
   private readonly calendarSource: ReturnType<typeof DataSourceFactory.createCalendarDataSource>;
@@ -336,9 +327,9 @@ class BirthdayService {
       return [];
     }
 
-    return birthdays.map((record, index) => {
+    return birthdays.map((record) => {
       const fullName = getFullName(record.firstName, record.lastName);
-      return getPersonalBirthdayMessage(fullName, index);
+      return `Happy birthday, ${fullName}! 🎂`;
     });
   }
 
