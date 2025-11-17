@@ -26,7 +26,7 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "build:lambda": "./scripts/build-lambda.sh",
-    "package:lambda": "sam build --template-file infrastructure/template.yaml --config-file infrastructure/samconfig.toml",
+    "package:lambda": "./scripts/package-lambda.sh",
     "deploy": "./scripts/deploy.sh",
     "deploy:lambda": "./scripts/deploy.sh",
     "deploy:force": "rm -rf .aws-sam && ./scripts/deploy.sh --force-upload",
