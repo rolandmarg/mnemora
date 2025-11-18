@@ -187,8 +187,11 @@ Resources:
         DailySchedule:
           Type: Schedule
           Properties:
-            Schedule: cron(0 9 * * ? *)
-            Description: Daily birthday check at 9 AM Los Angeles time
+            # 17:00 UTC = 10 AM PDT (most of year) or 9 AM PST (Nov-Mar)
+            # Note: EventBridge Rules don't support timezones, so this is approximate
+            # For exact 10 AM PST year-round, manually adjust to 18:00 UTC during standard time
+            Schedule: cron(0 17 * * ? *)
+            Description: Daily birthday check at 10 AM Pacific time (17:00 UTC, ~10 AM PDT most of year)
             Enabled: true
             Input: '{}'
       Tracing: Active

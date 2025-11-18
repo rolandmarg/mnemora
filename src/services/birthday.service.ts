@@ -328,8 +328,7 @@ class BirthdayService {
     }
 
     return birthdays.map((record) => {
-      const fullName = getFullName(record.firstName, record.lastName);
-      return `Happy birthday, ${fullName}! 🎂`;
+      return `Happy birthday ${record.firstName}! 🎂`;
     });
   }
 
