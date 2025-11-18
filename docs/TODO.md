@@ -204,9 +204,53 @@ interface MessageSendCompletedEvent {
 
 ---
 
+### 8. Automatic Calendar Event Deletion with Human Confirmation
+**Status**: Not Started  
+**Priority**: Medium  
+**Estimated Effort**: Medium
+
+**Current State**:
+- Sheets-to-Calendar sync only adds/updates birthdays
+- Deleted names in spreadsheet remain in Google Calendar
+- No automatic cleanup of removed birthdays
+
+**Proposed Changes**:
+- **Detect Deletions**: Compare current spreadsheet data with existing calendar events
+- **Identify Orphaned Events**: Find calendar events that no longer exist in spreadsheet
+- **Human Confirmation Safeguard**: Before deleting, require human verification (similar to terminal QR code flow)
+  - Display list of events to be deleted
+  - Show event details (name, date, event ID)
+  - Require explicit confirmation before proceeding
+  - Support both interactive terminal prompt and Lambda-friendly confirmation mechanism
+- **Safe Deletion**: Only delete events after confirmation
+- **Audit Trail**: Log all deletion operations with confirmation details
+
+**Implementation Considerations**:
+- Add deletion detection logic to `trySyncFromSheets()` or new `syncWithDeletion()` method
+- Create confirmation interface similar to WhatsApp QR code terminal display
+- For Lambda: Could use SNS email with confirmation link, or store pending deletions in S3 and require manual script execution
+- For local scripts: Interactive terminal confirmation prompt
+- Store pending deletions with metadata (detected date, event details)
+- Add configuration flag: `ENABLE_AUTO_DELETE` (default: false for safety)
+
+**Safety Features**:
+- Never auto-delete without explicit confirmation
+- Show full event details before confirmation
+- Support dry-run mode to preview what would be deleted
+- Reversible operation (could restore from backup if needed)
+- Rate limiting on deletions (e.g., max N deletions per sync)
+
+**Benefits**:
+- Keep calendar in sync with spreadsheet automatically
+- Prevent orphaned birthday events
+- Human oversight prevents accidental deletions
+- Maintains data integrity
+
+---
+
 ## Low Priority / Future Considerations
 
-### 8. AWS Deployment Playbooks
+### 9. AWS Deployment Playbooks
 **Status**: Not Started  
 **Priority**: Low  
 **Estimated Effort**: Medium
@@ -227,7 +271,7 @@ interface MessageSendCompletedEvent {
 
 ---
 
-### 9. WhatsApp Cloud API Migration
+### 10. WhatsApp Cloud API Migration
 **Status**: Documented (see [MIGRATION_GUIDE.md](./operations/MIGRATION_GUIDE.md))  
 **Priority**: Low (when WhatsApp Web.js becomes unsupported)  
 **Estimated Effort**: High
@@ -240,7 +284,7 @@ interface MessageSendCompletedEvent {
 
 ---
 
-### 10. CI/CD Pipeline
+### 11. CI/CD Pipeline
 **Status**: Not Started  
 **Priority**: Low  
 **Estimated Effort**: Medium
@@ -253,7 +297,7 @@ interface MessageSendCompletedEvent {
 
 ---
 
-### 11. Unit and Integration Tests
+### 12. Unit and Integration Tests
 **Status**: Not Started  
 **Priority**: Low  
 **Estimated Effort**: High
@@ -271,7 +315,7 @@ interface MessageSendCompletedEvent {
 
 ---
 
-### 12. Configuration Management
+### 13. Configuration Management
 **Status**: Not Started  
 **Priority**: Low  
 **Estimated Effort**: Low
@@ -284,7 +328,7 @@ interface MessageSendCompletedEvent {
 
 ---
 
-### 13. Performance Optimization
+### 14. Performance Optimization
 **Status**: Not Started  
 **Priority**: Low  
 **Estimated Effort**: Medium
@@ -297,7 +341,7 @@ interface MessageSendCompletedEvent {
 
 ---
 
-### 14. Monitoring Dashboard Enhancements
+### 15. Monitoring Dashboard Enhancements
 **Status**: Partially Complete (see [MONITORING.md](./operations/MONITORING.md))  
 **Priority**: Low  
 **Estimated Effort**: Low
@@ -312,7 +356,7 @@ interface MessageSendCompletedEvent {
 
 ## Technical Debt
 
-### 15. Type Safety Improvements
+### 16. Type Safety Improvements
 **Status**: Ongoing  
 **Priority**: Low  
 **Estimated Effort**: Low
@@ -324,7 +368,7 @@ interface MessageSendCompletedEvent {
 
 ---
 
-### 16. Error Handling Standardization
+### 17. Error Handling Standardization
 **Status**: Ongoing  
 **Priority**: Low  
 **Estimated Effort**: Low
@@ -336,7 +380,7 @@ interface MessageSendCompletedEvent {
 
 ---
 
-### 17. Documentation Updates
+### 18. Documentation Updates
 **Status**: Ongoing  
 **Priority**: Low  
 **Estimated Effort**: Low
@@ -350,7 +394,7 @@ interface MessageSendCompletedEvent {
 
 ## Research / Exploration
 
-### 18. Alternative Message Channels
+### 19. Alternative Message Channels
 **Status**: Research  
 **Priority**: Very Low  
 **Estimated Effort**: Unknown
@@ -363,7 +407,7 @@ interface MessageSendCompletedEvent {
 
 ---
 
-### 19. Machine Learning Enhancements
+### 20. Machine Learning Enhancements
 **Status**: Research  
 **Priority**: Very Low  
 **Estimated Effort**: High
