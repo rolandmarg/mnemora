@@ -1,7 +1,7 @@
 import { BaseDataSource } from '../data-source.base.js';
 import { extractNameFromEvent, isBirthdayEvent } from '../../utils/event-helpers.util.js';
 import { extractNameParts, getFullName } from '../../utils/name-helpers.util.js';
-import { parseDateFromString, formatDateISO, today } from '../../utils/date-helpers.util.js';
+import { parseDateFromString, formatDateISO, today, startOfYear, endOfYear } from '../../utils/date-helpers.util.js';
 import { auditDeletionAttempt, SecurityError } from '../../utils/security.util.js';
 import type { BirthdayRecord } from '../../types/birthday.types.js';
 import type { Event } from '../../types/event.types.js';
@@ -87,7 +87,7 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
 
   /**
    * Builds a map of existing birthdays for duplicate detection.
-   * Fetches existing events in the date range and maps them by date+name.
+   * Optimized to make a single API call for the full year instead of multiple calls.
    * Returns both the map and metadata about recurring events.
    */
   private async buildExistingBirthdayMap(
@@ -97,23 +97,39 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
       return { map: new Map(), uniqueRecurringEvents: 0, dateRangeYears: 0 };
     }
 
-    // Calculate date range covering all birthdays to add
-    const dates = birthdays.map(b => b.birthday);
-    const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
-    const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
-
-    // Fetch existing events in that date range
-    const existingEvents = await this.ctx.clients.calendar.fetchEvents({
-      startDate: minDate,
-      endDate: maxDate,
+    const todayDate = today();
+    const currentYear = todayDate.getFullYear();
+    
+    // Single API call: fetch entire year at once
+    const yearStart = startOfYear(new Date(currentYear, 0, 1));
+    const yearEnd = endOfYear(new Date(currentYear, 0, 1));
+    
+    const allEvents = await this.ctx.clients.calendar.fetchEvents({
+      startDate: yearStart,
+      endDate: yearEnd,
     });
 
-    // Filter to only birthday events and build map
-    const existingBirthdayEvents = existingEvents.filter(isBirthdayEvent);
+    // Filter to birthday events only
+    const birthdayEvents = allEvents.filter(isBirthdayEvent);
+    
     const existingBirthdayMap = new Map<string, boolean>();
     const uniqueRecurringEvents = new Set<string>();
+    
+    // Get unique month/day combinations from birthdays we're syncing
+    const uniqueDates = new Map<string, Date[]>();
+    for (const birthday of birthdays) {
+      const month = birthday.birthday.getMonth() + 1; // 1-12
+      const day = birthday.birthday.getDate();
+      const dateKey = `${month}-${day}`; // Month-Day key (e.g., "1-15" for Jan 15)
+      
+      if (!uniqueDates.has(dateKey)) {
+        uniqueDates.set(dateKey, []);
+      }
+      uniqueDates.get(dateKey)!.push(birthday.birthday);
+    }
 
-    for (const event of existingBirthdayEvents) {
+    // Process all birthday events from the year
+    for (const event of birthdayEvents) {
       const startDate = event.start?.date ?? event.start?.dateTime;
       if (!startDate) {
         continue;
@@ -123,18 +139,38 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
       const eventName = extractNameFromEvent(event);
 
       if (eventDate && eventName) {
-        const key = this.createDuplicateKey(eventDate, eventName);
-        existingBirthdayMap.set(key, true);
-
-        // Track unique recurring events (by name only)
-        if (event.recurrence) {
-          uniqueRecurringEvents.add(eventName.toLowerCase().trim());
+        const eventMonth = eventDate.getMonth() + 1;
+        const eventDay = eventDate.getDate();
+        const eventDateKey = `${eventMonth}-${eventDay}`;
+        
+        // Check if this event matches any of the dates we're syncing
+        const matchingDates = uniqueDates.get(eventDateKey);
+        if (matchingDates) {
+          if (event.recurrence) {
+            // Recurring event: add keys for all dates with same month/day
+            for (const date of matchingDates) {
+              const key = this.createDuplicateKey(date, eventName);
+              existingBirthdayMap.set(key, true);
+            }
+            uniqueRecurringEvents.add(eventName.toLowerCase().trim());
+          } else {
+            // Non-recurring event: only match if it's the exact date
+            for (const date of matchingDates) {
+              if (eventDate.getTime() === date.getTime()) {
+                const key = this.createDuplicateKey(date, eventName);
+                existingBirthdayMap.set(key, true);
+              }
+            }
+          }
         }
       }
     }
 
+    // Calculate date range years for metadata
+    const dates = birthdays.map(b => b.birthday);
+    const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
+    const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
     const dateRangeYears = Math.ceil((maxDate.getTime() - minDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
-
 
     return {
       map: existingBirthdayMap,
@@ -185,13 +221,39 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
   }
 
   async write(data: BirthdayRecord[], _options?: WriteOptions): Promise<WriteResult> {
+    if (data.length === 0) {
+      return { added: 0, skipped: 0, errors: 0 };
+    }
+
     // Build map of existing birthdays to check for duplicates
     const { map: existingBirthdayMap } = await this.buildExistingBirthdayMap(data);
 
-    // Process each birthday and accumulate results
-    const result: WriteResult = { added: 0, skipped: 0, errors: 0 };
+    // Batch duplicate check: check all birthdays first before processing
+    const birthdaysToAdd: BirthdayRecord[] = [];
+    let skippedCount = 0;
 
     for (const birthday of data) {
+      const fullName = getFullName(birthday.firstName, birthday.lastName);
+      const duplicateKey = this.createDuplicateKey(birthday.birthday, fullName);
+
+      if (existingBirthdayMap.has(duplicateKey)) {
+        this.ctx.logger.info(`Skipping duplicate birthday for ${fullName}`);
+        skippedCount++;
+      } else {
+        birthdaysToAdd.push(birthday);
+      }
+    }
+
+    // Early exit: if all birthdays are duplicates, skip processing
+    if (birthdaysToAdd.length === 0) {
+      this.ctx.logger.info(`All ${data.length} birthday(s) already exist in calendar - skipping sync`);
+      return { added: 0, skipped: skippedCount, errors: 0 };
+    }
+
+    // Process only non-duplicate birthdays
+    const result: WriteResult = { added: 0, skipped: skippedCount, errors: 0 };
+
+    for (const birthday of birthdaysToAdd) {
       const status = await this.processBirthday(birthday, existingBirthdayMap);
       result.added += status.added;
       result.skipped += status.skipped;

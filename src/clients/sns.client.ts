@@ -1,6 +1,7 @@
 import { SNSClient, PublishCommand, type PublishCommandInput } from '@aws-sdk/client-sns';
 import { config } from '../config.js';
 import { isLambda } from '../utils/runtime.util.js';
+import xrayClient from './xray.client.js';
 
 class SNSClientWrapper {
   private snsClient: SNSClient | null = null;
@@ -32,18 +33,25 @@ class SNSClientWrapper {
       throw new Error('SNS client not initialized. Check SNS_TOPIC_ARN and AWS_REGION environment variables.');
     }
 
-    const input: PublishCommandInput = {
-      TopicArn: this.topicArn,
-      Subject: subject,
-      Message: message,
-    };
+    return xrayClient.captureAsyncSegment('SNS.publish', async () => {
+      const input: PublishCommandInput = {
+        TopicArn: this.topicArn,
+        Subject: subject,
+        Message: message,
+      };
 
-    if (messageAttributes) {
-      input.MessageAttributes = messageAttributes;
-    }
+      if (messageAttributes) {
+        input.MessageAttributes = messageAttributes;
+      }
 
-    const response = await this.snsClient.send(new PublishCommand(input));
-    return response.MessageId ?? '';
+      const response = await this.snsClient!.send(new PublishCommand(input));
+      return response.MessageId ?? '';
+    }, {
+      topicArn: this.topicArn,
+      subject,
+      messageLength: message.length,
+      hasAttributes: !!messageAttributes,
+    });
   }
 
   async publishAlert(
@@ -53,7 +61,7 @@ class SNSClientWrapper {
     alertType: string,
     sendSMS: boolean = false
   ): Promise<string> {
-    return this.publish(subject, message, {
+    return xrayClient.captureAsyncSegment('SNS.publishAlert', async () => this.publish(subject, message, {
       Severity: {
         DataType: 'String',
         StringValue: severity,
@@ -66,6 +74,11 @@ class SNSClientWrapper {
         DataType: 'String',
         StringValue: sendSMS ? 'true' : 'false',
       },
+    }), {
+      severity,
+      alertType,
+      sendSMS,
+      messageLength: message.length,
     });
   }
 }

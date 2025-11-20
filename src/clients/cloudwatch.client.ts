@@ -1,6 +1,7 @@
 import { CloudWatchClient, PutMetricDataCommand, type MetricDatum } from '@aws-sdk/client-cloudwatch';
 import { config } from '../config.js';
 import { isLambda } from '../utils/runtime.util.js';
+import xrayClient from './xray.client.js';
 
 class CloudWatchMetricsClient {
   private cloudWatchClient: CloudWatchClient | null = null;
@@ -29,12 +30,18 @@ class CloudWatchMetricsClient {
       throw new Error('CloudWatch Metrics client not initialized. Check AWS_REGION environment variable.');
     }
 
-    const command = new PutMetricDataCommand({
-      Namespace: namespace,
-      MetricData: metricData,
-    });
+    return xrayClient.captureAsyncSegment('CloudWatch.putMetricData', async () => {
+      const command = new PutMetricDataCommand({
+        Namespace: namespace,
+        MetricData: metricData,
+      });
 
-    await this.cloudWatchClient.send(command);
+      await this.cloudWatchClient!.send(command);
+    }, {
+      namespace,
+      metricCount: metricData.length,
+      metricNames: metricData.map(m => m.MetricName).filter(Boolean) as string[],
+    });
   }
 }
 

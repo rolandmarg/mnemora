@@ -345,7 +345,27 @@ class BirthdayService {
         return [];
       }
 
-      return birthdays.map((record) => `Happy birthday ${record.firstName}! 🎂`);
+      // Single birthday: return one message
+      if (birthdays.length === 1) {
+        const record = birthdays[0];
+        return [`Happy birthday ${record.firstName}! 🎂`];
+      }
+
+      // Multiple birthdays: combine into a single message with proper grammar
+      const names = birthdays.map(record => record.firstName);
+      
+      let combinedNames: string;
+      if (names.length === 2) {
+        // Two names: "Name1 and Name2"
+        combinedNames = `${names[0]} and ${names[1]}`;
+      } else {
+        // Three or more names: "Name1, Name2, and Name3"
+        const lastName = names[names.length - 1];
+        const otherNames = names.slice(0, -1).join(', ');
+        combinedNames = `${otherNames}, and ${lastName}`;
+      }
+
+      return [`Happy birthday ${combinedNames}! 🎂`];
     }, {
       birthdaysCount: birthdays.length,
     });
