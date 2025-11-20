@@ -58,11 +58,15 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
       .map(eventToBirthdayRecord)
       .filter((record): record is BirthdayRecord => record !== null);
     
-    // Deduplicate records by date, first name, and last name
+    // Deduplicate records by month/day, first name, and last name
     // This prevents sending multiple messages for the same person when duplicates exist
+    // Use month/day pattern (not exact date) because recurring events appear with current year dates
+    // but may have been created with different birth years, causing duplicates
     const seen = new Set<string>();
     const deduplicated = records.filter(record => {
-      const key = `${formatDateISO(new Date(record.birthday))}|${record.firstName.toLowerCase()}|${(record.lastName ?? '').toLowerCase()}`;
+      const month = String(record.birthday.getMonth() + 1).padStart(2, '0');
+      const day = String(record.birthday.getDate()).padStart(2, '0');
+      const key = `${month}-${day}|${record.firstName.toLowerCase()}|${(record.lastName ?? '').toLowerCase()}`;
       if (seen.has(key)) {
         this.ctx.logger.warn(`Deduplicating duplicate birthday record: ${getFullName(record.firstName, record.lastName)} on ${formatDateISO(new Date(record.birthday))}`);
         return false;
@@ -107,8 +111,13 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
         return firstNameMatch && lastNameMatch && dateMatch;
       });
     } catch (error) {
-      this.ctx.logger.error('Error checking for duplicates', error);
-      return [];
+      this.ctx.logger.error('CRITICAL: Failed to check for duplicates', error, {
+        errorType: 'duplicate_check_failed',
+        impact: 'Cannot safely sync - would create duplicates',
+        birthday: `${birthday.firstName} ${birthday.lastName ?? ''}`,
+      });
+      // Throw error instead of returning empty array to prevent duplicate creation
+      throw new Error(`Failed to check for duplicate birthdays: ${error instanceof Error ? error.message : String(error)}. Cannot safely sync without duplicate check.`);
     }
   }
 
@@ -135,12 +144,16 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
       return { added: 0, skipped: 0, errors: 0 };
     }
 
-    const getLookupKey = (b: BirthdayRecord) => 
-      `${formatDateISO(new Date(b.birthday))}|${b.firstName.toLowerCase()}|${(b.lastName ?? '').toLowerCase()}`;
+    // IMPORTANT: Match by name and month/day, NOT by exact date including year
+    // Recurring events appear with current year dates (e.g., 2025-05-31) but were created with birth year dates (e.g., 1990-05-31)
+    // So we need to match by month/day pattern, not exact date
+    const getLookupKey = (b: BirthdayRecord) => {
+      const month = String(b.birthday.getMonth() + 1).padStart(2, '0');
+      const day = String(b.birthday.getDate()).padStart(2, '0');
+      return `${month}-${day}|${b.firstName.toLowerCase()}|${(b.lastName ?? '').toLowerCase()}`;
+    };
     
-    // IMPORTANT: Check for duplicates in current year, not birth year
-    // Birthday events are recurring and appear in the current year, not the birth year
-    // If we check the birth year (e.g., 1990), we'll miss events that exist in 2024/2025
+    // Check for duplicates in current year range to find recurring event instances
     const currentYear = new Date().getFullYear();
     const checkStartDate = new Date(currentYear, 0, 1);
     const checkEndDate = new Date(currentYear + 1, 11, 31); // Check current year + next year to catch all recurring instances
@@ -150,19 +163,26 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
         min: checkStartDate.toISOString().split('T')[0],
         max: checkEndDate.toISOString().split('T')[0],
       },
-      note: 'Checking current year range (not birth year) because events are recurring',
+      note: 'Checking current year range and matching by month/day pattern (not exact date) because events are recurring',
     });
 
+    // CRITICAL: If we can't read existing birthdays, we MUST fail rather than create duplicates
+    // Returning an empty array would cause all birthdays to be created again, leading to massive duplication
     const existingBirthdays = await this.read({ 
       startDate: checkStartDate, 
       endDate: checkEndDate 
     }).catch((error) => {
-      this.ctx.logger.error('Error reading existing birthdays for duplicate check', error);
-      return [];
+      this.ctx.logger.error('CRITICAL: Failed to read existing birthdays for duplicate check', error, {
+        errorType: 'duplicate_check_failed',
+        impact: 'Cannot safely sync - would create duplicates',
+      });
+      // Throw error instead of returning empty array to prevent duplicate creation
+      throw new Error(`Failed to check for duplicate birthdays: ${error instanceof Error ? error.message : String(error)}. Cannot safely sync without duplicate check.`);
     });
     
     this.ctx.logger.info(`Found ${existingBirthdays.length} existing birthday event(s) in calendar (current year range)`);
     
+    // Build map using month/day pattern for matching
     const existingBirthdaysMap = existingBirthdays.reduce((map, b) => {
       const key = getLookupKey(b);
       (map[key] ??= []).push(b);
@@ -179,20 +199,23 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
           this.ctx.logger.info(`Skipping duplicate birthday for ${fullName}`, {
             lookupKey,
             existingCount: existingBirthdaysMap[lookupKey].length,
+            matchType: 'month/day pattern',
           });
           return { ...acc, skipped: acc.skipped + 1 };
         }
 
-        // Double-check for duplicates right before inserting to handle race conditions
-        // This prevents duplicates when multiple Lambda invocations run concurrently
+        // Check for duplicates right before inserting to handle race conditions
+        // Note: This reduces but doesn't fully eliminate race conditions in concurrent writes.
+        // If two processes write simultaneously, both might pass the checks before either's
+        // insert is visible to the calendar API. This is acceptable for this use case as
+        // duplicates are handled by deduplication in read() and won't cause duplicate messages.
         const duplicates = await this.checkForDuplicates(birthday);
         if (duplicates.length > 0) {
-          this.ctx.logger.info(`Skipping duplicate birthday for ${fullName} (found during double-check)`, {
+          this.ctx.logger.info(`Skipping duplicate birthday for ${fullName}`, {
             lookupKey,
             duplicateCount: duplicates.length,
+            matchType: 'month/day pattern',
           });
-          // Update the map so subsequent items in this batch are also skipped
-          existingBirthdaysMap[lookupKey] = [birthday];
           return { ...acc, skipped: acc.skipped + 1 };
         }
 

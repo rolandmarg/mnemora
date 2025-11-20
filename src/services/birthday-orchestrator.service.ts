@@ -25,7 +25,7 @@ import {
 import { AlertingService } from './alerting.service.js';
 import { LastRunTrackerService } from './last-run-tracker.service.js';
 import { getFullName } from '../utils/name-helpers.util.js';
-import { isFirstDayOfMonth, startOfMonth, endOfMonth } from '../utils/date-helpers.util.js';
+import { isFirstDayOfMonth, startOfMonth, endOfMonth, today, startOfDay } from '../utils/date-helpers.util.js';
 import { initializeCorrelationId } from '../utils/correlation.util.js';
 import type { AppContext } from '../app-context.js';
 
@@ -87,7 +87,15 @@ class BirthdayOrchestratorService {
       return;
     }
 
-    const missedFirstOfMonths = missedDates.filter(date => isFirstDayOfMonth(date));
+    const todayDate = today();
+    const todayStart = startOfDay(todayDate);
+
+    const missedFirstOfMonths = missedDates.filter(date => {
+      const dateStart = startOfDay(date);
+      // Only process missed 1st-of-month dates that are NOT today
+      // (today's monthly digest is handled by the regular flow)
+      return isFirstDayOfMonth(date) && dateStart.getTime() < todayStart.getTime();
+    });
     
     if (missedFirstOfMonths.length === 0) {
       this.ctx.logger.info(`Found ${missedDates.length} missed day(s), but no missed 1st-of-month dates to recover`);

@@ -101,7 +101,35 @@ async function getAllEvents(): Promise<Array<{ id: string; summary: string; star
   return allEvents;
 }
 
-async function deleteEvent(eventId: string): Promise<void> {
+/**
+ * Sleep utility for delays
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Check if error is a rate limit error
+ */
+function isRateLimitError(error: unknown): boolean {
+  if (error && typeof error === 'object' && 'code' in error) {
+    return error.code === 403 || error.code === 429;
+  }
+  if (error && typeof error === 'object' && 'response' in error) {
+    const response = (error as any).response;
+    if (response?.data?.error) {
+      const err = response.data.error;
+      return err.code === 403 || err.code === 429 || 
+             err.errors?.some((e: any) => e.reason === 'rateLimitExceeded' || e.reason === 'userRateLimitExceeded');
+    }
+  }
+  return false;
+}
+
+/**
+ * Delete an event with exponential backoff retry logic
+ */
+async function deleteEvent(eventId: string, summary: string, maxRetries = 5): Promise<boolean> {
   auditDeletionAttempt(appContext, 'delete-all-events.ts', { eventId });
 
   const clientEmail = config.google.clientEmail;
@@ -120,10 +148,36 @@ async function deleteEvent(eventId: string): Promise<void> {
 
   const calendar = google.calendar({ version: 'v3', auth });
 
-  await calendar.events.delete({
-    calendarId: calendarId || 'primary',
-    eventId,
-  });
+  let attempt = 0;
+  let lastError: unknown;
+
+  while (attempt < maxRetries) {
+    try {
+      await calendar.events.delete({
+        calendarId: calendarId || 'primary',
+        eventId,
+      });
+      return true;
+    } catch (error) {
+      lastError = error;
+
+      // If it's a rate limit error, wait and retry
+      if (isRateLimitError(error) && attempt < maxRetries - 1) {
+        attempt++;
+        // Exponential backoff: 2^attempt seconds, with a max of 64 seconds
+        const waitTime = Math.min(Math.pow(2, attempt) * 1000, 64000);
+        appContext.logger.warn(`Rate limit hit for event ${eventId} (${summary}). Retrying in ${waitTime / 1000}s (attempt ${attempt}/${maxRetries})`);
+        await sleep(waitTime);
+        continue;
+      }
+
+      // For non-rate-limit errors or if we've exhausted retries, throw
+      throw error;
+    }
+  }
+
+  // If we get here, all retries failed
+  throw lastError;
 }
 
 async function main(): Promise<void> {
@@ -213,12 +267,13 @@ async function main(): Promise<void> {
 
     // Actually delete events
     console.log('⚠️  Starting deletion of ALL events...\n');
-    console.log('   Using parallel deletion (10 concurrent requests) for faster processing...\n');
+    console.log('   Using parallel deletion with rate limiting (3 concurrent requests)...\n');
 
     let deleted = 0;
-    let errors = 0;
+    const failedEvents: Array<{ id: string; summary: string; start?: string }> = [];
     const totalEvents = allEvents.length;
-    const CONCURRENT_DELETES = 10; // Process 10 deletions in parallel
+    const CONCURRENT_DELETES = 3; // Reduced from 10 to 3 to avoid rate limits
+    const DELAY_BETWEEN_BATCHES_MS = 1000; // 1 second delay between batches
     const BATCH_SIZE = 100; // Process in batches to avoid memory issues
 
     // Process events in batches with parallel deletion
@@ -233,50 +288,95 @@ async function main(): Promise<void> {
         // Delete up to CONCURRENT_DELETES events in parallel
         const deletePromises = concurrentBatch.map(async (event) => {
           try {
-            await deleteEvent(event.id);
-            appContext.logger.info('Deleted event', {
-              eventId: event.id,
-              summary: event.summary,
-            });
-            return { success: true, eventId: event.id };
+            const success = await deleteEvent(event.id, event.summary);
+            if (success) {
+              appContext.logger.info('Deleted event', {
+                eventId: event.id,
+                summary: event.summary,
+              });
+              return { success: true, eventId: event.id, event };
+            }
+            return { success: false, eventId: event.id, event };
           } catch (error) {
             appContext.logger.error('Failed to delete event', error, {
               eventId: event.id,
               summary: event.summary,
             });
-            return { success: false, eventId: event.id };
+            return { success: false, eventId: event.id, event };
           }
         });
         
         // Wait for this batch of concurrent deletions to complete
         const results = await Promise.allSettled(deletePromises);
         
-        // Count successes and errors
+        // Count successes and track failures
         results.forEach((result) => {
           if (result.status === 'fulfilled') {
             if (result.value.success) {
               deleted++;
             } else {
-              errors++;
+              failedEvents.push(result.value.event);
             }
           } else {
-            errors++;
+            // If the promise itself was rejected, we can't identify the event
+            // This shouldn't happen but we'll skip it
           }
         });
         
         // Progress indicator
         const processed = batchStart + Math.min(i + CONCURRENT_DELETES, batch.length);
         const percent = Math.round((processed / totalEvents) * 100);
-        process.stdout.write(`\r   Progress: ${processed}/${totalEvents} (${percent}%) - Deleted: ${deleted}, Errors: ${errors}`);
+        process.stdout.write(`\r   Progress: ${processed}/${totalEvents} (${percent}%) - Deleted: ${deleted}, Failed: ${failedEvents.length}`);
         
-        // Small delay to avoid hitting rate limits too aggressively
-        if (i + CONCURRENT_DELETES < batch.length) {
-          await new Promise(resolve => setTimeout(resolve, 50)); // 50ms delay between concurrent batches
+        // Delay between batches to avoid hitting rate limits
+        if (i + CONCURRENT_DELETES < batch.length || batchEnd < allEvents.length) {
+          await sleep(DELAY_BETWEEN_BATCHES_MS);
         }
       }
     }
 
-    console.log('\n');
+    // Retry failed deletions with exponential backoff
+    if (failedEvents.length > 0) {
+      console.log(`\n\n⚠️  Retrying ${failedEvents.length} failed deletions with exponential backoff...\n`);
+      
+      const retryFailed: Array<{ id: string; summary: string; start?: string }> = [];
+      const initialDeleted = deleted;
+      
+      for (const event of failedEvents) {
+        try {
+          const success = await deleteEvent(event.id, event.summary, 10); // More retries for failed events
+          if (success) {
+            deleted++;
+            appContext.logger.info('Successfully deleted event on retry', {
+              eventId: event.id,
+              summary: event.summary,
+            });
+          } else {
+            retryFailed.push(event);
+          }
+        } catch (error) {
+          retryFailed.push(event);
+          appContext.logger.error('Failed to delete event after retries', error, {
+            eventId: event.id,
+            summary: event.summary,
+          });
+        }
+        
+        // Progress indicator for retries
+        const retryDeleted = deleted - initialDeleted;
+        const remaining = failedEvents.length - retryDeleted;
+        process.stdout.write(`\r   Retry progress: ${remaining} remaining, ${retryDeleted} succeeded...`);
+        
+        // Longer delay between retry attempts
+        await sleep(2000);
+      }
+      
+      failedEvents.length = 0;
+      failedEvents.push(...retryFailed);
+      console.log('\n');
+    }
+
+    const errors = failedEvents.length;
     console.log(`\n✅ Deletion complete:`);
     console.log(`   Total events: ${totalEvents}`);
     console.log(`   Deleted: ${deleted}`);

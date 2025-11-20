@@ -33,6 +33,9 @@ Each bug fix document follows this structure:
 - [Sync Logic Bug - Duplicate Check Using Wrong Date Range](./2025-11-20-sync-logic-bug.md)
   - Fixed duplicate check using birth year range instead of current year range
   - Fixed recurring event duplicate detection
+- [Sync Logic Refinement - Month/Day Pattern Matching and Fail-Fast Error Handling](./2025-11-20-sync-logic-refinement.md)
+  - Fixed duplicate detection to match by month/day pattern instead of exact date
+  - Added fail-fast error handling to prevent duplicate creation on API failures
 
 ## Contributing
 
