@@ -6,10 +6,11 @@ import makeWASocket, {
   makeCacheableSignalKeyStore,
   ConnectionState,
 } from '@whiskeysockets/baileys';
-import qrcode from 'qrcode-terminal';
 import { existsSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { isLambda } from '../utils/runtime.util.js';
+import { QRAuthenticationRequiredError } from '../types/qr-auth-error.js';
+import { displayQRCode } from '../utils/qr-code.util.js';
 
 class WhatsAppClient {
   private sock: WASocket | null = null;
@@ -162,7 +163,7 @@ class WhatsAppClient {
     this.sock.ev.on('connection.update', (update: Partial<ConnectionState>) => {
       const { connection, lastDisconnect, qr } = update;
 
-      // Handle QR code - consistent handling for both local and Lambda
+      // Handle QR code
       if (qr) {
         clearInitTimeout();
         this.authRequired = true;
@@ -175,38 +176,9 @@ class WhatsAppClient {
           '4. Scan the QR code below',
         ];
         
-        // Generate QR code (same method for both environments)
-        // qrcode-terminal is lightweight, has no dependencies, and works well for Lambda
-        try {
-          if (this.isLambda) {
-            // Lambda: Log QR code and instructions as JSON for CloudWatch
-            console.log(JSON.stringify({
-              level: 'warn',
-              message: '🔐 WHATSAPP AUTHENTICATION REQUIRED - QR CODE IN LOGS',
-              qrCode: qr,
-              instructions: [
-                ...instructions,
-                '5. Open CloudWatch Logs and find this log entry',
-                '6. Copy the qrCode value from the log',
-                '7. Use a QR code generator to display the code and scan it',
-                `8. Or use: https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`,
-              ],
-              qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`,
-              note: 'Lambda will timeout, but session will be saved to S3. Next invocation will use saved session.',
-            }));
-            
-            console.log(JSON.stringify({
-              level: 'info',
-              message: 'QR_CODE_FOR_SCANNING',
-              qrCode: qr,
-              format: 'string',
-            }));
-            
-            // Display QR code in terminal (may work in some Lambda environments)
-            console.log('\nQR Code (terminal display):');
-            qrcode.generate(qr, { small: true });
-          } else {
-            // Local: Display QR code in terminal with instructions
+        // Generate QR code for local environment
+        if (!this.isLambda) {
+          try {
             console.log('\n\n');
             console.log(`\n${'='.repeat(60)}`);
             console.log('🔐 WHATSAPP AUTHENTICATION REQUIRED');
@@ -216,17 +188,19 @@ class WhatsAppClient {
             console.log('\n');
             console.log('-'.repeat(60));
             console.log(''); // Extra blank line before QR code
-            qrcode.generate(qr, { small: true });
+            displayQRCode(qr);
             console.log(''); // Extra blank line after QR code
             console.log('-'.repeat(60));
             console.log('\n⏳ Waiting for you to scan the QR code...');
             console.log('💡 Keep this terminal open while scanning\n');
+          } catch (error) {
+            console.error('Error generating QR code:', error);
+            console.log('\nQR Code string (fallback):', qr);
+            console.log('Please use a QR code generator with the string above');
           }
-        } catch (error) {
-          console.error('Error generating QR code:', error);
-          console.log('\nQR Code string (fallback):', qr);
-          console.log('Please use a QR code generator with the string above');
-          console.log(`Or use: https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`);
+        } else {
+          // In Lambda, throw error immediately - let the handler log the QR code
+          throw new QRAuthenticationRequiredError(qr);
         }
       }
 

@@ -89,11 +89,11 @@ if [ ${EXIT_CODE} -ne 0 ] || [ -z "${QR_CODE}" ]; then
   exit 1
 fi
 
-# Display QR code in terminal (compact mode)
+# Display QR code in terminal using shared utility
 echo ""
 echo "📱 WhatsApp QR Code (scan with your phone):"
 echo ""
-cd "${PROJECT_ROOT}" && node -e "const qr = require('qrcode-terminal'); qr.generate(process.argv[1], { small: true });" "${QR_CODE}"
+cd "${PROJECT_ROOT}" && node -e "const { displayQRCode } = require('./dist/utils/qr-code.util.js'); displayQRCode(process.argv[1]);" "${QR_CODE}"
 echo ""
 echo "Instructions:"
 echo "1. Open WhatsApp on your phone"

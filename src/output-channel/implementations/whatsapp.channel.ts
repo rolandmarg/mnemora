@@ -16,6 +16,7 @@ import { MetricsCollector, trackWhatsAppMessageSent, trackWhatsAppAuthRequired, 
 import { AuthReminderService } from '../../services/auth-reminder.service.js';
 import { WhatsAppSessionManagerService } from '../../services/whatsapp-session-manager.service.js';
 import { logSentMessage } from '../../services/message-logger.service.js';
+import { QRAuthenticationRequiredError } from '../../types/qr-auth-error.js';
 import type { SendOptions, SendResult, OutputChannelMetadata } from '../output-channel.interface.js';
 import type { AppContext } from '../../app-context.js';
 
@@ -70,6 +71,12 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
         await this.syncSessionToS3();
       }
     } catch (error) {
+      // Re-throw QR authentication required error so it bubbles up to handler
+      // Don't treat it as a generic initialization failure
+      if (error instanceof QRAuthenticationRequiredError) {
+        throw error;
+      }
+      
       this.ctx.logger.error('Failed to initialize WhatsApp client', error);
       this.alerting.sendWhatsAppClientInitFailedAlert(error instanceof Error ? error : new Error(String(error)), {
         reason: 'initialization_error',
