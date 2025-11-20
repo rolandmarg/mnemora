@@ -75,59 +75,61 @@ class WhatsAppClient {
 
     this.isInitializing = true;
 
-    return new Promise(async (resolve, reject) => {
-      try {
-        if (this.sock) {
-          this.sock.end(undefined);
-          this.sock = null;
-        }
-
-        // Load auth state
-        const { state, saveCreds } = await useMultiFileAuthState(this.sessionPath);
-        this.saveCreds = saveCreds;
-
-        // Fetch latest version
-        const { version } = await fetchLatestBaileysVersion();
-        
-        // Create socket
-        // Note: Some decryption errors from libsignal (the underlying encryption library)
-        // may appear in console output. These are expected and non-fatal - they occur
-        // when Baileys receives messages it can't decrypt (usually from before session
-        // was established or from other devices). They don't affect message sending.
-        this.sock = makeWASocket({
-          version,
-          auth: {
-            creds: state.creds,
-            keys: makeCacheableSignalKeyStore(state.keys),
-          },
-          // Minimal configuration - send-only mode
-          // These options minimize unnecessary operations like read receipts syncing,
-          // message history syncing, presence updates, and other background operations.
-          // This reduces S3 session file updates and improves performance.
-          syncFullHistory: false,              // Don't sync full message history
-          markOnlineOnConnect: false,          // Don't mark as online automatically
-          fireInitQueries: false,               // Don't fire initialization queries
-          shouldSyncHistoryMessage: () => false, // Don't sync history messages
-          shouldIgnoreJid: () => true,          // Ignore all incoming messages (send-only)
-          getMessage: async () => undefined,    // Don't fetch messages
-          connectTimeoutMs: 60000,              // Connection timeout
-          defaultQueryTimeoutMs: 60000,         // Query timeout
-          // Don't use printQRInTerminal (deprecated) - we handle QR manually for consistency
-        });
-
-        // Save credentials when they update
-        this.sock.ev.on('creds.update', async () => {
-          if (this.saveCreds) {
-            await this.saveCreds();
+    return new Promise((resolve, reject) => {
+      (async () => {
+        try {
+          if (this.sock) {
+            this.sock.end(undefined);
+            this.sock = null;
           }
-        });
 
-        this.setupSocketEvents(resolve, reject);
-      } catch (error) {
-        this.isInitializing = false;
-        this.sock = null;
-        reject(error instanceof Error ? error : new Error(String(error)));
-      }
+          // Load auth state
+          const { state, saveCreds } = await useMultiFileAuthState(this.sessionPath);
+          this.saveCreds = saveCreds;
+
+          // Fetch latest version
+          const { version } = await fetchLatestBaileysVersion();
+          
+          // Create socket
+          // Note: Some decryption errors from libsignal (the underlying encryption library)
+          // may appear in console output. These are expected and non-fatal - they occur
+          // when Baileys receives messages it can't decrypt (usually from before session
+          // was established or from other devices). They don't affect message sending.
+          this.sock = makeWASocket({
+            version,
+            auth: {
+              creds: state.creds,
+              keys: makeCacheableSignalKeyStore(state.keys),
+            },
+            // Minimal configuration - send-only mode
+            // These options minimize unnecessary operations like read receipts syncing,
+            // message history syncing, presence updates, and other background operations.
+            // This reduces S3 session file updates and improves performance.
+            syncFullHistory: false,              // Don't sync full message history
+            markOnlineOnConnect: false,          // Don't mark as online automatically
+            fireInitQueries: false,               // Don't fire initialization queries
+            shouldSyncHistoryMessage: () => false, // Don't sync history messages
+            shouldIgnoreJid: () => true,          // Ignore all incoming messages (send-only)
+            getMessage: async () => undefined,    // Don't fetch messages
+            connectTimeoutMs: 60000,              // Connection timeout
+            defaultQueryTimeoutMs: 60000,         // Query timeout
+            // Don't use printQRInTerminal (deprecated) - we handle QR manually for consistency
+          });
+
+          // Save credentials when they update
+          this.sock.ev.on('creds.update', async () => {
+            if (this.saveCreds) {
+              await this.saveCreds();
+            }
+          });
+
+          this.setupSocketEvents(resolve, reject);
+        } catch (error) {
+          this.isInitializing = false;
+          this.sock = null;
+          reject(error instanceof Error ? error : new Error(String(error)));
+        }
+      })();
     });
   }
 

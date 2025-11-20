@@ -327,9 +327,7 @@ class BirthdayService {
       return [];
     }
 
-    return birthdays.map((record) => {
-      return `Happy birthday ${record.firstName}! 🎂`;
-    });
+    return birthdays.map((record) => `Happy birthday ${record.firstName}! 🎂`);
   }
 
   async formatAndSendAllBirthdays(outputChannel: OutputChannel, birthdays: BirthdayRecord[]): Promise<void> {

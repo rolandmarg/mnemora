@@ -83,7 +83,7 @@ async function getAllEvents(): Promise<Array<{ id: string; summary: string; star
     const events: Array<{ id: string; summary: string; start?: string }> = items.map((event) => ({
       id: event.id ?? '',
       summary: event.summary ?? 'Untitled Event',
-      start: event.start?.date || event.start?.dateTime || undefined,
+      start: event.start?.date ?? event.start?.dateTime ?? undefined,
     }));
 
     allEvents = allEvents.concat(events);
@@ -116,11 +116,21 @@ function isRateLimitError(error: unknown): boolean {
     return error.code === 403 || error.code === 429;
   }
   if (error && typeof error === 'object' && 'response' in error) {
-    const response = (error as any).response;
+    interface ErrorResponse {
+      response?: {
+        data?: {
+          error?: {
+            code?: number;
+            errors?: Array<{ reason?: string }>;
+          };
+        };
+      };
+    }
+    const response = (error as ErrorResponse).response;
     if (response?.data?.error) {
       const err = response.data.error;
       return err.code === 403 || err.code === 429 || 
-             err.errors?.some((e: any) => e.reason === 'rateLimitExceeded' || e.reason === 'userRateLimitExceeded');
+             (err.errors?.some((e) => e.reason === 'rateLimitExceeded' || e.reason === 'userRateLimitExceeded') ?? false);
     }
   }
   return false;
@@ -184,13 +194,13 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const isDryRun = !args.includes('--confirm');
 
-  console.log('\n' + '='.repeat(70));
+  console.log(`\n${'='.repeat(70)}`);
   if (isDryRun) {
     console.log('🔍 DRY RUN MODE - No events will be deleted');
   } else {
     console.log('⚠️  DESTRUCTIVE MODE - ALL EVENTS WILL BE PERMANENTLY DELETED');
   }
-  console.log('='.repeat(70) + '\n');
+  console.log(`${'='.repeat(70)}\n`);
 
   if (!isDryRun) {
     console.log('⚠️  WARNING: This will delete ALL events from your Google Calendar!');
@@ -217,14 +227,20 @@ async function main(): Promise<void> {
     // For now, we'll use a simple heuristic based on summary
     for (const event of allEvents) {
       // Create a minimal event object for isBirthdayEvent check
-      const eventObj = {
+      interface EventForCheck {
+        summary?: string;
+        description?: string;
+        recurrence?: string[];
+        start?: { date?: string; dateTime?: string };
+      }
+      const eventObj: EventForCheck = {
         summary: event.summary,
         description: undefined,
         recurrence: undefined,
         start: event.start ? { date: event.start.includes('T') ? undefined : event.start } : undefined,
       };
       
-      if (isBirthdayEvent(eventObj as any)) {
+      if (isBirthdayEvent(eventObj)) {
         birthdayEvents.push(event);
       } else {
         otherEvents.push(event);
@@ -256,7 +272,7 @@ async function main(): Promise<void> {
       if (birthdayEvents.length > 0) {
         console.log(`Birthday Events (${birthdayEvents.length}):`);
         birthdayEvents.slice(0, 10).forEach((event, i) => {
-          console.log(`  ${i + 1}. ${event.summary} (${event.start || 'no date'})`);
+          console.log(`  ${i + 1}. ${event.summary} (${event.start ?? 'no date'})`);
         });
         if (birthdayEvents.length > 10) {
           console.log(`  ... and ${birthdayEvents.length - 10} more birthday events`);
@@ -267,7 +283,7 @@ async function main(): Promise<void> {
       if (otherEvents.length > 0) {
         console.log(`Other Events (${otherEvents.length}):`);
         otherEvents.slice(0, 10).forEach((event, i) => {
-          console.log(`  ${i + 1}. ${event.summary} (${event.start || 'no date'})`);
+          console.log(`  ${i + 1}. ${event.summary} (${event.start ?? 'no date'})`);
         });
         if (otherEvents.length > 10) {
           console.log(`  ... and ${otherEvents.length - 10} more events`);

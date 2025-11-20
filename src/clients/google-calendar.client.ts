@@ -129,7 +129,7 @@ class GoogleCalendarClient {
         calendarId: this.calendarId,
         sampleEvents: items.slice(0, 3).map(e => ({
           summary: e.summary,
-          start: e.start?.date || e.start?.dateTime,
+          start: e.start?.date ?? e.start?.dateTime,
           recurrence: e.recurrence,
         })),
       });
