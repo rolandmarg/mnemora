@@ -123,15 +123,17 @@ class GoogleCalendarClient {
       ...(maxResults && { maxResults }),
     }).then(response => response.data.items ?? []);
 
-    // Filter events to only include those that actually match the target date
-    // For all-day events (date-only), check if the date matches
+    // Filter events to only include those within the date range
+    // For all-day events (date-only), check if the date is within the range
     // For timed events, they're already filtered by the API query
+    const startDateStr = `${startYear}-${String(startMonth + 1).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
+    const endDateStr = `${endYear}-${String(endMonth + 1).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
+    
     const filteredEvents = calendarEvents.filter(event => {
       if (event.start?.date) {
-        // All-day event: check if the date string matches our target date
+        // All-day event: check if the date is within the range (inclusive)
         const eventDate = event.start.date;
-        const targetDate = `${startYear}-${String(startMonth + 1).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
-        return eventDate === targetDate;
+        return eventDate >= startDateStr && eventDate <= endDateStr;
       }
       // Timed event: already filtered by API query
       return true;

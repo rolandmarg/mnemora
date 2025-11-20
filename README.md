@@ -87,6 +87,22 @@ yarn dev            # Development mode with auto-reload
 
 ### CLI Scripts
 
+#### Deduplicate Birthday Events
+
+If duplicate birthday events were created (e.g., due to concurrent Lambda executions), you can clean them up:
+
+```bash
+# Dry run - shows what would be deleted (safe, no changes)
+yarn deduplicate-birthdays
+
+# Actually delete duplicates (requires confirmation)
+yarn deduplicate-birthdays --confirm
+```
+
+The script identifies duplicates by matching date, first name, and last name, then keeps one event and deletes the rest.
+
+**Note:** See [Bug Fixes Documentation](../docs/bugs-fixes/README.md) for details on how duplicates can occur and how they're prevented.
+
 ```bash
 yarn get-todays-birthdays                    # Get today's birthdays
 yarn get-monthly-digest                      # Get monthly digest
@@ -96,6 +112,8 @@ yarn delete-events --all                     # Delete all birthday events
 yarn delete-events --all --date-range "2024-01-01" "2024-12-31"  # Delete in date range
 yarn manual-send                             # Manually send monthly digest + today's birthdays
 yarn send-monthly-digest-whatsapp            # Send monthly digest to WhatsApp group
+yarn deduplicate-birthdays                   # Find duplicate birthday events (dry run)
+yarn deduplicate-birthdays --confirm          # Delete duplicate birthday events
 ```
 
 ### Local Scheduling Setup (macOS)
@@ -269,6 +287,8 @@ See [docs/TODO.md](./docs/TODO.md) for planned enhancements including:
 ### Project Management
 - **[docs/TODO.md](./docs/TODO.md)** - Future improvements and roadmap
 - **[docs/CONTRIBUTING.md](./docs/CONTRIBUTING.md)** - How to contribute to the project
+- **[docs/bugs-fixes/README.md](./docs/bugs-fixes/README.md)** - Bug fixes and resolutions
+- **[docs/bugs-fixes/README.md](./docs/bugs-fixes/README.md)** - Bug fixes and resolutions
 
 ## Extending
 
