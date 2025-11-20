@@ -114,8 +114,9 @@ You are an expert in TypeScript, Node.js.
 2. Use utilities from `src/utils/` when possible
 3. Add script to `package.json` scripts section
 4. Add debug configuration to `.vscode/launch.json`
-5. Use `calendarClient` from `src/clients/google-calendar.client.ts` for calendar operations
-6. Use `appContext` from `src/app-context.ts` for application context
+5. **IMPORTANT**: Ensure `package.json` and `.vscode/launch.json` are kept in sync
+6. Use `calendarClient` from `src/clients/google-calendar.client.ts` for calendar operations
+7. Use `appContext` from `src/app-context.ts` for application context
 
 ### Calendar Operations
 - **Read operations**: Use `calendarClient` from `src/clients/google-calendar.client.ts`
@@ -139,11 +140,12 @@ You are an expert in TypeScript, Node.js.
 1. **Reuse Code**: Always check `src/utils/` before writing new utility functions
 2. **Type Safety**: Never use `any`, always provide proper types
 3. **Error Messages**: Make error messages helpful and actionable
-4. **Documentation**: Add JSDoc comments for public functions
-5. **Consistency**: Follow existing patterns in the codebase
-6. **Testing**: Run `yarn type-check` and `yarn lint` before committing
-7. **Scripts**: Always add new scripts to `package.json` and `launch.json`
+4. **Consistency**: Follow existing patterns in the codebase
+5. **Testing**: Run `yarn type-check` and `yarn lint` before committing
+6. **After Big Changes**: Always run tests, typecheck, and lint after making significant changes
+7. **Scripts**: Always add new scripts to `package.json` and `launch.json` - keep them in sync
 8. **Linting**: Follow ESLint rules - use `yarn lint:fix` to auto-fix issues
+9. **Documentation**: Do NOT add JSDoc type comments - TypeScript types are sufficient
 
 ## Environment Variables
 - `GOOGLE_CALENDAR_ID` - Calendar ID (defaults to 'primary')
@@ -174,8 +176,10 @@ You are an expert in TypeScript, Node.js.
 2. **Follow existing patterns** - Match the style of similar code
 3. **Update documentation** - Add to README if needed
 4. **Add to launch.json** - Include debug configuration for scripts
-5. **Type check** - Always run `yarn type-check` before committing
-6. **Use shared utilities** - Leverage existing CLI, date, and auth utilities
+5. **Keep in sync** - Ensure `package.json` and `.vscode/launch.json` are synchronized
+6. **Type check** - Always run `yarn type-check` before committing
+7. **Use shared utilities** - Leverage existing CLI, date, and auth utilities
+8. **After big changes** - Run tests (`yarn test`), typecheck (`yarn type-check`), and lint (`yarn lint`) to verify everything works
 
 ## Important Notes
 
@@ -185,3 +189,6 @@ You are an expert in TypeScript, Node.js.
 - Use `appContext` from `src/app-context.ts` for application context and logger
 - Use `BirthdayService` from `src/services/birthday.service.ts` for birthday operations
 - Use `OutputChannelFactory` from `src/output-channel/output-channel.factory.js` for output channels
+- **Do NOT add JSDoc type comments** - TypeScript provides type information, JSDoc type annotations are redundant
+- **After significant changes**: Run `yarn test && yarn type-check && yarn lint` to ensure everything is working
+- **Keep `package.json` and `.vscode/launch.json` synchronized** - When adding scripts, update both files
