@@ -43,15 +43,22 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
 
   /**
    * Sync session to S3 if in Lambda. Helper to avoid repetition.
+   * Made public so orchestrator can sync at the end.
    */
-  private async syncSessionToS3(): Promise<void> {
+  async syncSessionToS3(): Promise<void> {
     const sessionPath = this.getSessionPath();
     await this.sessionManager.syncSessionToS3(sessionPath).catch(() => {});
   }
 
   private async initializeClient(): Promise<void> {
     try {
+      // Check if client is already initialized and ready
+      if (this.ctx.clients.whatsapp.isClientReady()) {
+        return;
+      }
+
       // Sync session from S3 before initialization (Lambda only)
+      // Only sync once at startup - if client is already ready, skip sync
       const sessionPath = this.getSessionPath();
       await this.sessionManager.syncSessionFromS3(sessionPath);
       
@@ -67,8 +74,6 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
       
       if (this.ctx.clients.whatsapp.isClientReady()) {
         await this.authReminder.recordAuthentication().catch(() => {});
-        // Sync session to S3 after successful initialization (Lambda only)
-        await this.syncSessionToS3();
       }
     } catch (error) {
       // Re-throw QR authentication required error so it bubbles up to handler
@@ -156,8 +161,8 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
             }
           ).catch(() => {});
 
-          // Sync session to S3 after successful message send (Lambda only)
-          await this.syncSessionToS3();
+          // Note: Session sync removed here - will sync after all messages in orchestrator
+          // This reduces sync frequency from N times (one per message) to once after all messages
 
           return {
             success: true,
@@ -340,6 +345,7 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
   async destroy(): Promise<void> {
     try {
       // Sync session to S3 before destroying (Lambda only)
+      // This is the only place we save session to S3 after loading at start
       await this.syncSessionToS3();
       
       await this.ctx.clients.whatsapp.destroy();

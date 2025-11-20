@@ -9,6 +9,7 @@ import {
   type GetObjectCommandInput,
 } from '@aws-sdk/client-s3';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync } from 'fs';
+import { createHash } from 'crypto';
 import { join } from 'path';
 import { config } from '../config.js';
 import { isLambda } from '../utils/runtime.util.js';
@@ -143,13 +144,59 @@ class S3ClientWrapper {
 const s3Client = new S3ClientWrapper();
 export default s3Client;
 
+interface SyncMetadata {
+  files: Record<string, { hash: string; mtime: number }>;
+  lastSyncTime: number;
+}
+
 export class FileStorage {
   private readonly basePath: string;
   private readonly isLambda: boolean;
+  private readonly METADATA_KEY = '.sync-metadata.json';
 
   constructor(basePath: string) {
     this.basePath = basePath;
     this.isLambda = isLambda();
+  }
+
+  /**
+   * Compute SHA-256 hash of file content
+   */
+  private getFileHash(content: Buffer): string {
+    return createHash('sha256').update(content).digest('hex');
+  }
+
+  /**
+   * Load sync metadata from S3
+   */
+  private async loadSyncMetadata(): Promise<SyncMetadata | null> {
+    if (!this.isLambda || !s3Client.isAvailable()) {
+      return null;
+    }
+
+    try {
+      const metadataKey = `${this.basePath}/${this.METADATA_KEY}`;
+      const metadataContent = await s3Client.download(metadataKey);
+      if (metadataContent) {
+        return JSON.parse(metadataContent.toString()) as SyncMetadata;
+      }
+    } catch (error) {
+      // Metadata doesn't exist yet (first sync) - this is expected
+    }
+    return null;
+  }
+
+  /**
+   * Save sync metadata to S3
+   */
+  private async saveSyncMetadata(metadata: SyncMetadata): Promise<void> {
+    if (!this.isLambda || !s3Client.isAvailable()) {
+      return;
+    }
+
+    const metadataKey = `${this.basePath}/${this.METADATA_KEY}`;
+    const metadataJson = JSON.stringify(metadata, null, 2);
+    await s3Client.upload(metadataKey, metadataJson, 'application/json');
   }
 
   async readFile(filePath: string): Promise<Buffer | null> {
@@ -199,7 +246,19 @@ export class FileStorage {
       return;
     }
 
-    const syncDirectory = async (dirPath: string, relativePath: string = ''): Promise<void> => {
+    // Only sync files modified within the last 30 days to avoid old session data
+    // Exception: creds.json is always synced (essential for authentication)
+    const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+    const now = Date.now();
+    const CREDS_FILE = 'creds.json';
+
+    // Load previous sync metadata to determine which files changed
+    const previousMetadata = await this.loadSyncMetadata();
+    const currentFiles: Record<string, { hash: string; mtime: number }> = {};
+    const filesToUpload: Array<{ s3Key: string; content: Buffer }> = [];
+
+    // Collect all files and compute hashes
+    const collectFiles = (dirPath: string, relativePath: string = ''): void => {
       const files = readdirSync(dirPath);
       
       for (const file of files) {
@@ -207,17 +266,66 @@ export class FileStorage {
         const stat = statSync(filePath);
         const currentRelativePath = relativePath ? `${relativePath}/${file}` : file;
         
+        // Skip metadata file itself
+        if (currentRelativePath === this.METADATA_KEY) {
+          continue;
+        }
+        
         if (stat.isDirectory()) {
-          await syncDirectory(filePath, currentRelativePath);
+          collectFiles(filePath, currentRelativePath);
         } else {
+          const fileName = currentRelativePath.split('/').pop() ?? currentRelativePath;
+          const fileAge = now - stat.mtimeMs;
+          
+          // Always sync creds.json (essential for authentication)
+          // For other files, only sync if modified within MAX_AGE_MS (to avoid old session data)
+          const isEssential = fileName === CREDS_FILE;
+          const isRecent = fileAge <= MAX_AGE_MS;
+          
+          if (!isEssential && !isRecent) {
+            // Skip old files (except creds.json)
+            continue;
+          }
+          
           const fileContent = readFileSync(filePath);
+          const hash = this.getFileHash(fileContent);
+          const mtime = stat.mtimeMs;
           const s3Key = `${this.basePath}/${currentRelativePath}`;
-          await s3Client.upload(s3Key, fileContent);
+          
+          currentFiles[currentRelativePath] = { hash, mtime };
+          
+          // Only upload if file is new or changed
+          const previousFile = previousMetadata?.files[currentRelativePath];
+          const needsUpload = !previousFile || 
+                             previousFile.hash !== hash || 
+                             previousFile.mtime !== mtime;
+          
+          if (needsUpload) {
+            filesToUpload.push({ s3Key, content: fileContent });
+          }
         }
       }
     };
 
-    await syncDirectory(localPath);
+    collectFiles(localPath);
+
+    // Upload changed files in parallel batches
+    if (filesToUpload.length > 0) {
+      const BATCH_SIZE = 10;
+      for (let i = 0; i < filesToUpload.length; i += BATCH_SIZE) {
+        const batch = filesToUpload.slice(i, i + BATCH_SIZE);
+        await Promise.all(
+          batch.map(({ s3Key, content }) => s3Client.upload(s3Key, content))
+        );
+      }
+    }
+
+    // Save updated metadata (only for files we're tracking)
+    const newMetadata: SyncMetadata = {
+      files: currentFiles,
+      lastSyncTime: Date.now(),
+    };
+    await this.saveSyncMetadata(newMetadata);
   }
 
   async syncFromS3(localPath: string): Promise<void> {

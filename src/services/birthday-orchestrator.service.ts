@@ -74,7 +74,7 @@ class BirthdayOrchestratorService {
     }
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // channel.destroy() handles S3 sync and cleanup with its own wait logic
       await channel.destroy();
     } catch (error) {
       this.ctx.logger.error('Error destroying WhatsApp client', error);
@@ -380,6 +380,7 @@ class BirthdayOrchestratorService {
               
               await new Promise(resolve => setTimeout(resolve, 1000));
             }, Promise.resolve());
+            
           } else {
             // WhatsApp channel unavailable - this is fatal when there are birthdays to send
             const error = new Error('WhatsApp channel is not available (WHATSAPP_GROUP_ID not configured)');

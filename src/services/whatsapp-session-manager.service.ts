@@ -41,7 +41,7 @@ export class WhatsAppSessionManagerService {
 
   /**
    * Sync session from local filesystem to S3.
-   * Should be called after authentication or when session changes in Lambda.
+   * Should be called at the end of execution to save session state.
    */
   async syncSessionToS3(sessionPath: string): Promise<void> {
     if (!this.isLambda) {
