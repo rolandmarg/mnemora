@@ -14,18 +14,19 @@ echo "Copying files to dist..."
 cp package.json dist/
 cp yarn.lock dist/
 
-# Remove node_modules if it exists (SAM will install dependencies during build)
-if [ -d "dist/node_modules" ]; then
-  echo "Removing existing node_modules (SAM will install dependencies)..."
-  rm -rf dist/node_modules
-fi
+# Install dependencies in dist to ensure all packages (including dotenv) are available
+# SAM will use these during build
+echo "Installing dependencies in dist..."
+cd dist
+yarn install --production --frozen-lockfile
+cd ..
 
 echo ""
-echo "📦 Package size (without node_modules - SAM will install dependencies):"
+echo "📦 Package size (with node_modules):"
 SIZE=$(du -sh dist 2>/dev/null | cut -f1)
 SIZE_MB=$(du -sm dist 2>/dev/null | cut -f1)
 echo "   dist/: $SIZE (${SIZE_MB}MB)"
-echo "   (node_modules will be installed by SAM during build)"
+echo "   (dependencies installed, SAM will use them during build)"
 
 echo ""
 echo "✅ Build complete"
