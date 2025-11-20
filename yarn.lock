@@ -70,6 +70,19 @@
     "@smithy/util-utf8" "^2.0.0"
     tslib "^2.6.2"
 
+"@aws-lambda-powertools/commons@2.28.1":
+  version "2.28.1"
+  resolved "https://registry.yarnpkg.com/@aws-lambda-powertools/commons/-/commons-2.28.1.tgz#d29fd2f325bcefeecb83213e4e0db39316ade9b1"
+  integrity sha512-XZyup4C9gNnxIi5UUNErXudnwursG4F0tXZMaeTsyMslNLwQJp3zl35MTALV4cXx6Fbz1BmdQIUhGBJraKSpnA==
+
+"@aws-lambda-powertools/tracer@^2.0.0":
+  version "2.28.1"
+  resolved "https://registry.yarnpkg.com/@aws-lambda-powertools/tracer/-/tracer-2.28.1.tgz#25ee0ca89955aa25c5e549e0871f6c9fe2924b8c"
+  integrity sha512-6Fy3TrU+X7Zjl1hs3EvHRPy5Rv4PTOiKYdlaqvo/1FWYlqKnUVaQEfS/ejJnOYOXL16xMMC6y40j7wOTPiTEjw==
+  dependencies:
+    "@aws-lambda-powertools/commons" "2.28.1"
+    aws-xray-sdk-core "^3.11.0"
+
 "@aws-sdk/client-cloudwatch-logs@^3.932.0":
   version "3.932.0"
   resolved "https://registry.yarnpkg.com/@aws-sdk/client-cloudwatch-logs/-/client-cloudwatch-logs-3.932.0.tgz#6f0402bb55022a75b766ab4133082ce866f69d1c"
@@ -2085,7 +2098,7 @@ atomic-sleep@^1.0.0:
   resolved "https://registry.yarnpkg.com/atomic-sleep/-/atomic-sleep-1.0.0.tgz#eb85b77a601fc932cfe432c5acd364a9e2c9075b"
   integrity sha512-kNOjDqAh7px0XWNI+4QbzoiR/nTkHAWNud2uvnJquD1/x5a7EQZMJT0AczqK0Qn67oY/TTQ1LbUKajZpp3I9tQ==
 
-aws-xray-sdk-core@^3.7.0:
+aws-xray-sdk-core@^3.11.0:
   version "3.11.0"
   resolved "https://registry.yarnpkg.com/aws-xray-sdk-core/-/aws-xray-sdk-core-3.11.0.tgz#3ef45e1793f35e5b7d9bc3bcfd10bc59c0d392af"
   integrity sha512-b7RRs3/twrsCxb113ZgycyaYcXJUQADFMKTiAfzRJu/2hBD2UZkyrjrh8BNTwQ5PUJJmHLoapv1uhpJFk3qKvQ==

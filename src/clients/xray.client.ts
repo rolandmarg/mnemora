@@ -1,14 +1,29 @@
-import * as AWSXRay from 'aws-xray-sdk-core';
+import { Tracer } from '@aws-lambda-powertools/tracer';
 import { config } from '../config.js';
+
+interface SubsegmentLike {
+  addMetadata(key: string, value: unknown): void;
+  addError(error: Error): void;
+  close(): void;
+}
 
 /**
  * X-Ray Client
  * 
  * Provides X-Ray tracing functionality for AWS Lambda.
- * Wraps the AWS X-Ray SDK to provide a consistent interface for creating
+ * Wraps AWS Lambda Powertools Tracer to provide a consistent interface for creating
  * subsegments and adding annotations/metadata to traces.
  */
 class XRayClient {
+  private tracer: Tracer;
+
+  constructor() {
+    this.tracer = new Tracer({
+      serviceName: 'mnemora',
+      enabled: config.aws.enableXRay,
+    });
+  }
+
   /**
    * Checks if X-Ray tracing is enabled
    */
@@ -19,11 +34,11 @@ class XRayClient {
   /**
    * Gets the current X-Ray segment
    */
-  private getSegment(): AWSXRay.Segment | undefined {
+  private getSegment() {
     if (!this.isEnabled()) {
       return undefined;
     }
-    return AWSXRay.getSegment();
+    return this.tracer.getSegment();
   }
 
   /**
@@ -31,19 +46,19 @@ class XRayClient {
    */
   async captureAsyncSegment<T>(
     name: string,
-    operation: (subsegment: AWSXRay.Subsegment) => Promise<T>,
+    operation: (subsegment: SubsegmentLike) => Promise<T>,
     metadata?: Record<string, unknown>
   ): Promise<T> {
     if (!this.isEnabled()) {
       // If X-Ray is disabled, just run the operation without tracing
-      const dummySubsegment = {} as AWSXRay.Subsegment;
+      const dummySubsegment = {} as SubsegmentLike;
       return operation(dummySubsegment);
     }
 
     const segment = this.getSegment();
     if (!segment) {
       // No segment available, run without tracing
-      const dummySubsegment = {} as AWSXRay.Subsegment;
+      const dummySubsegment = {} as SubsegmentLike;
       return operation(dummySubsegment);
     }
 
@@ -72,19 +87,19 @@ class XRayClient {
    */
   captureSyncSegment<T>(
     name: string,
-    operation: (subsegment: AWSXRay.Subsegment) => T,
+    operation: (subsegment: SubsegmentLike) => T,
     metadata?: Record<string, unknown>
   ): T {
     if (!this.isEnabled()) {
       // If X-Ray is disabled, just run the operation without tracing
-      const dummySubsegment = {} as AWSXRay.Subsegment;
+      const dummySubsegment = {} as SubsegmentLike;
       return operation(dummySubsegment);
     }
 
     const segment = this.getSegment();
     if (!segment) {
       // No segment available, run without tracing
-      const dummySubsegment = {} as AWSXRay.Subsegment;
+      const dummySubsegment = {} as SubsegmentLike;
       return operation(dummySubsegment);
     }
 
@@ -116,10 +131,7 @@ class XRayClient {
       return;
     }
 
-    const segment = this.getSegment();
-    if (segment) {
-      segment.addAnnotation(key, value);
-    }
+    this.tracer.putAnnotation(key, value);
   }
 
   /**
@@ -130,14 +142,9 @@ class XRayClient {
       return;
     }
 
-    const segment = this.getSegment();
-    if (segment) {
-      segment.addMetadata(key, value);
-    }
+    this.tracer.putMetadata(key, value);
   }
 }
 
 const xrayClient = new XRayClient();
 export default xrayClient;
-
-
