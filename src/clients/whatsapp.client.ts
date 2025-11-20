@@ -100,6 +100,18 @@ class WhatsAppClient {
             creds: state.creds,
             keys: makeCacheableSignalKeyStore(state.keys),
           },
+          // Minimal configuration - send-only mode
+          // These options minimize unnecessary operations like read receipts syncing,
+          // message history syncing, presence updates, and other background operations.
+          // This reduces S3 session file updates and improves performance.
+          syncFullHistory: false,              // Don't sync full message history
+          markOnlineOnConnect: false,          // Don't mark as online automatically
+          fireInitQueries: false,               // Don't fire initialization queries
+          shouldSyncHistoryMessage: () => false, // Don't sync history messages
+          shouldIgnoreJid: () => true,          // Ignore all incoming messages (send-only)
+          getMessage: async () => undefined,    // Don't fetch messages
+          connectTimeoutMs: 60000,              // Connection timeout
+          defaultQueryTimeoutMs: 60000,         // Query timeout
           // Don't use printQRInTerminal (deprecated) - we handle QR manually for consistency
         });
 

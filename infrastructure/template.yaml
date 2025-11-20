@@ -105,8 +105,18 @@ Resources:
       BucketName: !Sub 'mnemora-whatsapp-sessions-${Environment}-${AWS::AccountId}'
       VersioningConfiguration:
         Status: Enabled
-      # LifecycleConfiguration removed - requires s3:PutLifecycleConfiguration permission
-      # Can be added later via AWS Console if needed
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldVersions
+            Status: Enabled
+            NoncurrentVersionExpirationInDays: 7
+            # Delete non-current versions after 7 days to prevent accumulation
+            # WhatsApp session files don't need long version history
+          - Id: DeleteIncompleteMultipartUploads
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+            # Clean up incomplete multipart uploads after 1 day
 
   # Note: DynamoDB removed - using S3 instead (cheaper for once-a-day script)
   # Execution tracking stored in S3 bucket (same bucket as WhatsApp sessions)
