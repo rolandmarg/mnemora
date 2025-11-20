@@ -161,48 +161,51 @@ class WhatsAppClient {
 
     // Handle connection updates (QR, connection state, errors)
     this.sock.ev.on('connection.update', (update: Partial<ConnectionState>) => {
-      const { connection, lastDisconnect, qr } = update;
+      try {
+        const { connection, lastDisconnect, qr } = update;
 
-      // Handle QR code
-      if (qr) {
-        clearInitTimeout();
-        this.authRequired = true;
-        
-        // Common instructions
-        const instructions = [
-          '1. Open WhatsApp on your phone',
-          '2. Go to Settings > Linked Devices',
-          '3. Tap "Link a Device"',
-          '4. Scan the QR code below',
-        ];
-        
-        // Generate QR code for local environment
-        if (!this.isLambda) {
-          try {
-            console.log('\n\n');
-            console.log(`\n${'='.repeat(60)}`);
-            console.log('🔐 WHATSAPP AUTHENTICATION REQUIRED');
-            console.log('='.repeat(60));
-            console.log('\n📱 Please scan the QR code below with your WhatsApp mobile app:');
-            instructions.forEach(instruction => console.log(`   ${instruction}`));
-            console.log('\n');
-            console.log('-'.repeat(60));
-            console.log(''); // Extra blank line before QR code
-            displayQRCode(qr);
-            console.log(''); // Extra blank line after QR code
-            console.log('-'.repeat(60));
-            console.log('\n⏳ Waiting for you to scan the QR code...');
-            console.log('💡 Keep this terminal open while scanning\n');
-          } catch (error) {
-            console.error('Error generating QR code:', error);
-            console.log('\nQR Code string (fallback):', qr);
-            console.log('Please use a QR code generator with the string above');
+        // Handle QR code
+        if (qr) {
+          clearInitTimeout();
+          this.authRequired = true;
+          
+          // Common instructions
+          const instructions = [
+            '1. Open WhatsApp on your phone',
+            '2. Go to Settings > Linked Devices',
+            '3. Tap "Link a Device"',
+            '4. Scan the QR code below',
+          ];
+          
+          // Generate QR code for local environment
+          if (!this.isLambda) {
+            try {
+              console.log('\n\n');
+              console.log(`\n${'='.repeat(60)}`);
+              console.log('🔐 WHATSAPP AUTHENTICATION REQUIRED');
+              console.log('='.repeat(60));
+              console.log('\n📱 Please scan the QR code below with your WhatsApp mobile app:');
+              instructions.forEach(instruction => console.log(`   ${instruction}`));
+              console.log('\n');
+              console.log('-'.repeat(60));
+              console.log(''); // Extra blank line before QR code
+              displayQRCode(qr);
+              console.log(''); // Extra blank line after QR code
+              console.log('-'.repeat(60));
+              console.log('\n⏳ Waiting for you to scan the QR code...');
+              console.log('💡 Keep this terminal open while scanning\n');
+            } catch (error) {
+              console.error('Error generating QR code:', error);
+              console.log('\nQR Code string (fallback):', qr);
+              console.log('Please use a QR code generator with the string above');
+            }
+          } else {
+            // In Lambda, reject promise immediately - let the handler log the QR code
+            this.isInitializing = false;
+            reject(new QRAuthenticationRequiredError(qr));
+            return;
           }
-        } else {
-          // In Lambda, throw error immediately - let the handler log the QR code
-          throw new QRAuthenticationRequiredError(qr);
         }
-      }
 
       // Handle connection open
       if (connection === 'open') {
@@ -302,6 +305,12 @@ class WhatsAppClient {
           // Will reconnect automatically, just mark as not ready
           this.isReady = false;
         }
+      }
+      } catch (error) {
+        // Catch any unexpected errors in the event handler and reject the promise
+        clearInitTimeout();
+        this.isInitializing = false;
+        reject(error instanceof Error ? error : new Error(String(error)));
       }
     });
   }
