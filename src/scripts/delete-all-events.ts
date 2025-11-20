@@ -231,9 +231,24 @@ async function main(): Promise<void> {
       }
     }
 
+    // Deduplicate birthday events to count unique birthdays
+    // Since recurring events are expanded with singleEvents: true, we need to group by name
+    const uniqueBirthdays = new Set<string>();
+    for (const event of birthdayEvents) {
+      // Extract name from summary (e.g., "John's Birthday" -> "John")
+      const nameMatch = event.summary.match(/^(.+?)(?:'s)?\s*Birthday/i);
+      if (nameMatch) {
+        uniqueBirthdays.add(nameMatch[1].toLowerCase().trim());
+      }
+    }
+
     console.log(`\n📊 Found ${allEvents.length} total event(s):`);
-    console.log(`   - Birthday events: ${birthdayEvents.length}`);
-    console.log(`   - Other events: ${otherEvents.length}\n`);
+    console.log(`   - Birthday event instances: ${birthdayEvents.length} (${uniqueBirthdays.size} unique birthdays)`);
+    console.log(`   - Other events: ${otherEvents.length}`);
+    if (birthdayEvents.length > uniqueBirthdays.size) {
+      console.log(`   ⚠️  Note: Birthday events are expanded due to recurring instances across the date range`);
+    }
+    console.log();
 
     if (isDryRun) {
       console.log('🔍 DRY RUN - Would delete the following events:\n');

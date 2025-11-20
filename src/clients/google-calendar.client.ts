@@ -121,7 +121,20 @@ class GoogleCalendarClient {
       singleEvents: true,
       orderBy: 'startTime',
       ...(maxResults && { maxResults }),
-    }).then(response => response.data.items ?? []);
+    }).then(response => {
+      const items = response.data.items ?? [];
+      appContext.logger.info(`Google Calendar API returned ${items.length} event(s)`, {
+        timeMin: timeMinUTC.toISOString(),
+        timeMax: timeMaxUTC.toISOString(),
+        calendarId: this.calendarId,
+        sampleEvents: items.slice(0, 3).map(e => ({
+          summary: e.summary,
+          start: e.start?.date || e.start?.dateTime,
+          recurrence: e.recurrence,
+        })),
+      });
+      return items;
+    });
 
     // Filter events to only include those within the date range
     // For all-day events (date-only), check if the date is within the range

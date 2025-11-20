@@ -4,10 +4,6 @@ function getTimezone(): string {
   return config.schedule.timezone;
 }
 
-/**
- * Convert a date in a specific timezone to UTC Date
- * Replaces date-fns-tz's fromZonedTime using native JavaScript Intl API
- */
 function fromZonedTime(date: Date, timeZone: string): Date {
   // Get the date/time components as they appear in the target timezone
   const formatter = new Intl.DateTimeFormat('en-US', {
@@ -50,13 +46,11 @@ function fromZonedTime(date: Date, timeZone: string): Date {
   const offsetMs = localDate.getTime() - tzDate.getTime();
   
   // Apply the offset to get the correct UTC time
-  return new Date(utcCandidate.getTime() - offsetMs);
+  // offsetMs is (what we want) - (what we got), so add it to adjust
+  return new Date(utcCandidate.getTime() + offsetMs);
 }
 
-/**
- * Convert UTC date to a date in a specific timezone
- * Replaces date-fns-tz's toZonedTime using native JavaScript
- */
+
 function toZonedTime(date: Date, timeZone: string): Date {
   // Format the UTC date as if it were in the target timezone
   const formatter = new Intl.DateTimeFormat('en-US', {
@@ -78,8 +72,10 @@ function toZonedTime(date: Date, timeZone: string): Date {
   const minute = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10);
   const second = parseInt(parts.find(p => p.type === 'second')?.value || '0', 10);
   
-  // Return a date object with these components (as if they were local time)
-  return new Date(year, month, day, hour, minute, second);
+  // Create a date object with these components (treating them as if in the target timezone)
+  // Then convert it back to UTC using fromZonedTime to ensure correct timezone handling
+  const localDate = new Date(year, month, day, hour, minute, second);
+  return fromZonedTime(localDate, timeZone);
 }
 
 function createDateInTimezone(year: number, month: number, day: number): Date {
@@ -197,10 +193,16 @@ export function endOfMonth(date: Date): Date {
 }
 
 export function formatDateISO(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  // Format using the configured timezone to get the correct calendar date
+  // This ensures birthdays are formatted as the date they represent in the configured timezone
+  const tz = getTimezone();
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: tz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  return formatter.format(date);
 }
 
 export function formatDateShort(date: Date, includeYear: boolean = false): string {
