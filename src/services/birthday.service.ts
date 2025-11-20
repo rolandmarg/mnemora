@@ -293,13 +293,34 @@ class BirthdayService {
       this.ctx.logger.info('Attempting to sync birthdays from Sheets to Calendar...');
 
       const sheetBirthdays = await this.readFromSheets();
+      
+      this.ctx.logger.info(`Read ${sheetBirthdays.length} birthday(s) from Sheets`, {
+        birthdaysCount: sheetBirthdays.length,
+        birthdays: sheetBirthdays.length > 0 ? sheetBirthdays.slice(0, 5).map(b => ({
+          name: getFullName(b.firstName, b.lastName),
+          date: b.birthday.toISOString().split('T')[0],
+        })) : [],
+      });
+
+      if (sheetBirthdays.length === 0) {
+        this.ctx.logger.warn('No birthdays found in Sheets - sync skipped (nothing to sync)');
+        return;
+      }
+
       const writeResult = await this.syncToCalendar(sheetBirthdays);
 
       this.ctx.logger.info('Successfully synced birthdays from Sheets to Calendar', {
+        readFromSheets: sheetBirthdays.length,
         added: writeResult.added,
         skipped: writeResult.skipped,
         errors: writeResult.errors,
       });
+
+      if (writeResult.added === 0 && writeResult.skipped === 0 && writeResult.errors === 0) {
+        this.ctx.logger.warn('Sync completed but no birthdays were processed - this should not happen if birthdays were read from Sheets', {
+          readFromSheets: sheetBirthdays.length,
+        });
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.ctx.logger.warn('Failed to sync from Sheets to Calendar', {

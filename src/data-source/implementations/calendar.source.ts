@@ -93,13 +93,34 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
   }
 
   async write(data: BirthdayRecord[], _options?: WriteOptions): Promise<WriteResult> {
+    this.ctx.logger.info(`Calendar write called with ${data.length} birthday record(s)`, {
+      recordCount: data.length,
+    });
+
+    if (data.length === 0) {
+      this.ctx.logger.warn('Calendar write called with empty array - nothing to write');
+      return { added: 0, skipped: 0, errors: 0 };
+    }
+
     const getLookupKey = (b: BirthdayRecord) => 
       `${formatDateISO(new Date(b.birthday))}|${b.firstName.toLowerCase()}|${(b.lastName ?? '').toLowerCase()}`;
     
     const dateRange = getDateRangeForBirthdays(data);
+    this.ctx.logger.info('Checking for existing birthdays in calendar', {
+      dateRange: dateRange ? {
+        min: dateRange.minDate.toISOString().split('T')[0],
+        max: dateRange.maxDate.toISOString().split('T')[0],
+      } : null,
+    });
+
     const existingBirthdays = dateRange 
-      ? await this.read({ startDate: dateRange.minDate, endDate: dateRange.maxDate }).catch(() => [])
+      ? await this.read({ startDate: dateRange.minDate, endDate: dateRange.maxDate }).catch((error) => {
+          this.ctx.logger.error('Error reading existing birthdays for duplicate check', error);
+          return [];
+        })
       : [];
+    
+    this.ctx.logger.info(`Found ${existingBirthdays.length} existing birthday(s) in calendar date range`);
     
     const existingBirthdaysMap = existingBirthdays.reduce((map, b) => {
       const key = getLookupKey(b);
@@ -114,11 +135,19 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
         const lookupKey = getLookupKey(birthday);
         
         if (existingBirthdaysMap[lookupKey]?.length) {
-          this.ctx.logger.info(`Skipping duplicate birthday for ${fullName}`);
+          this.ctx.logger.info(`Skipping duplicate birthday for ${fullName}`, {
+            lookupKey,
+            existingCount: existingBirthdaysMap[lookupKey].length,
+          });
           return { ...acc, skipped: acc.skipped + 1 };
         }
 
         const dateString = formatDateISO(new Date(birthday.birthday));
+        this.ctx.logger.info(`Creating birthday event for ${fullName}`, {
+          date: dateString,
+          lookupKey,
+        });
+
         await this.ctx.clients.calendar.insertEvent({
           summary: `${fullName}'s Birthday`,
           description: `Birthday of ${fullName}${birthday.year ? ` (born ${birthday.year})` : ''}`,
@@ -140,6 +169,13 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
         return { ...acc, errors: acc.errors + 1 };
       }
     }, Promise.resolve({ added: 0, skipped: 0, errors: 0 }));
+    
+    this.ctx.logger.info('Calendar write completed', {
+      total: data.length,
+      added: result.added,
+      skipped: result.skipped,
+      errors: result.errors,
+    });
     
     return result;
   }
