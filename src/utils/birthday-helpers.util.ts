@@ -12,6 +12,8 @@ export function parseRowToBirthdays(row: string[]): BirthdayRecord[] {
     }
     const birthday = parseDateString(dateStr);
     if (!birthday) {
+      // Log failed date parsing for debugging
+      console.warn(`Failed to parse date: "${dateStr}" for name: "${name}"`);
       continue;
     }
     const nameParts = extractNameParts(name);
