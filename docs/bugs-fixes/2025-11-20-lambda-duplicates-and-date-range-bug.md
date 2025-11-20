@@ -30,13 +30,13 @@ Fixed critical bugs that caused:
 - Duplicate detection had race condition - both invocations read before either wrote
 
 **Fix:**
-- Added `ReservedConcurrentExecutions: 1` to Lambda function in `infrastructure/template.yaml`
-- Added double-check for duplicates right before inserting events in `calendar.source.ts`
+- Added double-check for duplicates right before inserting events in `calendar.source.ts` (primary protection)
 - Added deduplication when reading today's birthdays to prevent duplicate messages
 - Improved logging to distinguish manual vs EventBridge invocations
+- **Note:** `ReservedConcurrentExecutions` was attempted but removed due to AWS account limits (minimum 10 unreserved concurrency required). The double-check mechanism provides sufficient protection.
 
 **Files Changed:**
-- `infrastructure/template.yaml` - Added reserved concurrency
+- `infrastructure/template.yaml` - Attempted reserved concurrency (removed due to account limits)
 - `src/data-source/implementations/calendar.source.ts` - Added race condition protection and deduplication
 - `src/lambda/handler.ts` - Improved logging for invocation source
 
@@ -83,10 +83,11 @@ Fixed critical bugs that caused:
 
 ## Prevention
 
-1. **Reserved Concurrency:** Always set `ReservedConcurrentExecutions: 1` for critical Lambda functions
-2. **Race Condition Protection:** Always double-check for duplicates right before inserting
-3. **Date Range Logic:** Always use inclusive range checks (`>=` and `<=`) not exact matches
+1. **Race Condition Protection:** Always double-check for duplicates right before inserting (primary protection)
+2. **Date Range Logic:** Always use inclusive range checks (`>=` and `<=`) not exact matches
+3. **Deduplication on Read:** Deduplicate when reading to prevent duplicate messages
 4. **Testing:** Test with concurrent invocations and wide date ranges
+5. **Note on Reserved Concurrency:** AWS requires minimum 10 unreserved concurrent executions per account. If your account is at the limit, use double-check mechanisms instead of reserved concurrency.
 
 ## Deployment Notes
 

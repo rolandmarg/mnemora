@@ -128,7 +128,8 @@ Resources:
       Runtime: nodejs20.x
       Timeout: 900
       MemorySize: 512
-      ReservedConcurrentExecutions: 1
+      # Note: ReservedConcurrentExecutions removed - account has minimum unreserved concurrency (10)
+      # Duplicate protection is handled via double-check in calendar.source.ts
       Environment:
         Variables:
           GOOGLE_CALENDAR_ID: !Ref GoogleCalendarId

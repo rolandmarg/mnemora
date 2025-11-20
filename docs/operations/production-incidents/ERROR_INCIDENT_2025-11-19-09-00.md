@@ -1,6 +1,6 @@
-# Error Analysis: Lambda Initialization Failure (2025-11-19)
+# Error Incident: Lambda Initialization Failure (2025-11-19 09:00)
 
-## Summary
+## Incident Summary
 
 The daily summary Lambda function (`mnemora-daily-summary-prod`) failed with `Runtime.Unknown` errors during initialization, preventing the bot from running.
 
@@ -11,7 +11,8 @@ The daily summary Lambda function (`mnemora-daily-summary-prod`) failed with `Ru
 **Request ID**: `bfd64dff-0b61-457b-a16e-e5f82f4d6d27`  
 **Function**: `mnemora-daily-summary-prod`  
 **Memory**: 256 MB  
-**Duration**: ~2.8 seconds (init phase)
+**Duration**: ~2.8 seconds (init phase)  
+**Timestamp**: 2025-11-19 09:00 UTC
 
 ### Error Message
 
@@ -80,79 +81,9 @@ The daily summary handler doesn't actually need the Google Calendar client - it 
 - **No alerting** - Because the handler never ran, no SNS alerts were sent about the failure
 - **Silent failure** - Only visible in CloudWatch Logs, not caught by existing alarms
 
-## Fixes Applied
+## Detection
 
-### 1. Added CloudWatch Alarm for Initialization Errors
-
-Added alarms to `infrastructure/cloudwatch-alarms.yaml`:
-- `LambdaInitErrorAlarm` - Monitors main function for `Runtime.Unknown` errors
-- `DailySummaryInitErrorAlarm` - Monitors daily summary function for `Runtime.Unknown` errors
-
-These alarms use the AWS Lambda `Errors` metric which includes initialization failures.
-
-**Alarm Configuration**:
-- **Metric**: `AWS/Lambda` namespace, `Errors` metric
-- **Period**: 5 minutes
-- **Threshold**: 1 error
-- **Action**: SNS notification
-
-### 2. Made Calendar Client Lazy-Loaded
-
-Modified `src/clients/google-calendar.client.ts`:
-- Changed from eager initialization to lazy initialization
-- Client only initializes when first accessed (via getter methods)
-- Allows handlers that don't need calendar to load without errors
-
-**Before**:
-```typescript
-class GoogleCalendarClient {
-  private readonly readOnlyCalendar: CalendarClient;
-  // ... initialized in constructor
-}
-
-const calendarClient = new GoogleCalendarClient(); // ❌ Eager
-```
-
-**After**:
-```typescript
-class GoogleCalendarClient {
-  private _readOnlyCalendar: CalendarClient | null = null;
-  private _initialized = false;
-  
-  private initialize(): void {
-    if (this._initialized) return;
-    // ... initialization logic
-  }
-  
-  private get readOnlyCalendar(): CalendarClient {
-    this.initialize(); // ✅ Lazy
-    return this._readOnlyCalendar!;
-  }
-}
-
-const calendarClient = new GoogleCalendarClient(); // ✅ Safe - no init yet
-```
-
-### 3. Made Sheets Client Lazy-Loaded
-
-Applied the same lazy-loading pattern to `src/clients/google-sheets.client.ts` to prevent similar issues.
-
-## Prevention
-
-### Immediate Actions
-
-1. **Deploy the alarm** - The new alarms will catch future initialization errors
-2. **Deploy the code fix** - Lazy-loading prevents the error from occurring
-
-### Long-term Improvements
-
-1. **Monitor initialization errors** - The new alarms will alert on `Runtime.Unknown` errors
-2. **Consider dependency injection** - For better separation of concerns
-3. **Add integration tests** - Test that handlers can load without all dependencies
-
-## Playbook Links
-
-When this error occurs, check:
+### Where to Check
 
 1. **CloudWatch Logs**: 
    - https://us-west-1.console.aws.amazon.com/cloudwatch/home?region=us-west-1#logsV2:log-groups/log-group/$252Faws$252Flambda$252Fmnemora-daily-summary-prod
@@ -160,10 +91,7 @@ When this error occurs, check:
 2. **Lambda Monitoring**:
    - https://us-west-1.console.aws.amazon.com/lambda/home?region=us-west-1#/functions/mnemora-daily-summary-prod/monitoring
 
-3. **CloudWatch Alarms** (after deployment):
-   - https://us-west-1.console.aws.amazon.com/cloudwatch/home?region=us-west-1#alarmsV2:?alarmNameFilter=InitError
-
-4. **Log Insights Query**:
+3. **Log Insights Query**:
    ```
    fields @timestamp, @message
    | filter @message like /Runtime.Unknown/ or @message like /INIT_REPORT/
@@ -172,24 +100,13 @@ When this error occurs, check:
 
 ## Related Files
 
-- `src/clients/google-calendar.client.ts` - Fixed with lazy initialization
-- `src/clients/google-sheets.client.ts` - Fixed with lazy initialization  
-- `src/app-context.ts` - Imports clients (now safe with lazy loading)
+- `src/clients/google-calendar.client.ts` - Source of eager initialization
+- `src/clients/google-sheets.client.ts` - Similar pattern (potential issue)
+- `src/app-context.ts` - Imports clients eagerly
 - `src/lambda/daily-summary-handler.ts` - Handler that was failing
-- `infrastructure/cloudwatch-alarms.yaml` - Added initialization error alarms
-
-## Next Steps
-
-1. ✅ Add CloudWatch alarms for initialization errors
-2. ✅ Fix lazy-loading for calendar and sheets clients
-3. ⏳ Deploy infrastructure changes (alarms)
-4. ⏳ Deploy code changes (lazy-loading)
-5. ⏳ Verify the fix works by checking logs after deployment
 
 ---
 
-**Date**: 2025-11-19  
-**Resolved**: Yes (code fix + alarms added)  
-**Status**: Ready for deployment
-
+**Incident Date**: 2025-11-19 09:00 UTC  
+**Status**: Identified - See resolution document
 
