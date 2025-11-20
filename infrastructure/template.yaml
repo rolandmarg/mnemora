@@ -77,9 +77,6 @@ Resources:
     Properties:
       TopicName: !Sub 'mnemora-alerts-${Environment}'
       DisplayName: Mnemora Birthday Bot Alerts
-      Subscription:
-        - Protocol: email
-          Endpoint: !Ref AlertEmail
 
   # SNS Email Subscription
   AlertEmailSubscription:
