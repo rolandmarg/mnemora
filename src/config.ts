@@ -1,4 +1,6 @@
 import dotenv from 'dotenv';
+import { DynamicConfigService } from './services/dynamic-config.service.js';
+import type { AppContext } from './app-context.js';
 
 dotenv.config();
 
@@ -43,6 +45,14 @@ export interface AppConfig {
   environment: string;
 }
 
+// Cache for dynamic config values loaded from Parameter Store
+let dynamicConfigCache: {
+  whatsapp?: { groupId?: string };
+  schedule?: { time?: string; timezone?: string };
+  logging?: { level?: string };
+  google?: { spreadsheetId?: string };
+} | null = null;
+
 /**
  * Processes the Google private key from environment variable.
  * Handles both base64-encoded keys (from CloudFormation) and raw PEM keys (from .env).
@@ -70,20 +80,73 @@ function processPrivateKey(rawKey: string | undefined): string | undefined {
   return key;
 }
 
+/**
+ * Loads dynamic configuration from Parameter Store.
+ * Should be called at the start of each Lambda invocation.
+ */
+export async function loadDynamicConfig(ctx: AppContext): Promise<void> {
+  const dynamicConfig = new DynamicConfigService(ctx.logger);
+  
+  try {
+    const params = await dynamicConfig.getParameters({
+      whatsapp: ['groupId'],
+      schedule: ['time', 'timezone'],
+      logging: ['level'],
+      google: ['spreadsheetId'],
+    });
+
+    dynamicConfigCache = {
+      whatsapp: {
+        groupId: params['whatsapp.groupId'] ?? undefined,
+      },
+      schedule: {
+        time: params['schedule.time'] ?? undefined,
+        timezone: params['schedule.timezone'] ?? undefined,
+      },
+      logging: {
+        level: params['logging.level'] ?? undefined,
+      },
+      google: {
+        spreadsheetId: params['google.spreadsheetId'] ?? undefined,
+      },
+    };
+
+    ctx.logger.info('Dynamic config loaded from Parameter Store', {
+      whatsappGroupId: dynamicConfigCache.whatsapp?.groupId ? '***' : undefined,
+      scheduleTime: dynamicConfigCache.schedule?.time,
+      timezone: dynamicConfigCache.schedule?.timezone,
+      logLevel: dynamicConfigCache.logging?.level,
+      hasSpreadsheetId: !!dynamicConfigCache.google?.spreadsheetId,
+    });
+  } catch (error) {
+    ctx.logger.error('Failed to load dynamic config from Parameter Store', error);
+    // Continue with empty cache - will use defaults
+    dynamicConfigCache = {};
+  }
+}
+
 export const config: AppConfig = {
   google: {
     calendarId: process.env.GOOGLE_CALENDAR_ID || 'primary',
-    spreadsheetId: process.env.GOOGLE_SPREADSHEET_ID,
+    get spreadsheetId(): string | undefined {
+      return dynamicConfigCache?.google?.spreadsheetId ?? process.env.GOOGLE_SPREADSHEET_ID;
+    },
     clientEmail: process.env.GOOGLE_CLIENT_EMAIL,
     privateKey: processPrivateKey(process.env.GOOGLE_PRIVATE_KEY),
     projectId: process.env.GOOGLE_PROJECT_ID,
   },
   whatsapp: {
-    groupId: process.env.WHATSAPP_GROUP_ID,
+    get groupId(): string | undefined {
+      return dynamicConfigCache?.whatsapp?.groupId ?? process.env.WHATSAPP_GROUP_ID;
+    },
   },
   schedule: {
-    time: process.env.SCHEDULE_TIME || '09:00',
-    timezone: process.env.TIMEZONE || process.env.TZ || 'America/Los_Angeles',
+    get time(): string {
+      return dynamicConfigCache?.schedule?.time ?? process.env.SCHEDULE_TIME ?? '09:00';
+    },
+    get timezone(): string {
+      return dynamicConfigCache?.schedule?.timezone ?? process.env.TIMEZONE ?? process.env.TZ ?? 'America/Los_Angeles';
+    },
   },
   aws: {
     region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-west-1',
@@ -97,7 +160,9 @@ export const config: AppConfig = {
     enabled: process.env.ENABLE_CLOUDWATCH_METRICS !== 'false',
   },
   logging: {
-    level: process.env.LOG_LEVEL || 'info',
+    get level(): string {
+      return dynamicConfigCache?.logging?.level ?? process.env.LOG_LEVEL ?? 'info';
+    },
     pretty: process.env.NODE_ENV === 'development',
   },
   environment: process.env.NODE_ENV || 'development',

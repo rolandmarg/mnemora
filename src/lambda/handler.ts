@@ -2,6 +2,7 @@ import { runBirthdayCheck } from '../services/birthday-orchestrator.service.js';
 import { AlertingService } from '../services/alerting.service.js';
 import { MetricsCollector } from '../services/metrics.service.js';
 import { appContext } from '../app-context.js';
+import { loadDynamicConfig } from '../config.js';
 import { setCorrelationId } from '../utils/correlation.util.js';
 import type { EventBridgeEvent, LambdaContext, LambdaResponse } from './types.js';
 
@@ -9,6 +10,9 @@ export async function handler(
   event: EventBridgeEvent,
   context: LambdaContext
 ): Promise<LambdaResponse | void> {
+  // Load dynamic configuration from Parameter Store
+  await loadDynamicConfig(appContext);
+
   const alerting = new AlertingService(appContext);
   const metrics = new MetricsCollector(appContext);
   
