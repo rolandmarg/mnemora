@@ -253,12 +253,12 @@ class BirthdayOrchestratorService {
               });
               
               if (isFirstDayOfMonth(new Date())) {
-                this.alerting.sendMonthlyDigestFailedAlert(result.error || error, {
+                this.alerting.sendMonthlyDigestFailedAlert(result.error ?? error, {
                   messageId: result.messageId,
                   isFirstOfMonth: true,
                 });
               } else {
-                this.alerting.sendWhatsAppMessageFailedAlert(result.error || error, {
+                this.alerting.sendWhatsAppMessageFailedAlert(result.error ?? error, {
                   messageType: 'monthly-digest',
                 });
               }
@@ -359,7 +359,7 @@ class BirthdayOrchestratorService {
                   messageIndex: index,
                 });
                 
-                this.alerting.sendWhatsAppMessageFailedAlert(result.error || error, {
+                this.alerting.sendWhatsAppMessageFailedAlert(result.error ?? error, {
                   messageType: 'birthday',
                   messageId: result.messageId,
                 });
@@ -371,7 +371,7 @@ class BirthdayOrchestratorService {
                   message,
                   false,
                   sendDuration,
-                  result.error || error,
+                  result.error ?? error,
                   { messageIndex: index }
                 );
                 
