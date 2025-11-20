@@ -17,7 +17,6 @@
     "send-monthly-digest-whatsapp": "tsx src/scripts/send-monthly-digest-whatsapp.ts",
     "manual-send": "tsx src/scripts/manual-send.ts",
     "delete-all-events": "tsx src/scripts/delete-all-events.ts",
-    "show-qr-code": "./scripts/show-qr-code.sh",
     "install-cron": "./scripts/install-cron.sh",
     "uninstall-cron": "./scripts/uninstall-cron.sh",
     "type-check": "tsc --noEmit",

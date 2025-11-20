@@ -248,9 +248,39 @@ interface MessageSendCompletedEvent {
 
 ---
 
+### 9. Unify Lambda and Local Execution
+**Status**: Not Started  
+**Priority**: Medium  
+**Estimated Effort**: Medium
+
+**Current State**:
+- Lambda handler has lambda-specific branching logic
+- Local execution paths differ from Lambda execution
+- Code duplication and maintenance burden
+
+**Proposed Changes**:
+- Refactor code to make lambda and local execution as similar as possible
+- Remove all `if (lambda)` branching in the code
+- Abstract environment differences into configuration or adapters
+- Ensure same code paths are used for both execution contexts
+
+**Implementation**:
+- Review all lambda-specific conditionals
+- Extract environment detection to configuration layer
+- Create unified execution path
+- Test both Lambda and local execution modes
+
+**Benefits**:
+- Reduced code complexity
+- Easier maintenance (single code path)
+- Better testability
+- Consistent behavior across environments
+
+---
+
 ## Low Priority / Future Considerations
 
-### 9. AWS Deployment Playbooks
+### 10. AWS Deployment Playbooks
 **Status**: Not Started  
 **Priority**: Low  
 **Estimated Effort**: Medium
@@ -271,7 +301,7 @@ interface MessageSendCompletedEvent {
 
 ---
 
-### 10. WhatsApp Cloud API Migration
+### 11. WhatsApp Cloud API Migration
 **Status**: Documented (see [MIGRATION_GUIDE.md](./operations/MIGRATION_GUIDE.md))  
 **Priority**: Low (when WhatsApp Web.js becomes unsupported)  
 **Estimated Effort**: High
@@ -284,7 +314,7 @@ interface MessageSendCompletedEvent {
 
 ---
 
-### 11. CI/CD Pipeline
+### 12. CI/CD Pipeline
 **Status**: Not Started  
 **Priority**: Low  
 **Estimated Effort**: Medium
@@ -297,7 +327,7 @@ interface MessageSendCompletedEvent {
 
 ---
 
-### 12. Unit and Integration Tests
+### 13. Unit and Integration Tests
 **Status**: Not Started  
 **Priority**: Low  
 **Estimated Effort**: High
@@ -315,7 +345,7 @@ interface MessageSendCompletedEvent {
 
 ---
 
-### 13. Configuration Management
+### 14. Configuration Management
 **Status**: Complete  
 **Priority**: Low  
 **Estimated Effort**: Low
@@ -324,7 +354,7 @@ interface MessageSendCompletedEvent {
 
 ---
 
-### 14. Performance Optimization
+### 15. Performance Optimization
 **Status**: Not Started  
 **Priority**: Low  
 **Estimated Effort**: Medium
@@ -337,7 +367,7 @@ interface MessageSendCompletedEvent {
 
 ---
 
-### 15. Monitoring Dashboard Enhancements
+### 16. Monitoring Dashboard Enhancements
 **Status**: Partially Complete (see [MONITORING.md](./operations/MONITORING.md))  
 **Priority**: Low  
 **Estimated Effort**: Low
@@ -352,7 +382,7 @@ interface MessageSendCompletedEvent {
 
 ## Technical Debt
 
-### 16. Type Safety Improvements
+### 17. Type Safety Improvements
 **Status**: Ongoing  
 **Priority**: Low  
 **Estimated Effort**: Low
@@ -364,7 +394,7 @@ interface MessageSendCompletedEvent {
 
 ---
 
-### 17. Error Handling Standardization
+### 18. Error Handling Standardization
 **Status**: Ongoing  
 **Priority**: Low  
 **Estimated Effort**: Low
@@ -376,7 +406,7 @@ interface MessageSendCompletedEvent {
 
 ---
 
-### 18. Documentation Updates
+### 19. Documentation Updates
 **Status**: Ongoing  
 **Priority**: Low  
 **Estimated Effort**: Low
@@ -390,7 +420,7 @@ interface MessageSendCompletedEvent {
 
 ## Research / Exploration
 
-### 19. Alternative Message Channels
+### 20. Alternative Message Channels
 **Status**: Research  
 **Priority**: Very Low  
 **Estimated Effort**: Unknown
@@ -403,7 +433,7 @@ interface MessageSendCompletedEvent {
 
 ---
 
-### 20. Machine Learning Enhancements
+### 21. Machine Learning Enhancements
 **Status**: Research  
 **Priority**: Very Low  
 **Estimated Effort**: High
