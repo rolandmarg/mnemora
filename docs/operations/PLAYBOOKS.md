@@ -46,9 +46,9 @@ Quick reference guide with useful links, CLI commands, and helpers for managing 
 - [Main Log Group](https://us-west-1.console.aws.amazon.com/cloudwatch/home?region=us-west-1#logsV2:log-groups/log-group/$252Faws$252Flambda$252Fmnemora-birthday-bot-prod)
 
 **Manage Infrastructure:**
-- [CloudFormation Stack](https://us-west-1.console.aws.amazon.com/cloudformation/home?region=us-west-1#/stacks/stackinfo?stackId=arn:aws:cloudformation:us-west-1:845641743616:stack%2Fmnemora-birthday-bot-prod)
-- [S3 Bucket](https://s3.console.aws.amazon.com/s3/buckets/mnemora-whatsapp-sessions-prod-845641743616?region=us-west-1&tab=objects)
-- [SNS Topic](https://us-west-1.console.aws.amazon.com/sns/v3/home?region=us-west-1#/topic/arn:aws:sns:us-west-1:845641743616:mnemora-alerts-prod)
+- [CloudFormation Stack](https://us-west-1.console.aws.amazon.com/cloudformation/home?region=us-west-1#/stacks/stackinfo?stackId=arn:aws:cloudformation:us-west-1:YOUR_ACCOUNT_ID:stack%2Fmnemora-birthday-bot-prod)
+- [S3 Bucket](https://s3.console.aws.amazon.com/s3/buckets/mnemora-whatsapp-sessions-prod-YOUR_ACCOUNT_ID?region=us-west-1&tab=objects)
+- [SNS Topic](https://us-west-1.console.aws.amazon.com/sns/v3/home?region=us-west-1#/topic/arn:aws:sns:us-west-1:YOUR_ACCOUNT_ID:mnemora-alerts-prod)
 
 ---
 
@@ -56,7 +56,7 @@ Quick reference guide with useful links, CLI commands, and helpers for managing 
 
 ### Quick Access (Replace `us-west-1` with your region if different)
 
-**Region**: `us-west-1` | **Account ID**: `845641743616` | **Stack**: `mnemora-birthday-bot-prod`
+**Region**: `us-west-1` | **Account ID**: `YOUR_ACCOUNT_ID` | **Stack**: `mnemora-birthday-bot-prod`
 
 ---
 
@@ -117,16 +117,16 @@ Quick reference guide with useful links, CLI commands, and helpers for managing 
 
 ### S3 Bucket
 
-- **Session Storage Bucket**: https://s3.console.aws.amazon.com/s3/buckets/mnemora-whatsapp-sessions-prod-845641743616?region=us-west-1&tab=objects
-- **Bucket Properties**: https://s3.console.aws.amazon.com/s3/buckets/mnemora-whatsapp-sessions-prod-845641743616?region=us-west-1&tab=properties
-- **Bucket Metrics**: https://s3.console.aws.amazon.com/s3/buckets/mnemora-whatsapp-sessions-prod-845641743616?region=us-west-1&tab=metrics
-- **Bucket Access**: https://s3.console.aws.amazon.com/s3/buckets/mnemora-whatsapp-sessions-prod-845641743616?region=us-west-1&tab=permissions
+- **Session Storage Bucket**: https://s3.console.aws.amazon.com/s3/buckets/mnemora-whatsapp-sessions-prod-YOUR_ACCOUNT_ID?region=us-west-1&tab=objects
+- **Bucket Properties**: https://s3.console.aws.amazon.com/s3/buckets/mnemora-whatsapp-sessions-prod-YOUR_ACCOUNT_ID?region=us-west-1&tab=properties
+- **Bucket Metrics**: https://s3.console.aws.amazon.com/s3/buckets/mnemora-whatsapp-sessions-prod-YOUR_ACCOUNT_ID?region=us-west-1&tab=metrics
+- **Bucket Access**: https://s3.console.aws.amazon.com/s3/buckets/mnemora-whatsapp-sessions-prod-YOUR_ACCOUNT_ID?region=us-west-1&tab=permissions
 
 ---
 
 ### SNS (Simple Notification Service)
 
-- **Alerts Topic**: https://us-west-1.console.aws.amazon.com/sns/v3/home?region=us-west-1#/topic/arn:aws:sns:us-west-1:845641743616:mnemora-alerts-prod
+- **Alerts Topic**: https://us-west-1.console.aws.amazon.com/sns/v3/home?region=us-west-1#/topic/arn:aws:sns:us-west-1:YOUR_ACCOUNT_ID:mnemora-alerts-prod
 - **All Topics**: https://us-west-1.console.aws.amazon.com/sns/v3/home?region=us-west-1#/topics
 - **Subscriptions**: https://us-west-1.console.aws.amazon.com/sns/v3/home?region=us-west-1#/subscriptions
 
@@ -143,10 +143,10 @@ Quick reference guide with useful links, CLI commands, and helpers for managing 
 
 ### CloudFormation
 
-- **Main Stack**: https://us-west-1.console.aws.amazon.com/cloudformation/home?region=us-west-1#/stacks/stackinfo?stackId=arn:aws:cloudformation:us-west-1:845641743616:stack%2Fmnemora-birthday-bot-prod
-- **Stack Events**: https://us-west-1.console.aws.amazon.com/cloudformation/home?region=us-west-1#/stacks/stackinfo?stackId=arn:aws:cloudformation:us-west-1:845641743616:stack%2Fmnemora-birthday-bot-prod&view=events
-- **Stack Resources**: https://us-west-1.console.aws.amazon.com/cloudformation/home?region=us-west-1#/stacks/stackinfo?stackId=arn:aws:cloudformation:us-west-1:845641743616:stack%2Fmnemora-birthday-bot-prod&view=resources
-- **Stack Outputs**: https://us-west-1.console.aws.amazon.com/cloudformation/home?region=us-west-1#/stacks/stackinfo?stackId=arn:aws:cloudformation:us-west-1:845641743616:stack%2Fmnemora-birthday-bot-prod&view=outputs
+- **Main Stack**: https://us-west-1.console.aws.amazon.com/cloudformation/home?region=us-west-1#/stacks/stackinfo?stackId=arn:aws:cloudformation:us-west-1:YOUR_ACCOUNT_ID:stack%2Fmnemora-birthday-bot-prod
+- **Stack Events**: https://us-west-1.console.aws.amazon.com/cloudformation/home?region=us-west-1#/stacks/stackinfo?stackId=arn:aws:cloudformation:us-west-1:YOUR_ACCOUNT_ID:stack%2Fmnemora-birthday-bot-prod&view=events
+- **Stack Resources**: https://us-west-1.console.aws.amazon.com/cloudformation/home?region=us-west-1#/stacks/stackinfo?stackId=arn:aws:cloudformation:us-west-1:YOUR_ACCOUNT_ID:stack%2Fmnemora-birthday-bot-prod&view=resources
+- **Stack Outputs**: https://us-west-1.console.aws.amazon.com/cloudformation/home?region=us-west-1#/stacks/stackinfo?stackId=arn:aws:cloudformation:us-west-1:YOUR_ACCOUNT_ID:stack%2Fmnemora-birthday-bot-prod&view=outputs
 - **All Stacks**: https://us-west-1.console.aws.amazon.com/cloudformation/home?region=us-west-1#/stacks
 
 ---
@@ -297,28 +297,28 @@ aws logs tail /aws/lambda/mnemora-birthday-bot-prod \
 
 ```bash
 # List files in session bucket
-aws s3 ls s3://mnemora-whatsapp-sessions-prod-845641743616/ \
+aws s3 ls s3://mnemora-whatsapp-sessions-prod-YOUR_ACCOUNT_ID/ \
   --region us-west-1 \
   --recursive
 
 # Download WhatsApp session (for backup)
-aws s3 cp s3://mnemora-whatsapp-sessions-prod-845641743616/.wwebjs_auth/ \
+aws s3 cp s3://mnemora-whatsapp-sessions-prod-YOUR_ACCOUNT_ID/.wwebjs_auth/ \
   ./backup-session/ \
   --region us-west-1 \
   --recursive
 
 # Upload session (restore from backup)
 aws s3 cp ./backup-session/ \
-  s3://mnemora-whatsapp-sessions-prod-845641743616/.wwebjs_auth/ \
+  s3://mnemora-whatsapp-sessions-prod-YOUR_ACCOUNT_ID/.wwebjs_auth/ \
   --region us-west-1 \
   --recursive
 
 # Check execution tracking files
-aws s3 ls s3://mnemora-whatsapp-sessions-prod-845641743616/executions/ \
+aws s3 ls s3://mnemora-whatsapp-sessions-prod-YOUR_ACCOUNT_ID/executions/ \
   --region us-west-1
 
 # View last run date
-aws s3 cp s3://mnemora-whatsapp-sessions-prod-845641743616/last-run.txt \
+aws s3 cp s3://mnemora-whatsapp-sessions-prod-YOUR_ACCOUNT_ID/last-run.txt \
   - \
   --region us-west-1
 ```
@@ -333,12 +333,12 @@ aws sns list-topics \
 
 # Get topic subscriptions
 aws sns list-subscriptions-by-topic \
-  --topic-arn arn:aws:sns:us-west-1:845641743616:mnemora-alerts-prod \
+  --topic-arn arn:aws:sns:us-west-1:YOUR_ACCOUNT_ID:mnemora-alerts-prod \
   --region us-west-1
 
 # Send test alert
 aws sns publish \
-  --topic-arn arn:aws:sns:us-west-1:845641743616:mnemora-alerts-prod \
+  --topic-arn arn:aws:sns:us-west-1:YOUR_ACCOUNT_ID:mnemora-alerts-prod \
   --region us-west-1 \
   --subject "Test Alert" \
   --message "This is a test alert from Mnemora"
@@ -412,7 +412,7 @@ aws cloudwatch get-metric-statistics \
 
 ### Check Deployment Status
 
-**Console:** [CloudFormation Stack](https://us-west-1.console.aws.amazon.com/cloudformation/home?region=us-west-1#/stacks/stackinfo?stackId=arn:aws:cloudformation:us-west-1:845641743616:stack%2Fmnemora-birthday-bot-prod)
+**Console:** [CloudFormation Stack](https://us-west-1.console.aws.amazon.com/cloudformation/home?region=us-west-1#/stacks/stackinfo?stackId=arn:aws:cloudformation:us-west-1:YOUR_ACCOUNT_ID:stack%2Fmnemora-birthday-bot-prod)
 
 ```bash
 # Quick status check
@@ -464,7 +464,7 @@ aws logs filter-log-events \
 
 ### Check WhatsApp Authentication Status
 
-**Console:** [S3 Bucket](https://s3.console.aws.amazon.com/s3/buckets/mnemora-whatsapp-sessions-prod-845641743616?region=us-west-1&tab=objects) | [Log Insights - WhatsApp Auth Query](https://us-west-1.console.aws.amazon.com/cloudwatch/home?region=us-west-1#logsV2:logs-insights)
+**Console:** [S3 Bucket](https://s3.console.aws.amazon.com/s3/buckets/mnemora-whatsapp-sessions-prod-YOUR_ACCOUNT_ID?region=us-west-1&tab=objects) | [Log Insights - WhatsApp Auth Query](https://us-west-1.console.aws.amazon.com/cloudwatch/home?region=us-west-1#logsV2:logs-insights)
 
 ```bash
 # Look for QR code in logs
@@ -475,19 +475,19 @@ aws logs filter-log-events \
   --max-items 10
 
 # Check if session exists in S3
-aws s3 ls s3://mnemora-whatsapp-sessions-prod-845641743616/.wwebjs_auth/ \
+aws s3 ls s3://mnemora-whatsapp-sessions-prod-YOUR_ACCOUNT_ID/.wwebjs_auth/ \
   --region us-west-1 \
   --recursive
 ```
 
 ### Verify SNS Subscriptions
 
-**Console:** [SNS Topic](https://us-west-1.console.aws.amazon.com/sns/v3/home?region=us-west-1#/topic/arn:aws:sns:us-west-1:845641743616:mnemora-alerts-prod) | [All Subscriptions](https://us-west-1.console.aws.amazon.com/sns/v3/home?region=us-west-1#/subscriptions)
+**Console:** [SNS Topic](https://us-west-1.console.aws.amazon.com/sns/v3/home?region=us-west-1#/topic/arn:aws:sns:us-west-1:YOUR_ACCOUNT_ID:mnemora-alerts-prod) | [All Subscriptions](https://us-west-1.console.aws.amazon.com/sns/v3/home?region=us-west-1#/subscriptions)
 
 ```bash
 # Check if email subscription is confirmed
 aws sns list-subscriptions-by-topic \
-  --topic-arn arn:aws:sns:us-west-1:845641743616:mnemora-alerts-prod \
+  --topic-arn arn:aws:sns:us-west-1:YOUR_ACCOUNT_ID:mnemora-alerts-prod \
   --region us-west-1 \
   --query 'Subscriptions[?Protocol==`email`]'
 ```
@@ -528,7 +528,7 @@ mkdir -p backups/session-$(date +%Y%m%d)
 
 # Download session
 aws s3 sync \
-  s3://mnemora-whatsapp-sessions-prod-845641743616/.wwebjs_auth/ \
+  s3://mnemora-whatsapp-sessions-prod-YOUR_ACCOUNT_ID/.wwebjs_auth/ \
   ./backups/session-$(date +%Y%m%d)/ \
   --region us-west-1
 ```
@@ -539,7 +539,7 @@ aws s3 sync \
 # Upload from backup
 aws s3 sync \
   ./backups/session-YYYYMMDD/ \
-  s3://mnemora-whatsapp-sessions-prod-845641743616/.wwebjs_auth/ \
+  s3://mnemora-whatsapp-sessions-prod-YOUR_ACCOUNT_ID/.wwebjs_auth/ \
   --region us-west-1
 ```
 
@@ -547,12 +547,12 @@ aws s3 sync \
 
 ```bash
 # List execution records
-aws s3 ls s3://mnemora-whatsapp-sessions-prod-845641743616/executions/ \
+aws s3 ls s3://mnemora-whatsapp-sessions-prod-YOUR_ACCOUNT_ID/executions/ \
   --region us-west-1
 
 # View today's execution record
 aws s3 cp \
-  s3://mnemora-whatsapp-sessions-prod-845641743616/executions/$(date +%Y-%m-%d).json \
+  s3://mnemora-whatsapp-sessions-prod-YOUR_ACCOUNT_ID/executions/$(date +%Y-%m-%d).json \
   - \
   --region us-west-1 | jq .
 ```
@@ -561,12 +561,12 @@ aws s3 cp \
 
 ```bash
 # List message logs
-aws s3 ls s3://mnemora-whatsapp-sessions-prod-845641743616/messages/ \
+aws s3 ls s3://mnemora-whatsapp-sessions-prod-YOUR_ACCOUNT_ID/messages/ \
   --region us-west-1 \
   --recursive
 
 # View today's messages
-aws s3 ls s3://mnemora-whatsapp-sessions-prod-845641743616/messages/$(date +%Y-%m-%d)/ \
+aws s3 ls s3://mnemora-whatsapp-sessions-prod-YOUR_ACCOUNT_ID/messages/$(date +%Y-%m-%d)/ \
   --region us-west-1
 ```
 
@@ -575,7 +575,7 @@ aws s3 ls s3://mnemora-whatsapp-sessions-prod-845641743616/messages/$(date +%Y-%
 ```bash
 # Send test alert
 aws sns publish \
-  --topic-arn arn:aws:sns:us-west-1:845641743616:mnemora-alerts-prod \
+  --topic-arn arn:aws:sns:us-west-1:YOUR_ACCOUNT_ID:mnemora-alerts-prod \
   --region us-west-1 \
   --subject "[Mnemora TEST] Test Alert" \
   --message '{"type":"test","severity":"info","title":"Test Alert","description":"This is a test"}'
@@ -617,11 +617,11 @@ aws lambda get-function-configuration \
 
 ### WhatsApp Authentication Issues
 
-**Console:** [S3 Bucket](https://s3.console.aws.amazon.com/s3/buckets/mnemora-whatsapp-sessions-prod-845641743616?region=us-west-1&tab=objects) | [CloudWatch Logs](https://us-west-1.console.aws.amazon.com/cloudwatch/home?region=us-west-1#logsV2:log-groups/log-group/$252Faws$252Flambda$252Fmnemora-birthday-bot-prod) | [Log Insights](https://us-west-1.console.aws.amazon.com/cloudwatch/home?region=us-west-1#logsV2:logs-insights)
+**Console:** [S3 Bucket](https://s3.console.aws.amazon.com/s3/buckets/mnemora-whatsapp-sessions-prod-YOUR_ACCOUNT_ID?region=us-west-1&tab=objects) | [CloudWatch Logs](https://us-west-1.console.aws.amazon.com/cloudwatch/home?region=us-west-1#logsV2:log-groups/log-group/$252Faws$252Flambda$252Fmnemora-birthday-bot-prod) | [Log Insights](https://us-west-1.console.aws.amazon.com/cloudwatch/home?region=us-west-1#logsV2:logs-insights)
 
 ```bash
 # 1. Check if session exists
-aws s3 ls s3://mnemora-whatsapp-sessions-prod-845641743616/.wwebjs_auth/ \
+aws s3 ls s3://mnemora-whatsapp-sessions-prod-YOUR_ACCOUNT_ID/.wwebjs_auth/ \
   --region us-west-1 \
   --recursive
 
@@ -633,7 +633,7 @@ aws logs filter-log-events \
   --max-items 5
 
 # 3. Delete session to force re-authentication
-aws s3 rm s3://mnemora-whatsapp-sessions-prod-845641743616/.wwebjs_auth/ \
+aws s3 rm s3://mnemora-whatsapp-sessions-prod-YOUR_ACCOUNT_ID/.wwebjs_auth/ \
   --region us-west-1 \
   --recursive
 
@@ -664,26 +664,26 @@ aws lambda get-function-configuration \
 
 ### SNS Email Not Received
 
-**Console:** [SNS Topic](https://us-west-1.console.aws.amazon.com/sns/v3/home?region=us-west-1#/topic/arn:aws:sns:us-west-1:845641743616:mnemora-alerts-prod) | [Subscriptions](https://us-west-1.console.aws.amazon.com/sns/v3/home?region=us-west-1#/subscriptions)
+**Console:** [SNS Topic](https://us-west-1.console.aws.amazon.com/sns/v3/home?region=us-west-1#/topic/arn:aws:sns:us-west-1:YOUR_ACCOUNT_ID:mnemora-alerts-prod) | [Subscriptions](https://us-west-1.console.aws.amazon.com/sns/v3/home?region=us-west-1#/subscriptions)
 
 ```bash
 # Check subscription status
 aws sns list-subscriptions-by-topic \
-  --topic-arn arn:aws:sns:us-west-1:845641743616:mnemora-alerts-prod \
+  --topic-arn arn:aws:sns:us-west-1:YOUR_ACCOUNT_ID:mnemora-alerts-prod \
   --region us-west-1 \
   --query 'Subscriptions[?Protocol==`email`]'
 
 # If status is "PendingConfirmation", check email for confirmation link
 # Resend confirmation (if needed)
 aws sns confirm-subscription \
-  --topic-arn arn:aws:sns:us-west-1:845641743616:mnemora-alerts-prod \
+  --topic-arn arn:aws:sns:us-west-1:YOUR_ACCOUNT_ID:mnemora-alerts-prod \
   --token <confirmation-token> \
   --region us-west-1
 ```
 
 ### High Costs
 
-**Console:** [Cost Explorer](https://console.aws.amazon.com/cost-management/home#/cost-explorer) | [Billing Dashboard](https://console.aws.amazon.com/billing/home#/) | [Lambda Metrics](https://us-west-1.console.aws.amazon.com/cloudwatch/home?region=us-west-1#metricsV2:graph=~();namespace=AWS/Lambda;dimensions=FunctionName~mnemora-birthday-bot-prod) | [S3 Bucket](https://s3.console.aws.amazon.com/s3/buckets/mnemora-whatsapp-sessions-prod-845641743616?region=us-west-1&tab=metrics)
+**Console:** [Cost Explorer](https://console.aws.amazon.com/cost-management/home#/cost-explorer) | [Billing Dashboard](https://console.aws.amazon.com/billing/home#/) | [Lambda Metrics](https://us-west-1.console.aws.amazon.com/cloudwatch/home?region=us-west-1#metricsV2:graph=~();namespace=AWS/Lambda;dimensions=FunctionName~mnemora-birthday-bot-prod) | [S3 Bucket](https://s3.console.aws.amazon.com/s3/buckets/mnemora-whatsapp-sessions-prod-YOUR_ACCOUNT_ID?region=us-west-1&tab=metrics)
 
 ```bash
 # Check Lambda invocations
@@ -698,7 +698,7 @@ aws cloudwatch get-metric-statistics \
   --region us-west-1
 
 # Check S3 storage
-aws s3 ls s3://mnemora-whatsapp-sessions-prod-845641743616/ \
+aws s3 ls s3://mnemora-whatsapp-sessions-prod-YOUR_ACCOUNT_ID/ \
   --region us-west-1 \
   --recursive \
   --summarize \
@@ -778,9 +778,9 @@ Replace these in commands as needed:
 - `REGION`: `us-west-1`
 - `STACK_NAME`: `mnemora-birthday-bot-prod`
 - `FUNCTION_NAME`: `mnemora-birthday-bot-prod`
-- `BUCKET_NAME`: `mnemora-whatsapp-sessions-prod-845641743616`
-- `SNS_TOPIC_ARN`: `arn:aws:sns:us-west-1:845641743616:mnemora-alerts-prod`
-- `ACCOUNT_ID`: `845641743616`
+- `BUCKET_NAME`: `mnemora-whatsapp-sessions-prod-YOUR_ACCOUNT_ID`
+- `SNS_TOPIC_ARN`: `arn:aws:sns:us-west-1:YOUR_ACCOUNT_ID:mnemora-alerts-prod`
+- `ACCOUNT_ID`: `YOUR_ACCOUNT_ID`
 
 ---
 
@@ -949,7 +949,7 @@ Run this script to generate all console links for your account:
 ```bash
 #!/bin/bash
 REGION="us-west-1"
-ACCOUNT_ID="845641743616"
+ACCOUNT_ID="YOUR_ACCOUNT_ID"
 FUNCTION_NAME="mnemora-birthday-bot-prod"
 SUMMARY_FUNCTION="mnemora-daily-summary-prod"
 STACK_NAME="mnemora-birthday-bot-prod"

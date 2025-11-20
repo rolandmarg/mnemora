@@ -1,17 +1,15 @@
 import { SSMClient, GetParameterCommand, GetParametersCommand, type GetParameterCommandInput, type GetParametersCommandInput } from '@aws-sdk/client-ssm';
 import { config } from '../config.js';
-import { isLambda } from '../utils/runtime.util.js';
 
 class SSMClientWrapper {
   private ssmClient: SSMClient | null = null;
-  private readonly isLambda: boolean;
   private readonly region: string;
 
   constructor() {
-    this.isLambda = isLambda();
     this.region = config.aws.region;
 
-    if (this.isLambda && this.region) {
+    // Initialize SSM client if region is available (works in both Lambda and local)
+    if (this.region) {
       this.ssmClient = new SSMClient({
         region: this.region,
       });

@@ -32,7 +32,8 @@
     "invoke:local": "sam local invoke BirthdayBotFunction --event events/event.json",
     "invoke:lambda": "aws lambda invoke --function-name mnemora-birthday-bot-prod --payload '{}' /dev/stdout | cat",
     "update-config": "tsx src/scripts/update-config.ts",
-    "setup-parameter-store": "./scripts/setup-parameter-store.sh"
+    "setup-parameter-store": "./scripts/setup-parameter-store.sh",
+    "test:dynamic-config": "tsx src/scripts/test-dynamic-config.ts"
   },
   "keywords": [
     "calendar",
