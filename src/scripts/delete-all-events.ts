@@ -213,33 +213,66 @@ async function main(): Promise<void> {
 
     // Actually delete events
     console.log('⚠️  Starting deletion of ALL events...\n');
+    console.log('   Using parallel deletion (10 concurrent requests) for faster processing...\n');
 
     let deleted = 0;
     let errors = 0;
     const totalEvents = allEvents.length;
+    const CONCURRENT_DELETES = 10; // Process 10 deletions in parallel
+    const BATCH_SIZE = 100; // Process in batches to avoid memory issues
 
-    for (let i = 0; i < allEvents.length; i++) {
-      const event = allEvents[i];
-      try {
-        await deleteEvent(event.id);
-        deleted++;
+    // Process events in batches with parallel deletion
+    for (let batchStart = 0; batchStart < allEvents.length; batchStart += BATCH_SIZE) {
+      const batchEnd = Math.min(batchStart + BATCH_SIZE, allEvents.length);
+      const batch = allEvents.slice(batchStart, batchEnd);
+      
+      // Process batch with concurrent deletions
+      for (let i = 0; i < batch.length; i += CONCURRENT_DELETES) {
+        const concurrentBatch = batch.slice(i, i + CONCURRENT_DELETES);
+        
+        // Delete up to CONCURRENT_DELETES events in parallel
+        const deletePromises = concurrentBatch.map(async (event) => {
+          try {
+            await deleteEvent(event.id);
+            appContext.logger.info('Deleted event', {
+              eventId: event.id,
+              summary: event.summary,
+            });
+            return { success: true, eventId: event.id };
+          } catch (error) {
+            appContext.logger.error('Failed to delete event', error, {
+              eventId: event.id,
+              summary: event.summary,
+            });
+            return { success: false, eventId: event.id };
+          }
+        });
+        
+        // Wait for this batch of concurrent deletions to complete
+        const results = await Promise.allSettled(deletePromises);
+        
+        // Count successes and errors
+        results.forEach((result) => {
+          if (result.status === 'fulfilled') {
+            if (result.value.success) {
+              deleted++;
+            } else {
+              errors++;
+            }
+          } else {
+            errors++;
+          }
+        });
         
         // Progress indicator
-        if ((i + 1) % 10 === 0 || i === allEvents.length - 1) {
-          const percent = Math.round(((i + 1) / totalEvents) * 100);
-          process.stdout.write(`\r   Progress: ${i + 1}/${totalEvents} (${percent}%) - Deleted: ${deleted}, Errors: ${errors}`);
+        const processed = batchStart + Math.min(i + CONCURRENT_DELETES, batch.length);
+        const percent = Math.round((processed / totalEvents) * 100);
+        process.stdout.write(`\r   Progress: ${processed}/${totalEvents} (${percent}%) - Deleted: ${deleted}, Errors: ${errors}`);
+        
+        // Small delay to avoid hitting rate limits too aggressively
+        if (i + CONCURRENT_DELETES < batch.length) {
+          await new Promise(resolve => setTimeout(resolve, 50)); // 50ms delay between concurrent batches
         }
-
-        appContext.logger.info('Deleted event', {
-          eventId: event.id,
-          summary: event.summary,
-        });
-      } catch (error) {
-        errors++;
-        appContext.logger.error('Failed to delete event', error, {
-          eventId: event.id,
-          summary: event.summary,
-        });
       }
     }
 
