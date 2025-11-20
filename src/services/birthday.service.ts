@@ -38,85 +38,93 @@ class BirthdayService {
   }
 
   async getTodaysBirthdays(): Promise<BirthdayRecord[]> {
-    const startTime = Date.now();
-    try {
-      const todayDate = today();
-      trackApiCall(this.metrics, 'calendar', true);
-      const records = await this.calendarSource.read({ startDate: todayDate, endDate: todayDate });
-      
-      trackBirthdayFetch(this.metrics, records.length);
-      trackOperationDuration(this.metrics, 'getTodaysBirthdays', Date.now() - startTime);
-      
-      return records;
-    } catch (error) {
-      trackApiCall(this.metrics, 'calendar', false);
-      trackOperationDuration(this.metrics, 'getTodaysBirthdays', Date.now() - startTime, { success: 'false' });
-      this.ctx.logger.error('Error getting today\'s birthdays', error);
-      
-      // Determine error type and send appropriate alert
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const isAuthError = errorMessage.includes('401') || errorMessage.includes('403') || errorMessage.includes('authentication') || errorMessage.includes('permission');
-      const isQuotaError = errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate limit');
-      const isNetworkError = errorMessage.includes('timeout') || errorMessage.includes('ECONNREFUSED') || errorMessage.includes('network');
-      
-      const alerting = new AlertingService(this.ctx);
-      if (isAuthError) {
-        alerting.sendGoogleCalendarApiFailedAlert(error, {
-          errorType: 'authentication',
-          operation: 'getTodaysBirthdays',
-        });
-      } else if (isQuotaError) {
-        alerting.sendApiQuotaWarningAlert('calendar', 100, {
-          errorMessage,
-          operation: 'getTodaysBirthdays',
-        });
-      } else if (isNetworkError) {
-        alerting.sendGoogleCalendarApiFailedAlert(error, {
-          errorType: 'network',
-          operation: 'getTodaysBirthdays',
-        });
-      } else {
-        alerting.sendGoogleCalendarApiFailedAlert(error, {
-          errorType: 'unknown',
-          operation: 'getTodaysBirthdays',
-        });
+    return this.ctx.clients.xray.captureAsyncSegment('BirthdayService.getTodaysBirthdays', async () => {
+      const startTime = Date.now();
+      try {
+        const todayDate = today();
+        trackApiCall(this.metrics, 'calendar', true);
+        const records = await this.calendarSource.read({ startDate: todayDate, endDate: todayDate });
+        
+        trackBirthdayFetch(this.metrics, records.length);
+        trackOperationDuration(this.metrics, 'getTodaysBirthdays', Date.now() - startTime);
+        
+        return records;
+      } catch (error) {
+        trackApiCall(this.metrics, 'calendar', false);
+        trackOperationDuration(this.metrics, 'getTodaysBirthdays', Date.now() - startTime, { success: 'false' });
+        this.ctx.logger.error('Error getting today\'s birthdays', error);
+        
+        // Determine error type and send appropriate alert
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const isAuthError = errorMessage.includes('401') || errorMessage.includes('403') || errorMessage.includes('authentication') || errorMessage.includes('permission');
+        const isQuotaError = errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate limit');
+        const isNetworkError = errorMessage.includes('timeout') || errorMessage.includes('ECONNREFUSED') || errorMessage.includes('network');
+        
+        const alerting = new AlertingService(this.ctx);
+        if (isAuthError) {
+          alerting.sendGoogleCalendarApiFailedAlert(error, {
+            errorType: 'authentication',
+            operation: 'getTodaysBirthdays',
+          });
+        } else if (isQuotaError) {
+          alerting.sendApiQuotaWarningAlert('calendar', 100, {
+            errorMessage,
+            operation: 'getTodaysBirthdays',
+          });
+        } else if (isNetworkError) {
+          alerting.sendGoogleCalendarApiFailedAlert(error, {
+            errorType: 'network',
+            operation: 'getTodaysBirthdays',
+          });
+        } else {
+          alerting.sendGoogleCalendarApiFailedAlert(error, {
+            errorType: 'unknown',
+            operation: 'getTodaysBirthdays',
+          });
+        }
+        
+        throw error;
       }
-      
-      throw error;
-    }
+    }, {
+      operation: 'getTodaysBirthdays',
+    });
   }
 
   formatMonthlyDigest(monthlyBirthdays: BirthdayRecord[]): string {
-    if (monthlyBirthdays.length === 0) {
-      const todayDate = today();
-      const monthName = formatDateMonthYear(todayDate);
-      return `📅 No birthdays scheduled for ${monthName}.`;
-    }
+    return this.ctx.clients.xray.captureSyncSegment('BirthdayService.formatMonthlyDigest', () => {
+      if (monthlyBirthdays.length === 0) {
+        const todayDate = today();
+        const monthName = formatDateMonthYear(todayDate);
+        return `📅 No birthdays scheduled for ${monthName}.`;
+      }
 
-    const sortedRecords = [...monthlyBirthdays].sort((a, b) => 
-      a.birthday.getTime() - b.birthday.getTime()
-    );
-    
-    const birthdaysByDate = sortedRecords.reduce<Record<string, { name: string; randomEmoji: string }[]>>((acc, record, index) => {
-      const dateKey = formatDateShort(record.birthday);
-      const fullName = getFullName(record.firstName, record.lastName);
-      const randomEmoji = getRandomEmoji(index);
-      (acc[dateKey] ??= []).push({ name: fullName, randomEmoji });
-      return acc;
-    }, {});
+      const sortedRecords = [...monthlyBirthdays].sort((a, b) => 
+        a.birthday.getTime() - b.birthday.getTime()
+      );
+      
+      const birthdaysByDate = sortedRecords.reduce<Record<string, { name: string; randomEmoji: string }[]>>((acc, record, index) => {
+        const dateKey = formatDateShort(record.birthday);
+        const fullName = getFullName(record.firstName, record.lastName);
+        const randomEmoji = getRandomEmoji(index);
+        (acc[dateKey] ??= []).push({ name: fullName, randomEmoji });
+        return acc;
+      }, {});
 
-    const sortedDates = Object.keys(birthdaysByDate);
-    const maxDateWidth = Math.max(...sortedDates.map(date => `🎂 ${date}: `.length));
+      const sortedDates = Object.keys(birthdaysByDate);
+      const maxDateWidth = Math.max(...sortedDates.map(date => `🎂 ${date}: `.length));
 
-    const monthlyDigest = sortedDates.map(date => {
-      const people = birthdaysByDate[date];
-      const namesWithEmojis = people.map(p => `${p.name} ${p.randomEmoji}`).join(', ');
-      const datePrefix = `🎂 ${date}: `;
-      const paddedDatePrefix = datePrefix.padEnd(maxDateWidth);
-      return `${paddedDatePrefix}${namesWithEmojis}`;
-    }).join('\n');
+      const monthlyDigest = sortedDates.map(date => {
+        const people = birthdaysByDate[date];
+        const namesWithEmojis = people.map(p => `${p.name} ${p.randomEmoji}`).join(', ');
+        const datePrefix = `🎂 ${date}: `;
+        const paddedDatePrefix = datePrefix.padEnd(maxDateWidth);
+        return `${paddedDatePrefix}${namesWithEmojis}`;
+      }).join('\n');
 
-    return monthlyDigest;
+      return monthlyDigest;
+    }, {
+      birthdaysCount: monthlyBirthdays.length,
+    });
   }
 
   async getTodaysBirthdaysWithOptionalDigest(): Promise<{
@@ -204,49 +212,54 @@ class BirthdayService {
   }
 
   async getBirthdays(startDate: Date, endDate: Date): Promise<BirthdayRecord[]> {
-    const startTime = Date.now();
-    try {
-      trackApiCall(this.metrics, 'calendar', true);
-      const records = await this.calendarSource.read({ startDate, endDate });
-      trackBirthdayFetch(this.metrics, records.length);
-      trackOperationDuration(this.metrics, 'getBirthdays', Date.now() - startTime);
-      return records;
-    } catch (error) {
-      trackApiCall(this.metrics, 'calendar', false);
-      trackOperationDuration(this.metrics, 'getBirthdays', Date.now() - startTime, { success: 'false' });
-      this.ctx.logger.error('Error getting birthdays', error);
-      
-      // Determine error type and send appropriate alert
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const isAuthError = errorMessage.includes('401') || errorMessage.includes('403') || errorMessage.includes('authentication') || errorMessage.includes('permission');
-      const isQuotaError = errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate limit');
-      const isNetworkError = errorMessage.includes('timeout') || errorMessage.includes('ECONNREFUSED') || errorMessage.includes('network');
-      
-      const alerting = new AlertingService(this.ctx);
-      if (isAuthError) {
-        alerting.sendGoogleCalendarApiFailedAlert(error, {
-          errorType: 'authentication',
-          operation: 'getBirthdays',
-        });
-      } else if (isQuotaError) {
-        alerting.sendApiQuotaWarningAlert('calendar', 100, {
-          errorMessage,
-          operation: 'getBirthdays',
-        });
-      } else if (isNetworkError) {
-        alerting.sendGoogleCalendarApiFailedAlert(error, {
-          errorType: 'network',
-          operation: 'getBirthdays',
-        });
-      } else {
-        alerting.sendGoogleCalendarApiFailedAlert(error, {
-          errorType: 'unknown',
-          operation: 'getBirthdays',
-        });
+    return this.ctx.clients.xray.captureAsyncSegment('BirthdayService.getBirthdays', async () => {
+      const startTime = Date.now();
+      try {
+        trackApiCall(this.metrics, 'calendar', true);
+        const records = await this.calendarSource.read({ startDate, endDate });
+        trackBirthdayFetch(this.metrics, records.length);
+        trackOperationDuration(this.metrics, 'getBirthdays', Date.now() - startTime);
+        return records;
+      } catch (error) {
+        trackApiCall(this.metrics, 'calendar', false);
+        trackOperationDuration(this.metrics, 'getBirthdays', Date.now() - startTime, { success: 'false' });
+        this.ctx.logger.error('Error getting birthdays', error);
+        
+        // Determine error type and send appropriate alert
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const isAuthError = errorMessage.includes('401') || errorMessage.includes('403') || errorMessage.includes('authentication') || errorMessage.includes('permission');
+        const isQuotaError = errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate limit');
+        const isNetworkError = errorMessage.includes('timeout') || errorMessage.includes('ECONNREFUSED') || errorMessage.includes('network');
+        
+        const alerting = new AlertingService(this.ctx);
+        if (isAuthError) {
+          alerting.sendGoogleCalendarApiFailedAlert(error, {
+            errorType: 'authentication',
+            operation: 'getBirthdays',
+          });
+        } else if (isQuotaError) {
+          alerting.sendApiQuotaWarningAlert('calendar', 100, {
+            errorMessage,
+            operation: 'getBirthdays',
+          });
+        } else if (isNetworkError) {
+          alerting.sendGoogleCalendarApiFailedAlert(error, {
+            errorType: 'network',
+            operation: 'getBirthdays',
+          });
+        } else {
+          alerting.sendGoogleCalendarApiFailedAlert(error, {
+            errorType: 'unknown',
+            operation: 'getBirthdays',
+          });
+        }
+        
+        throw error;
       }
-      
-      throw error;
-    }
+    }, {
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+    });
   }
 
   async readFromSheets(): Promise<BirthdayRecord[]> {
@@ -284,28 +297,32 @@ class BirthdayService {
   }
 
   async trySyncFromSheets(): Promise<void> {
-    try {
-      if (!this.sheetsSource.isAvailable()) {
-        this.ctx.logger.info('Sheets not configured, skipping sync');
-        return;
+    return this.ctx.clients.xray.captureAsyncSegment('BirthdayService.trySyncFromSheets', async () => {
+      try {
+        if (!this.sheetsSource.isAvailable()) {
+          this.ctx.logger.info('Sheets not configured, skipping sync');
+          return;
+        }
+
+        this.ctx.logger.info('Attempting to sync birthdays from Sheets to Calendar...');
+
+        const sheetBirthdays = await this.readFromSheets();
+        const writeResult = await this.syncToCalendar(sheetBirthdays);
+
+        this.ctx.logger.info('Successfully synced birthdays from Sheets to Calendar', {
+          added: writeResult.added,
+          skipped: writeResult.skipped,
+          errors: writeResult.errors,
+        });
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        this.ctx.logger.warn('Failed to sync from Sheets to Calendar', {
+          error: errorMessage,
+        });
       }
-
-      this.ctx.logger.info('Attempting to sync birthdays from Sheets to Calendar...');
-
-      const sheetBirthdays = await this.readFromSheets();
-      const writeResult = await this.syncToCalendar(sheetBirthdays);
-
-      this.ctx.logger.info('Successfully synced birthdays from Sheets to Calendar', {
-        added: writeResult.added,
-        skipped: writeResult.skipped,
-        errors: writeResult.errors,
-      });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      this.ctx.logger.warn('Failed to sync from Sheets to Calendar', {
-        error: errorMessage,
-      });
-    }
+    }, {
+      sheetsAvailable: this.sheetsSource.isAvailable(),
+    });
   }
 
   async getAllBirthdaysForYear(year?: number): Promise<BirthdayRecord[]> {
@@ -323,11 +340,15 @@ class BirthdayService {
   }
 
   formatTodaysBirthdayMessages(birthdays: BirthdayRecord[]): string[] {
-    if (birthdays.length === 0) {
-      return [];
-    }
+    return this.ctx.clients.xray.captureSyncSegment('BirthdayService.formatTodaysBirthdayMessages', () => {
+      if (birthdays.length === 0) {
+        return [];
+      }
 
-    return birthdays.map((record) => `Happy birthday ${record.firstName}! 🎂`);
+      return birthdays.map((record) => `Happy birthday ${record.firstName}! 🎂`);
+    }, {
+      birthdaysCount: birthdays.length,
+    });
   }
 
   async formatAndSendAllBirthdays(outputChannel: OutputChannel, birthdays: BirthdayRecord[]): Promise<void> {

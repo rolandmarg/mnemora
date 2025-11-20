@@ -3,8 +3,6 @@ import { AlertingService } from '../services/alerting.service.js';
 import { MetricsCollector } from '../services/metrics.service.js';
 import { appContext } from '../app-context.js';
 import { setCorrelationId } from '../utils/correlation.util.js';
-import { QRAuthenticationRequiredError } from '../types/qr-auth-error.js';
-import { displayQRCode } from '../utils/qr-code.util.js';
 import type { EventBridgeEvent, LambdaContext, LambdaResponse } from './types.js';
 
 export async function handler(
@@ -24,6 +22,14 @@ export async function handler(
   const isManualInvoke = !event.source || event.source === '';
   const eventSource = isManualInvoke ? 'manual-invoke' : event.source;
   const eventType = isManualInvoke ? 'ManualInvocation' : (event['detail-type'] || 'Unknown');
+  
+  // Add X-Ray annotations
+  appContext.clients.xray.addAnnotation('eventSource', eventSource);
+  appContext.clients.xray.addAnnotation('eventType', eventType);
+  appContext.clients.xray.addAnnotation('isManualInvoke', String(isManualInvoke));
+  appContext.clients.xray.addMetadata('functionName', context.functionName);
+  appContext.clients.xray.addMetadata('requestId', context.awsRequestId);
+  appContext.clients.xray.addMetadata('remainingTime', context.getRemainingTimeInMillis());
   
   appContext.logger.info('Lambda function invoked', {
     functionName: context.functionName,
@@ -65,31 +71,6 @@ export async function handler(
     };
   } catch (error) {
     clearTimeout(timeoutWarning);
-    
-    // Handle QR authentication required error - exit gracefully
-    if (error instanceof QRAuthenticationRequiredError) {
-      displayQRCode(error.qrCode);
-
-      appContext.logger.info('QR authentication required', {
-        requestId: context.awsRequestId,
-        qrCode: error.qrCode,
-      });
-
-      try {
-        await metrics.flush();
-      } catch (flushError) {
-        appContext.logger.error('Error flushing metrics', flushError);
-      }
-
-      return {
-        statusCode: 200,
-        body: JSON.stringify({
-          message: 'QR authentication required. QR code has been logged. Please scan the QR code and reinvoke the Lambda.',
-          requestId: context.awsRequestId,
-          qrAuthRequired: true,
-        }),
-      };
-    }
     
     appContext.logger.error('Lambda function failed', error, {
       requestId: context.awsRequestId,

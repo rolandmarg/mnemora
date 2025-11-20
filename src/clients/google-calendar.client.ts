@@ -3,6 +3,7 @@ import { auditDeletionAttempt, SecurityError } from '../utils/security.util.js';
 import { startOfDay, endOfDay } from '../utils/date-helpers.util.js';
 import { appContext } from '../app-context.js';
 import { config } from '../config.js';
+import xrayClient from './xray.client.js';
 import type { Event, DeletionResult } from '../types/event.types.js';
 
 type CalendarClient = calendar_v3.Calendar;
@@ -99,96 +100,121 @@ class GoogleCalendarClient {
 
   async fetchEvents(options: EventListOptions): Promise<Event[]> {
     const { startDate, endDate, maxResults } = options;
-    const start = startOfDay(startDate);
-    const end = endOfDay(endDate);
-    
-    // Extract local date components and create UTC date range
-    // Query from start of target day to start of next day to catch all all-day events
-    const startYear = start.getFullYear();
-    const startMonth = start.getMonth();
-    const startDay = start.getDate();
-    const endYear = end.getFullYear();
-    const endMonth = end.getMonth();
-    const endDay = end.getDate();
-    
-    const timeMinUTC = new Date(Date.UTC(startYear, startMonth, startDay, 0, 0, 0, 0));
-    const timeMaxUTC = new Date(Date.UTC(endYear, endMonth, endDay + 1, 0, 0, 0, 0));
+    return xrayClient.captureAsyncSegment('GoogleCalendar.fetchEvents', async () => {
+      const start = startOfDay(startDate);
+      const end = endOfDay(endDate);
+      
+      // Extract local date components and create UTC date range
+      // Query from start of target day to start of next day to catch all all-day events
+      const startYear = start.getFullYear();
+      const startMonth = start.getMonth();
+      const startDay = start.getDate();
+      const endYear = end.getFullYear();
+      const endMonth = end.getMonth();
+      const endDay = end.getDate();
+      
+      const timeMinUTC = new Date(Date.UTC(startYear, startMonth, startDay, 0, 0, 0, 0));
+      const timeMaxUTC = new Date(Date.UTC(endYear, endMonth, endDay + 1, 0, 0, 0, 0));
 
-    const calendarEvents = await this.readOnlyCalendar.events.list({
-      calendarId: this.calendarId,
-      timeMin: timeMinUTC.toISOString(),
-      timeMax: timeMaxUTC.toISOString(),
-      singleEvents: true,
-      orderBy: 'startTime',
-      ...(maxResults && { maxResults }),
-    }).then(response => {
-      const items = response.data.items ?? [];
-      appContext.logger.info(`Google Calendar API returned ${items.length} event(s)`, {
+      const calendarEvents = await this.readOnlyCalendar.events.list({
+        calendarId: this.calendarId,
         timeMin: timeMinUTC.toISOString(),
         timeMax: timeMaxUTC.toISOString(),
-        calendarId: this.calendarId,
-        sampleEvents: items.slice(0, 3).map(e => ({
-          summary: e.summary,
-          start: e.start?.date ?? e.start?.dateTime,
-          recurrence: e.recurrence,
-        })),
+        singleEvents: true,
+        orderBy: 'startTime',
+        ...(maxResults && { maxResults }),
+      }).then(response => {
+        const items = response.data.items ?? [];
+        appContext.logger.info(`Google Calendar API returned ${items.length} event(s)`, {
+          timeMin: timeMinUTC.toISOString(),
+          timeMax: timeMaxUTC.toISOString(),
+          calendarId: this.calendarId,
+          sampleEvents: items.slice(0, 3).map(e => ({
+            summary: e.summary,
+            start: e.start?.date ?? e.start?.dateTime,
+            recurrence: e.recurrence,
+          })),
+        });
+        return items;
       });
-      return items;
-    });
 
-    // Filter events to only include those within the date range
-    // For all-day events (date-only), check if the date is within the range
-    // For timed events, they're already filtered by the API query
-    const startDateStr = `${startYear}-${String(startMonth + 1).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
-    const endDateStr = `${endYear}-${String(endMonth + 1).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
-    
-    const filteredEvents = calendarEvents.filter(event => {
-      if (event.start?.date) {
-        // All-day event: check if the date is within the range (inclusive)
-        const eventDate = event.start.date;
-        return eventDate >= startDateStr && eventDate <= endDateStr;
-      }
-      // Timed event: already filtered by API query
-      return true;
-    });
+      // Filter events to only include those within the date range
+      // For all-day events (date-only), check if the date is within the range
+      // For timed events, they're already filtered by the API query
+      const startDateStr = `${startYear}-${String(startMonth + 1).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
+      const endDateStr = `${endYear}-${String(endMonth + 1).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
+      
+      const filteredEvents = calendarEvents.filter(event => {
+        if (event.start?.date) {
+          // All-day event: check if the date is within the range (inclusive)
+          const eventDate = event.start.date;
+          return eventDate >= startDateStr && eventDate <= endDateStr;
+        }
+        // Timed event: already filtered by API query
+        return true;
+      });
 
-    return filteredEvents.map(calendarEventToEvent);
+      const result = filteredEvents.map(calendarEventToEvent);
+      
+      return result;
+    }, {
+      calendarId: this.calendarId,
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      maxResults: maxResults ?? 'unlimited',
+    });
   }
 
   async deleteEvent(eventId: string): Promise<boolean> {
-    auditDeletionAttempt(appContext, 'GoogleCalendarClient.deleteEvent', { eventId });
-    throw new SecurityError('Deletion of calendar events is disabled for security reasons');
+    return xrayClient.captureAsyncSegment('GoogleCalendar.deleteEvent', async () => {
+      auditDeletionAttempt(appContext, 'GoogleCalendarClient.deleteEvent', { eventId });
+      throw new SecurityError('Deletion of calendar events is disabled for security reasons');
+    }, {
+      calendarId: this.calendarId,
+      eventId,
+    });
   }
 
   async deleteAllEvents(events: Event[]): Promise<DeletionResult> {
-    auditDeletionAttempt(appContext, 'GoogleCalendarClient.deleteAllEvents', {
+    return xrayClient.captureAsyncSegment('GoogleCalendar.deleteAllEvents', async () => {
+      auditDeletionAttempt(appContext, 'GoogleCalendarClient.deleteAllEvents', {
+        eventCount: events.length,
+        eventIds: events.map(e => e.id).filter(Boolean),
+      });
+      throw new SecurityError('Deletion of calendar events is disabled for security reasons');
+    }, {
+      calendarId: this.calendarId,
       eventCount: events.length,
-      eventIds: events.map(e => e.id).filter(Boolean),
     });
-    throw new SecurityError('Deletion of calendar events is disabled for security reasons');
   }
 
   async insertEvent(event: Event): Promise<{ id: string }> {
-    const calendarEvent = {
-      summary: event.summary,
-      description: event.description,
-      location: event.location,
-      start: event.start,
-      end: event.end,
-      recurrence: event.recurrence,
-      reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: 1440 }] },
-    };
+    return xrayClient.captureAsyncSegment('GoogleCalendar.insertEvent', async () => {
+      const calendarEvent = {
+        summary: event.summary,
+        description: event.description,
+        location: event.location,
+        start: event.start,
+        end: event.end,
+        recurrence: event.recurrence,
+        reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: 1440 }] },
+      };
 
-    const response = await this.readWriteCalendar.events.insert({
+      const response = await this.readWriteCalendar.events.insert({
+        calendarId: this.calendarId,
+        requestBody: calendarEvent,
+      });
+
+      if (!response.data.id) {
+        throw new Error('Event created but no ID returned');
+      }
+
+      return { id: response.data.id };
+    }, {
       calendarId: this.calendarId,
-      requestBody: calendarEvent,
+      hasSummary: !!event.summary,
+      hasRecurrence: !!event.recurrence,
     });
-
-    if (!response.data.id) {
-      throw new Error('Event created but no ID returned');
-    }
-
-    return { id: response.data.id };
   }
 }
 

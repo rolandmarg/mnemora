@@ -9,8 +9,8 @@ import makeWASocket, {
 import { existsSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { isLambda } from '../utils/runtime.util.js';
-import { QRAuthenticationRequiredError } from '../types/qr-auth-error.js';
 import { displayQRCode } from '../utils/qr-code.util.js';
+import xrayClient from './xray.client.js';
 
 class WhatsAppClient {
   private sock: WASocket | null = null;
@@ -43,40 +43,41 @@ class WhatsAppClient {
   }
 
   async initialize(): Promise<void> {
-    if (this.isReady && this.sock) {
-      try {
-        const state = this.sock.user;
-        if (state) {
-          return;
-        }
-      } catch (_error) {
-        this.sock = null;
-        this.isReady = false;
-      }
-    }
-
-    if (this.isInitializing) {
-      return new Promise((resolve, reject) => {
-        const checkReady = setInterval(() => {
-          if (this.isReady && this.sock) {
-            clearInterval(checkReady);
-            resolve();
-          } else if (!this.isInitializing) {
-            clearInterval(checkReady);
-            reject(new Error('Initialization failed'));
+    return xrayClient.captureAsyncSegment('WhatsApp.initialize', async () => {
+      if (this.isReady && this.sock) {
+        try {
+          const state = this.sock.user;
+          if (state) {
+            return;
           }
-        }, 100);
-        
-        setTimeout(() => {
-          clearInterval(checkReady);
-          reject(new Error('Initialization timeout'));
-        }, 180000);
-      });
-    }
+        } catch (_error) {
+          this.sock = null;
+          this.isReady = false;
+        }
+      }
 
-    this.isInitializing = true;
+      if (this.isInitializing) {
+        return new Promise((resolve, reject) => {
+          const checkReady = setInterval(() => {
+            if (this.isReady && this.sock) {
+              clearInterval(checkReady);
+              resolve();
+            } else if (!this.isInitializing) {
+              clearInterval(checkReady);
+              reject(new Error('Initialization failed'));
+            }
+          }, 100);
+          
+          setTimeout(() => {
+            clearInterval(checkReady);
+            reject(new Error('Initialization timeout'));
+          }, 180000);
+        });
+      }
 
-    return new Promise((resolve, reject) => {
+      this.isInitializing = true;
+
+      return new Promise((resolve, reject) => {
       (async () => {
         try {
           if (this.sock) {
@@ -106,12 +107,15 @@ class WhatsAppClient {
             // These options minimize unnecessary operations like read receipts syncing,
             // message history syncing, presence updates, and other background operations.
             // This reduces S3 session file updates and improves performance.
+            // NOTE: We must NOT ignore all JIDs because Baileys needs to process protocol
+            // messages (sender keys, pre-keys, group metadata) for proper encryption.
+            // We only skip syncing message content/history.
             syncFullHistory: false,              // Don't sync full message history
             markOnlineOnConnect: false,          // Don't mark as online automatically
             fireInitQueries: false,               // Don't fire initialization queries
             shouldSyncHistoryMessage: () => false, // Don't sync history messages
-            shouldIgnoreJid: () => true,          // Ignore all incoming messages (send-only)
-            getMessage: async () => undefined,    // Don't fetch messages
+            // Removed shouldIgnoreJid - we need protocol messages for encryption to work
+            getMessage: async () => undefined,    // Don't fetch messages (but allow protocol processing)
             connectTimeoutMs: 60000,              // Connection timeout
             defaultQueryTimeoutMs: 60000,         // Query timeout
             // Don't use printQRInTerminal (deprecated) - we handle QR manually for consistency
@@ -131,6 +135,10 @@ class WhatsAppClient {
           reject(error instanceof Error ? error : new Error(String(error)));
         }
       })();
+    });
+    }, {
+      isLambda: this.isLambda,
+      sessionPath: this.sessionPath,
     });
   }
 
@@ -166,7 +174,8 @@ class WhatsAppClient {
 
       // Handle QR code
       if (qr) {
-        clearInitTimeout();
+        // Don't clear timeout - we want to wait for QR code scanning
+        // The timeout will be cleared when connection opens or on error
         this.authRequired = true;
         
         // Common instructions
@@ -200,10 +209,22 @@ class WhatsAppClient {
             console.log('Please use a QR code generator with the string above');
           }
         } else {
-            // In Lambda, reject promise immediately - let the handler log the QR code
-            this.isInitializing = false;
-            reject(new QRAuthenticationRequiredError(qr));
-            return;
+          // In Lambda, log QR code to CloudWatch and continue waiting for scanning
+          console.log('\n\n');
+          console.log('='.repeat(60));
+          console.log('🔐 WHATSAPP AUTHENTICATION REQUIRED');
+          console.log('='.repeat(60));
+          console.log('\n📱 Please scan the QR code below with your WhatsApp mobile app:');
+          instructions.forEach(instruction => console.log(`   ${instruction}`));
+          console.log('\n');
+          console.log('-'.repeat(60));
+          console.log('QR Code (use a QR code generator with this string):');
+          console.log(qr);
+          console.log('-'.repeat(60));
+          console.log('\n⏳ Lambda is waiting for you to scan the QR code...');
+          console.log('💡 You have up to 15 minutes to scan the QR code\n');
+          // Continue waiting - don't reject, don't return
+          // The connection.update handler will resolve when connection === 'open'
         }
       }
 
@@ -331,47 +352,74 @@ class WhatsAppClient {
   }
 
   async findGroupByName(groupName: string): Promise<{ id: string; name: string } | null> {
-    const sock = this.getClient();
-    
-    try {
-      const groups = await sock.groupFetchAllParticipating();
+    return xrayClient.captureAsyncSegment('WhatsApp.findGroupByName', async () => {
+      const sock = this.getClient();
       
-      for (const [groupId, group] of Object.entries(groups)) {
-        const groupData = group as { subject?: string };
-        if (groupData.subject === groupName) {
-          return {
-            id: groupId,
-            name: groupData.subject ?? groupName,
-          };
+      try {
+        const groups = await sock.groupFetchAllParticipating();
+        
+        for (const [groupId, group] of Object.entries(groups)) {
+          const groupData = group as { subject?: string };
+          if (groupData.subject === groupName) {
+            return {
+              id: groupId,
+              name: groupData.subject ?? groupName,
+            };
+          }
         }
+        
+        return null;
+      } catch (error) {
+        throw new Error(`Failed to find group: ${error instanceof Error ? error.message : String(error)}`);
       }
-      
-      return null;
-    } catch (error) {
-      throw new Error(`Failed to find group: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    }, {
+      groupName,
+    });
   }
 
   async sendMessage(chatId: string, message: string): Promise<{ id: string; from: string }> {
-    const sock = this.getClient();
-    
-    try {
-      // Ensure chatId has @g.us suffix for groups
-      const normalizedChatId = chatId.includes('@g.us') ? chatId : `${chatId}@g.us`;
+    return xrayClient.captureAsyncSegment('WhatsApp.sendMessage', async () => {
+      const sock = this.getClient();
       
-      const result = await sock.sendMessage(normalizedChatId, { text: message });
-      
-      if (!result) {
-        throw new Error('Failed to send message: no result returned');
+      try {
+        // Ensure chatId has @g.us suffix for groups
+        const normalizedChatId = chatId.includes('@g.us') ? chatId : `${chatId}@g.us`;
+        
+        // For groups, fetch group metadata first to ensure sender keys are available
+        // This is necessary for proper message encryption when fireInitQueries is disabled
+        if (normalizedChatId.includes('@g.us')) {
+          try {
+            await sock.groupMetadata(normalizedChatId);
+            // Give Baileys a moment to process sender keys if needed
+            await new Promise(resolve => setTimeout(resolve, 500));
+          } catch (metadataError) {
+            // Log but don't fail - metadata fetch might fail but message sending could still work
+            // if sender keys are already cached
+            const errorMessage = metadataError instanceof Error ? metadataError.message : String(metadataError);
+            if (!errorMessage.includes('not found') && !errorMessage.includes('404')) {
+              console.warn(`Warning: Could not fetch group metadata: ${errorMessage}`);
+            }
+          }
+        }
+        
+        const result = await sock.sendMessage(normalizedChatId, { text: message });
+        
+        if (!result) {
+          throw new Error('Failed to send message: no result returned');
+        }
+        
+        return {
+          id: result.key.id ?? '',
+          from: result.key.remoteJid ?? normalizedChatId,
+        };
+      } catch (error) {
+        throw new Error(`Failed to send message: ${error instanceof Error ? error.message : String(error)}`);
       }
-      
-      return {
-        id: result.key.id ?? '',
-        from: result.key.remoteJid ?? normalizedChatId,
-      };
-    } catch (error) {
-      throw new Error(`Failed to send message: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    }, {
+      chatId,
+      messageLength: message.length,
+      isGroup: chatId.includes('@g.us'),
+    });
   }
 
   async destroy(): Promise<void> {

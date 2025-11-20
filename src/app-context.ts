@@ -7,6 +7,7 @@ import whatsappClient from './clients/whatsapp.client.js';
 import cloudWatchMetricsClient from './clients/cloudwatch.client.js';
 import calendarClient from './clients/google-calendar.client.js';
 import sheetsClient from './clients/google-sheets.client.js';
+import xrayClient from './clients/xray.client.js';
 import type { Logger } from './types/logger.types.js';
 import type { AppConfig } from './config.js';
 
@@ -23,6 +24,7 @@ export interface AppContext {
     cloudWatch: typeof cloudWatchMetricsClient;
     calendar: typeof calendarClient;
     sheets: typeof sheetsClient;
+    xray: typeof xrayClient;
   };
 }
 
@@ -50,6 +52,7 @@ export function createAppContext(): AppContext {
       cloudWatch: cloudWatchMetricsClient,
       calendar: calendarClient,
       sheets: sheetsClient,
+      xray: xrayClient,
     },
   };
 

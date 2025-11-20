@@ -1,5 +1,6 @@
 import { google, type sheets_v4 } from 'googleapis';
 import { config } from '../config.js';
+import xrayClient from './xray.client.js';
 
 class GoogleSheetsClient {
   private _sheets: sheets_v4.Sheets | null = null;
@@ -57,38 +58,50 @@ class GoogleSheetsClient {
       return this.cachedSheetName;
     }
 
-    const response = await this.sheets.spreadsheets.get({
+    return xrayClient.captureAsyncSegment('GoogleSheets.getFirstSheetName', async () => {
+      const response = await this.sheets.spreadsheets.get({
+        spreadsheetId: this.spreadsheetId,
+      });
+
+      const sheets = response.data.sheets;
+      if (!sheets || sheets.length === 0) {
+        throw new Error('No sheets found in spreadsheet');
+      }
+
+      this.cachedSheetName = sheets[0].properties?.title ?? 'Sheet1';
+      return this.cachedSheetName;
+    }, {
       spreadsheetId: this.spreadsheetId,
     });
-
-    const sheets = response.data.sheets;
-    if (!sheets || sheets.length === 0) {
-      throw new Error('No sheets found in spreadsheet');
-    }
-
-    this.cachedSheetName = sheets[0].properties?.title ?? 'Sheet1';
-    return this.cachedSheetName;
   }
 
   async readRows(options?: {
     skipHeaderRow?: boolean;
     sheetName?: string;
   }): Promise<string[][]> {
-    const sheetName = options?.sheetName ?? await this.getFirstSheetName();
-    const skipHeaderRow = options?.skipHeaderRow ?? true;
+    return xrayClient.captureAsyncSegment('GoogleSheets.readRows', async () => {
+      const sheetName = options?.sheetName ?? await this.getFirstSheetName();
+      const skipHeaderRow = options?.skipHeaderRow ?? true;
 
-    const response = await this.sheets.spreadsheets.values.get({
+      const response = await this.sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: sheetName,
+      });
+
+      const rows = response.data.values;
+      if (!rows || rows.length === 0) {
+        return [];
+      }
+
+      const startIndex = skipHeaderRow ? 1 : 0;
+      const result = rows.slice(startIndex);
+      
+      return result;
+    }, {
       spreadsheetId: this.spreadsheetId,
-      range: sheetName,
+      sheetName: options?.sheetName ?? 'auto-detect',
+      skipHeaderRow: options?.skipHeaderRow ?? true,
     });
-
-    const rows = response.data.values;
-    if (!rows || rows.length === 0) {
-      return [];
-    }
-
-    const startIndex = skipHeaderRow ? 1 : 0;
-    return rows.slice(startIndex);
   }
 }
 
