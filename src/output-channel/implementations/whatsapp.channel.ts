@@ -195,6 +195,12 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
       
       throw lastError ?? new Error('Failed to send message after retries');
     } catch (error) {
+      // Re-throw QR authentication required error so it bubbles up to handler
+      // This is a fatal error that should stop execution, not be treated as a failed send
+      if (error instanceof QRAuthenticationRequiredError) {
+        throw error;
+      }
+      
       const duration = Date.now() - startTime;
       trackWhatsAppMessageSent(this.metrics, false);
       trackOperationDuration(this.metrics, 'whatsapp.send', duration, { success: 'false' });

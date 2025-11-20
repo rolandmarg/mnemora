@@ -27,6 +27,7 @@ import { LastRunTrackerService } from './last-run-tracker.service.js';
 import { getFullName } from '../utils/name-helpers.util.js';
 import { isFirstDayOfMonth, startOfMonth, endOfMonth, today, startOfDay } from '../utils/date-helpers.util.js';
 import { initializeCorrelationId } from '../utils/correlation.util.js';
+import { QRAuthenticationRequiredError } from '../types/qr-auth-error.js';
 import type { AppContext } from '../app-context.js';
 
 class BirthdayOrchestratorService {
@@ -146,6 +147,11 @@ class BirthdayOrchestratorService {
           
           await this.logMessage(result.messageId, 'monthly-digest', whatsappChannel, monthlyDigest, true);
         } else {
+          // Re-throw QR authentication required error - this is fatal
+          if (result.error instanceof QRAuthenticationRequiredError) {
+            throw result.error;
+          }
+          
           this.ctx.logger.warn('Failed to send missed monthly digest', {
             date: dateStr,
             error: result.error?.message,
@@ -156,6 +162,11 @@ class BirthdayOrchestratorService {
           });
         }
       } catch (error) {
+        // Re-throw QR authentication required error - this is fatal
+        if (error instanceof QRAuthenticationRequiredError) {
+          throw error;
+        }
+        
         this.ctx.logger.error(`Error recovering monthly digest for ${dateStr}`, error);
         this.alerting.sendMissedDaysRecoveryFailedAlert(error, {
           missedDate: dateStr,
@@ -163,6 +174,11 @@ class BirthdayOrchestratorService {
         });
       }
     } catch (error) {
+      // Re-throw QR authentication required error - this is fatal
+      if (error instanceof QRAuthenticationRequiredError) {
+        throw error;
+      }
+      
       this.ctx.logger.error('Error processing missed monthly digest recovery', error);
       this.alerting.sendMissedDaysRecoveryFailedAlert(error, {
         stage: 'initialization',
@@ -217,32 +233,56 @@ class BirthdayOrchestratorService {
               
               await this.alerting.resolveAlert('monthly-digest-failed');
             } else {
-              this.ctx.logger.warn('Failed to send monthly digest to WhatsApp', {
-                error: result.error?.message,
+              // Re-throw QR authentication required error - this is fatal
+              if (result.error instanceof QRAuthenticationRequiredError) {
+                throw result.error;
+              }
+              
+              // Throw error - WhatsApp send failures are fatal
+              const error = result.error instanceof Error 
+                ? new Error(`Failed to send monthly digest to WhatsApp: ${result.error.message}`)
+                : new Error('Failed to send monthly digest to WhatsApp');
+              
+              this.ctx.logger.error('Failed to send monthly digest to WhatsApp', {
+                error: error.message,
               });
               
               if (isFirstDayOfMonth(new Date())) {
-                this.alerting.sendMonthlyDigestFailedAlert(result.error, {
+                this.alerting.sendMonthlyDigestFailedAlert(result.error || error, {
                   messageId: result.messageId,
                   isFirstOfMonth: true,
                 });
               } else {
-                this.alerting.sendWhatsAppMessageFailedAlert(result.error, {
+                this.alerting.sendWhatsAppMessageFailedAlert(result.error || error, {
                   messageType: 'monthly-digest',
                 });
               }
+              
+              throw error;
             }
           } else {
-            this.ctx.logger.info('WhatsApp channel is not available (WHATSAPP_GROUP_ID not configured)');
+            // WhatsApp channel unavailable - this is fatal when monthly digest is needed
+            const error = new Error('WhatsApp channel is not available (WHATSAPP_GROUP_ID not configured)');
+            this.ctx.logger.error('WhatsApp channel is not available', {
+              reason: 'channel_unavailable',
+            });
             
             if (isFirstDayOfMonth(new Date())) {
-              this.alerting.sendMonthlyDigestFailedAlert(new Error('WhatsApp channel not available'), {
+              this.alerting.sendMonthlyDigestFailedAlert(error, {
                 isFirstOfMonth: true,
                 reason: 'channel_unavailable',
               });
             }
+            
+            throw error;
           }
         } catch (error) {
+          // Re-throw QR authentication required error - this is fatal
+          if (error instanceof QRAuthenticationRequiredError) {
+            throw error;
+          }
+          
+          // Re-throw all errors - WhatsApp failures are fatal
           this.ctx.logger.error('Error sending monthly digest to WhatsApp', error);
           
           if (isFirstDayOfMonth(new Date())) {
@@ -254,6 +294,8 @@ class BirthdayOrchestratorService {
               messageType: 'monthly-digest',
             });
           }
+          
+          throw error;
         }
       }
       
@@ -297,10 +339,22 @@ class BirthdayOrchestratorService {
                   { messageIndex: index }
                 );
               } else {
-                this.ctx.logger.warn('Failed to send birthday message to WhatsApp', {
-                  error: result.error?.message,
+                // Re-throw QR authentication required error - this is fatal
+                if (result.error instanceof QRAuthenticationRequiredError) {
+                  throw result.error;
+                }
+                
+                // Throw error immediately - WhatsApp send failures are fatal (fail fast on first failure)
+                const error = result.error instanceof Error 
+                  ? new Error(`Failed to send birthday message to WhatsApp: ${result.error.message}`)
+                  : new Error('Failed to send birthday message to WhatsApp');
+                
+                this.ctx.logger.error('Failed to send birthday message to WhatsApp', {
+                  error: error.message,
+                  messageIndex: index,
                 });
-                this.alerting.sendWhatsAppMessageFailedAlert(result.error, {
+                
+                this.alerting.sendWhatsAppMessageFailedAlert(result.error || error, {
                   messageType: 'birthday',
                   messageId: result.messageId,
                 });
@@ -312,18 +366,34 @@ class BirthdayOrchestratorService {
                   message,
                   false,
                   sendDuration,
-                  result.error,
+                  result.error || error,
                   { messageIndex: index }
                 );
+                
+                throw error;
               }
               
               await new Promise(resolve => setTimeout(resolve, 1000));
             }, Promise.resolve());
           } else {
-            this.ctx.logger.info('WhatsApp channel is not available (WHATSAPP_GROUP_ID not configured)');
+            // WhatsApp channel unavailable - this is fatal when there are birthdays to send
+            const error = new Error('WhatsApp channel is not available (WHATSAPP_GROUP_ID not configured)');
+            this.ctx.logger.error('WhatsApp channel is not available', {
+              reason: 'channel_unavailable',
+              birthdaysCount: todaysBirthdays.length,
+            });
+            
+            throw error;
           }
         } catch (error) {
+          // Re-throw QR authentication required error - this is fatal
+          if (error instanceof QRAuthenticationRequiredError) {
+            throw error;
+          }
+          
+          // Re-throw all errors - WhatsApp failures are fatal
           this.ctx.logger.error('Error sending birthday messages to WhatsApp', error);
+          throw error;
         }
       }
       
