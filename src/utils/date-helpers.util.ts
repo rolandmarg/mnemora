@@ -1,81 +1,8 @@
+import { fromZonedTime, toZonedTime } from 'date-fns-tz';
 import { config } from '../config.js';
 
 function getTimezone(): string {
   return config.schedule.timezone;
-}
-
-function fromZonedTime(date: Date, timeZone: string): Date {
-  // Get the date/time components as they appear in the target timezone
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  });
-  
-  const parts = formatter.formatToParts(date);
-  const year = parseInt(parts.find(p => p.type === 'year')?.value || '0', 10);
-  const month = parseInt(parts.find(p => p.type === 'month')?.value || '0', 10) - 1;
-  const day = parseInt(parts.find(p => p.type === 'day')?.value || '0', 10);
-  const hour = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
-  const minute = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10);
-  const second = parseInt(parts.find(p => p.type === 'second')?.value || '0', 10);
-  
-  // Create an ISO string representing this time
-  const isoString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}`;
-  
-  // Create a date as if this ISO string were in UTC
-  const utcCandidate = new Date(isoString + 'Z');
-  
-  // Now format that UTC candidate back to the target timezone to see what it actually represents
-  const tzParts = formatter.formatToParts(utcCandidate);
-  const tzYear = parseInt(tzParts.find(p => p.type === 'year')?.value || '0', 10);
-  const tzMonth = parseInt(tzParts.find(p => p.type === 'month')?.value || '0', 10) - 1;
-  const tzDay = parseInt(tzParts.find(p => p.type === 'day')?.value || '0', 10);
-  const tzHour = parseInt(tzParts.find(p => p.type === 'hour')?.value || '0', 10);
-  const tzMinute = parseInt(tzParts.find(p => p.type === 'minute')?.value || '0', 10);
-  const tzSecond = parseInt(tzParts.find(p => p.type === 'second')?.value || '0', 10);
-  
-  // Calculate the offset: how much we need to adjust
-  const tzDate = new Date(tzYear, tzMonth, tzDay, tzHour, tzMinute, tzSecond);
-  const localDate = new Date(year, month, day, hour, minute, second);
-  const offsetMs = localDate.getTime() - tzDate.getTime();
-  
-  // Apply the offset to get the correct UTC time
-  // offsetMs is (what we want) - (what we got), so add it to adjust
-  return new Date(utcCandidate.getTime() + offsetMs);
-}
-
-
-function toZonedTime(date: Date, timeZone: string): Date {
-  // Format the UTC date as if it were in the target timezone
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  });
-  
-  const parts = formatter.formatToParts(date);
-  const year = parseInt(parts.find(p => p.type === 'year')?.value || '0', 10);
-  const month = parseInt(parts.find(p => p.type === 'month')?.value || '0', 10) - 1;
-  const day = parseInt(parts.find(p => p.type === 'day')?.value || '0', 10);
-  const hour = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
-  const minute = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10);
-  const second = parseInt(parts.find(p => p.type === 'second')?.value || '0', 10);
-  
-  // Create a date object with these components (treating them as if in the target timezone)
-  // Then convert it back to UTC using fromZonedTime to ensure correct timezone handling
-  const localDate = new Date(year, month, day, hour, minute, second);
-  return fromZonedTime(localDate, timeZone);
 }
 
 function createDateInTimezone(year: number, month: number, day: number): Date {
