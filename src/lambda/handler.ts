@@ -18,11 +18,17 @@ export async function handler(
     setCorrelationId(correlationId);
   }
 
+  // Determine invocation source - EventBridge events have 'source' field, manual invokes don't
+  const isManualInvoke = !event.source || event.source === '';
+  const eventSource = isManualInvoke ? 'manual-invoke' : event.source;
+  const eventType = isManualInvoke ? 'ManualInvocation' : (event['detail-type'] || 'Unknown');
+  
   appContext.logger.info('Lambda function invoked', {
     functionName: context.functionName,
     requestId: context.awsRequestId,
-    eventSource: event.source,
-    eventType: event['detail-type'],
+    eventSource,
+    eventType,
+    isManualInvoke,
     remainingTime: context.getRemainingTimeInMillis(),
   });
 

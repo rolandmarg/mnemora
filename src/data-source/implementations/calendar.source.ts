@@ -55,9 +55,31 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
 
     const birthdayEvents = events.filter(event => isBirthdayEvent(event));
     
-    return birthdayEvents
+    const records = birthdayEvents
       .map(eventToBirthdayRecord)
       .filter((record): record is BirthdayRecord => record !== null);
+    
+    // Deduplicate records by date, first name, and last name
+    // This prevents sending multiple messages for the same person when duplicates exist
+    const seen = new Set<string>();
+    const deduplicated = records.filter(record => {
+      const key = `${formatDateISO(new Date(record.birthday))}|${record.firstName.toLowerCase()}|${(record.lastName ?? '').toLowerCase()}`;
+      if (seen.has(key)) {
+        this.ctx.logger.warn(`Deduplicating duplicate birthday record: ${getFullName(record.firstName, record.lastName)} on ${formatDateISO(new Date(record.birthday))}`);
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+    
+    if (deduplicated.length < records.length) {
+      this.ctx.logger.info(`Deduplicated ${records.length - deduplicated.length} duplicate birthday record(s)`, {
+        originalCount: records.length,
+        deduplicatedCount: deduplicated.length,
+      });
+    }
+    
+    return deduplicated;
   }
 
   async checkForDuplicates(birthday: BirthdayRecord): Promise<BirthdayRecord[]> {
@@ -139,6 +161,19 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
             lookupKey,
             existingCount: existingBirthdaysMap[lookupKey].length,
           });
+          return { ...acc, skipped: acc.skipped + 1 };
+        }
+
+        // Double-check for duplicates right before inserting to handle race conditions
+        // This prevents duplicates when multiple Lambda invocations run concurrently
+        const duplicates = await this.checkForDuplicates(birthday);
+        if (duplicates.length > 0) {
+          this.ctx.logger.info(`Skipping duplicate birthday for ${fullName} (found during double-check)`, {
+            lookupKey,
+            duplicateCount: duplicates.length,
+          });
+          // Update the map so subsequent items in this batch are also skipped
+          existingBirthdaysMap[lookupKey] = [birthday];
           return { ...acc, skipped: acc.skipped + 1 };
         }
 

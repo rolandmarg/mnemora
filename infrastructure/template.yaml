@@ -128,6 +128,7 @@ Resources:
       Runtime: nodejs20.x
       Timeout: 900
       MemorySize: 512
+      ReservedConcurrentExecutions: 1
       Environment:
         Variables:
           GOOGLE_CALENDAR_ID: !Ref GoogleCalendarId
