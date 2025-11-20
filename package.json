@@ -16,7 +16,7 @@
     "get-all-birthdays": "tsx src/scripts/get-all-birthdays.ts",
     "send-monthly-digest-whatsapp": "tsx src/scripts/send-monthly-digest-whatsapp.ts",
     "manual-send": "tsx src/scripts/manual-send.ts",
-    "deduplicate-birthdays": "tsx src/scripts/deduplicate-birthdays.ts",
+    "delete-all-events": "tsx src/scripts/delete-all-events.ts",
     "install-cron": "./scripts/install-cron.sh",
     "uninstall-cron": "./scripts/uninstall-cron.sh",
     "type-check": "tsc --noEmit",

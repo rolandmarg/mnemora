@@ -87,21 +87,31 @@ yarn dev            # Development mode with auto-reload
 
 ### CLI Scripts
 
-#### Deduplicate Birthday Events
+#### Delete All Events ⚠️ DESTRUCTIVE
 
-If duplicate birthday events were created (e.g., due to concurrent Lambda executions), you can clean them up:
+**⚠️ WARNING: This will delete ALL events from your Google Calendar! This cannot be undone!**
+
+Use this script only if you need to completely clear your calendar:
 
 ```bash
 # Dry run - shows what would be deleted (safe, no changes)
-yarn deduplicate-birthdays
+yarn delete-all-events
 
-# Actually delete duplicates (requires confirmation)
-yarn deduplicate-birthdays --confirm
+# Actually delete ALL events (requires confirmation)
+yarn delete-all-events --confirm
 ```
 
-The script identifies duplicates by matching date, first name, and last name, then keeps one event and deletes the rest.
+**Use Cases:**
+- Starting fresh with a clean calendar
+- Removing all events before re-syncing from Sheets
+- Complete calendar reset
 
-**Note:** See [Bug Fixes Documentation](../docs/bugs-fixes/README.md) for details on how duplicates can occur and how they're prevented.
+**Safety Features:**
+- Dry-run mode by default
+- Requires explicit `--confirm` flag
+- Shows breakdown of birthday vs other events
+- Progress indicator during deletion
+- Detailed logging of all operations
 
 ```bash
 yarn get-todays-birthdays                    # Get today's birthdays
@@ -112,8 +122,8 @@ yarn delete-events --all                     # Delete all birthday events
 yarn delete-events --all --date-range "2024-01-01" "2024-12-31"  # Delete in date range
 yarn manual-send                             # Manually send monthly digest + today's birthdays
 yarn send-monthly-digest-whatsapp            # Send monthly digest to WhatsApp group
-yarn deduplicate-birthdays                   # Find duplicate birthday events (dry run)
-yarn deduplicate-birthdays --confirm          # Delete duplicate birthday events
+yarn delete-all-events                        # Find all events (dry run) ⚠️
+yarn delete-all-events --confirm              # Delete ALL events ⚠️ DESTRUCTIVE
 ```
 
 ### Local Scheduling Setup (macOS)

@@ -88,16 +88,9 @@ Fixed critical bugs that caused:
 3. **Date Range Logic:** Always use inclusive range checks (`>=` and `<=`) not exact matches
 4. **Testing:** Test with concurrent invocations and wide date ranges
 
-## Scripts Added
-
-- `src/scripts/deduplicate-birthdays.ts` - Script to identify and remove duplicate birthday events
-  - Dry-run mode by default
-  - Requires `--confirm` flag to actually delete
-  - Fetches events directly from Google Calendar API to avoid date range bug
-
 ## Deployment Notes
 
 - Lambda configuration change requires redeployment
 - No data migration needed
-- Existing duplicate events can be cleaned up using `yarn deduplicate-birthdays --confirm`
+- Existing duplicate events can be cleaned up using `yarn delete-all-events --confirm` (⚠️ DESTRUCTIVE - deletes ALL events)
 

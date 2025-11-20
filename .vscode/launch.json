@@ -82,21 +82,21 @@
       "skipFiles": ["<node_internals>/**"]
     },
     {
-      "name": "Deduplicate Birthdays (Dry Run)",
+      "name": "Delete All Events (Dry Run)",
       "type": "node",
       "request": "launch",
       "runtimeExecutable": "yarn",
-      "runtimeArgs": ["deduplicate-birthdays"],
+      "runtimeArgs": ["delete-all-events"],
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
       "skipFiles": ["<node_internals>/**"]
     },
     {
-      "name": "Deduplicate Birthdays (Confirm)",
+      "name": "Delete All Events (Confirm) - DESTRUCTIVE",
       "type": "node",
       "request": "launch",
       "runtimeExecutable": "yarn",
-      "runtimeArgs": ["deduplicate-birthdays", "--confirm"],
+      "runtimeArgs": ["delete-all-events", "--confirm"],
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
       "skipFiles": ["<node_internals>/**"]
