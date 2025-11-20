@@ -3,10 +3,8 @@ import { BirthdayService } from '../services/birthday.service.js';
 import { SheetsDataSource } from '../data-source/implementations/sheets.source.js';
 import { CalendarDataSource } from '../data-source/implementations/calendar.source.js';
 import { WhatsAppOutputChannel } from '../output-channel/implementations/whatsapp.channel.js';
-import { OutputChannelFactory } from '../output-channel/output-channel.factory.js';
 import type { AppContext } from '../app-context.js';
 import type { BirthdayRecord } from '../types/birthday.types.js';
-import type { SendResult } from '../output-channel/output-channel.interface.js';
 
 // Mock date helpers to return Nov 18, 2024
 const mockToday = new Date(2024, 10, 18); // November 18, 2024 (month is 0-indexed)
