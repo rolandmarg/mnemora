@@ -52,21 +52,7 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
       events = await this.ctx.clients.calendar.fetchEvents({ startDate: todayDate, endDate: todayDate });
     }
 
-    this.ctx.logger.info(`Calendar read: fetched ${events.length} total event(s) from API`, {
-      dateRange: startDate && endDate ? {
-        start: startDate.toISOString().split('T')[0],
-        end: endDate.toISOString().split('T')[0],
-      } : undefined,
-      eventSummaries: events.slice(0, 5).map(e => e.summary),
-    });
-
     const birthdayEvents = events.filter(event => isBirthdayEvent(event));
-    
-    this.ctx.logger.info(`Calendar read: filtered to ${birthdayEvents.length} birthday event(s)`, {
-      totalEvents: events.length,
-      birthdayEvents: birthdayEvents.length,
-      sampleSummaries: birthdayEvents.slice(0, 3).map(e => e.summary),
-    });
     
     const records = birthdayEvents
       .map(eventToBirthdayRecord)
@@ -149,20 +135,6 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
 
     const dateRangeYears = Math.ceil((maxDate.getTime() - minDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
 
-    // Log with context about recurring events if relevant
-    const logMessage = dateRangeYears > 1 && uniqueRecurringEvents.size > 0
-      ? `Found ${existingBirthdayMap.size} existing birthday event instance(s) in date range (${uniqueRecurringEvents.size} unique recurring events expanded across ${dateRangeYears} year(s))`
-      : `Found ${existingBirthdayMap.size} existing birthday event(s) in date range`;
-
-    this.ctx.logger.info(logMessage, {
-      dateRange: {
-        start: formatDateISO(minDate),
-        end: formatDateISO(maxDate),
-      },
-      birthdaysToAdd: birthdays.length,
-      uniqueRecurringEvents: uniqueRecurringEvents.size,
-      dateRangeYears,
-    });
 
     return {
       map: existingBirthdayMap,
@@ -185,18 +157,12 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
 
     // Check if birthday already exists
     if (existingBirthdayMap.has(duplicateKey)) {
-      this.ctx.logger.info(`Skipping existing birthday event for ${fullName}`, {
-        date: dateString,
-      });
+      this.ctx.logger.info(`Skipping duplicate birthday for ${fullName}`);
       return { added: 0, skipped: 1, errors: 0 };
     }
 
     // Create new birthday event
     try {
-      this.ctx.logger.info(`Creating birthday event for ${fullName}`, {
-        date: dateString,
-      });
-
       await this.ctx.clients.calendar.insertEvent({
         summary: `${fullName}'s Birthday`,
         description: `Birthday of ${fullName}${birthday.year ? ` (born ${birthday.year})` : ''}`,
@@ -219,16 +185,6 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
   }
 
   async write(data: BirthdayRecord[], _options?: WriteOptions): Promise<WriteResult> {
-    this.ctx.logger.info(`Calendar write called with ${data.length} birthday record(s)`, {
-      recordCount: data.length,
-    });
-
-    // Early return for empty input
-    if (data.length === 0) {
-      this.ctx.logger.warn('Calendar write called with empty array - nothing to write');
-      return { added: 0, skipped: 0, errors: 0 };
-    }
-
     // Build map of existing birthdays to check for duplicates
     const { map: existingBirthdayMap } = await this.buildExistingBirthdayMap(data);
 
@@ -241,13 +197,6 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
       result.skipped += status.skipped;
       result.errors += status.errors;
     }
-    
-    this.ctx.logger.info('Calendar write completed', {
-      total: data.length,
-      added: result.added,
-      skipped: result.skipped,
-      errors: result.errors,
-    });
     
     return result;
   }

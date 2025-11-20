@@ -52,16 +52,6 @@
       "skipFiles": ["<node_internals>/**"]
     },
     {
-      "name": "Check Calendar-Sheets Sync",
-      "type": "node",
-      "request": "launch",
-      "runtimeExecutable": "yarn",
-      "runtimeArgs": ["check-calendar-sheets-sync"],
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
-      "skipFiles": ["<node_internals>/**"]
-    },
-    {
       "name": "Delete Events",
       "type": "node",
       "request": "launch",
@@ -227,16 +217,6 @@
       "request": "launch",
       "runtimeExecutable": "yarn",
       "runtimeArgs": ["deploy:force"],
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
-      "skipFiles": ["<node_internals>/**"]
-    },
-    {
-      "name": "Test Lambda Birthday Check",
-      "type": "node",
-      "request": "launch",
-      "runtimeExecutable": "yarn",
-      "runtimeArgs": ["test-lambda-birthday-check"],
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
       "skipFiles": ["<node_internals>/**"]
