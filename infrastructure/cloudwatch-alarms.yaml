@@ -7,6 +7,16 @@ Parameters:
     Description: Name of the Lambda function
     Default: MnemoraBirthdayBot
   
+  DailySummaryFunctionName:
+    Type: String
+    Description: Name of the daily summary Lambda function
+    Default: mnemora-daily-summary-prod
+  
+  Environment:
+    Type: String
+    Description: Environment name (dev/prod)
+    Default: prod
+  
   SnsTopicArn:
     Type: String
     Description: ARN of SNS topic for alerts
@@ -149,6 +159,52 @@ Resources:
           - !Ref SnsTopicArn
           - !Ref AlertTopic
 
+  # Alarm: Lambda initialization errors (Runtime.Unknown) - Main Function
+  LambdaInitErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${FunctionName}-InitError'
+      AlarmDescription: Alert when Lambda fails during initialization (Runtime.Unknown) - catches module load errors, missing env vars, etc.
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      Dimensions:
+        - Name: FunctionName
+          Value: !Sub 'mnemora-birthday-bot-${Environment}'
+      AlarmActions:
+        - !If
+          - UseProvidedSnsTopic
+          - !Ref SnsTopicArn
+          - !Ref AlertTopic
+
+  # Alarm: Lambda initialization errors (Runtime.Unknown) - Daily Summary Function
+  DailySummaryInitErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${DailySummaryFunctionName}-InitError'
+      AlarmDescription: Alert when daily summary Lambda fails during initialization (Runtime.Unknown) - catches module load errors, missing env vars, etc.
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref DailySummaryFunctionName
+      AlarmActions:
+        - !If
+          - UseProvidedSnsTopic
+          - !Ref SnsTopicArn
+          - !Ref AlertTopic
+
 Conditions:
   CreateSnsTopic: !Equals [!Ref SnsTopicArn, '']
   UseProvidedSnsTopic: !Not [!Equals [!Ref SnsTopicArn, '']]
@@ -170,4 +226,12 @@ Outputs:
   MonthlyDigestAlarm:
     Description: Alarm for monthly digest monitoring
     Value: !Ref MonthlyDigestNotSentAlarm
+
+  LambdaInitErrorAlarm:
+    Description: Alarm for Lambda initialization errors (main function)
+    Value: !Ref LambdaInitErrorAlarm
+
+  DailySummaryInitErrorAlarm:
+    Description: Alarm for Lambda initialization errors (daily summary function)
+    Value: !Ref DailySummaryInitErrorAlarm
 

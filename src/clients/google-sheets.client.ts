@@ -2,11 +2,16 @@ import { google, type sheets_v4 } from 'googleapis';
 import { config } from '../config.js';
 
 class GoogleSheetsClient {
-  private readonly sheets: sheets_v4.Sheets;
-  private readonly spreadsheetId: string;
+  private _sheets: sheets_v4.Sheets | null = null;
+  private _spreadsheetId: string | null = null;
   private cachedSheetName: string | null = null;
+  private _initialized = false;
 
-  constructor() {
+  private initialize(): void {
+    if (this._initialized) {
+      return;
+    }
+
     const clientEmail = config.google.clientEmail;
     const privateKey = config.google.privateKey;
     const spreadsheetId = config.google.spreadsheetId;
@@ -19,14 +24,32 @@ class GoogleSheetsClient {
       throw new Error('Google Sheets spreadsheet ID not configured. Please set GOOGLE_SPREADSHEET_ID in .env');
     }
 
-    this.spreadsheetId = spreadsheetId;
+    this._spreadsheetId = spreadsheetId;
 
     const auth = new google.auth.JWT({
       email: clientEmail,
       key: privateKey,
       scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
     });
-    this.sheets = google.sheets({ version: 'v4', auth });
+    this._sheets = google.sheets({ version: 'v4', auth });
+
+    this._initialized = true;
+  }
+
+  private get sheets(): sheets_v4.Sheets {
+    this.initialize();
+    if (!this._sheets) {
+      throw new Error('Sheets client not initialized');
+    }
+    return this._sheets;
+  }
+
+  private get spreadsheetId(): string {
+    this.initialize();
+    if (!this._spreadsheetId) {
+      throw new Error('Sheets client not initialized');
+    }
+    return this._spreadsheetId;
   }
 
   private async getFirstSheetName(): Promise<string> {
@@ -69,5 +92,7 @@ class GoogleSheetsClient {
   }
 }
 
+// Lazy initialization: create instance but don't initialize until first use
+// This allows handlers that don't need sheets (like daily-summary) to load without errors
 export default new GoogleSheetsClient();
 

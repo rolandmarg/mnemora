@@ -36,11 +36,16 @@ interface EventListOptions {
 }
 
 class GoogleCalendarClient {
-  private readonly readOnlyCalendar: CalendarClient;
-  private readonly readWriteCalendar: CalendarClient;
-  private readonly calendarId: string;
+  private _readOnlyCalendar: CalendarClient | null = null;
+  private _readWriteCalendar: CalendarClient | null = null;
+  private _calendarId: string | null = null;
+  private _initialized = false;
 
-  constructor() {
+  private initialize(): void {
+    if (this._initialized) {
+      return;
+    }
+
     const clientEmail = config.google.clientEmail;
     const privateKey = config.google.privateKey;
     const calendarId = config.google.calendarId;
@@ -49,21 +54,47 @@ class GoogleCalendarClient {
       throw new Error('Google Calendar credentials not configured. Please set GOOGLE_CLIENT_EMAIL and GOOGLE_PRIVATE_KEY in .env');
     }
 
-    this.calendarId = calendarId;
+    this._calendarId = calendarId;
 
     const readOnlyAuth = new google.auth.JWT({
       email: clientEmail,
       key: privateKey,
       scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
     });
-    this.readOnlyCalendar = google.calendar({ version: 'v3', auth: readOnlyAuth });
+    this._readOnlyCalendar = google.calendar({ version: 'v3', auth: readOnlyAuth });
 
     const readWriteAuth = new google.auth.JWT({
       email: clientEmail,
       key: privateKey,
       scopes: ['https://www.googleapis.com/auth/calendar'],
     });
-    this.readWriteCalendar = google.calendar({ version: 'v3', auth: readWriteAuth });
+    this._readWriteCalendar = google.calendar({ version: 'v3', auth: readWriteAuth });
+
+    this._initialized = true;
+  }
+
+  private get readOnlyCalendar(): CalendarClient {
+    this.initialize();
+    if (!this._readOnlyCalendar) {
+      throw new Error('Calendar client not initialized');
+    }
+    return this._readOnlyCalendar;
+  }
+
+  private get readWriteCalendar(): CalendarClient {
+    this.initialize();
+    if (!this._readWriteCalendar) {
+      throw new Error('Calendar client not initialized');
+    }
+    return this._readWriteCalendar;
+  }
+
+  private get calendarId(): string {
+    this.initialize();
+    if (!this._calendarId) {
+      throw new Error('Calendar client not initialized');
+    }
+    return this._calendarId;
   }
 
   async fetchEvents(options: EventListOptions): Promise<Event[]> {
@@ -146,5 +177,7 @@ class GoogleCalendarClient {
   }
 }
 
+// Lazy initialization: create instance but don't initialize until first use
+// This allows handlers that don't need calendar (like daily-summary) to load without errors
 const calendarClient = new GoogleCalendarClient();
 export default calendarClient;
