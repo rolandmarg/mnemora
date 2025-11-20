@@ -1,5 +1,10 @@
-import { fromZonedTime, toZonedTime } from 'date-fns-tz';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc.js';
+import timezone from 'dayjs/plugin/timezone.js';
 import { config } from '../config.js';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 function getTimezone(): string {
   return config.schedule.timezone;
@@ -9,14 +14,16 @@ function createDateInTimezone(year: number, month: number, day: number): Date {
   const tz = getTimezone();
   // Create a date at midnight in the target timezone
   const localDate = new Date(year, month - 1, day, 0, 0, 0, 0);
-  return fromZonedTime(localDate, tz);
+  // fromZonedTime equivalent: interpret localDate as being in timezone tz, return UTC Date
+  return dayjs.tz(localDate, tz).toDate();
 }
 
 export function today(): Date {
   const tz = getTimezone();
   const now = new Date();
-  const zonedDate = toZonedTime(now, tz);
-  return new Date(zonedDate.getFullYear(), zonedDate.getMonth(), zonedDate.getDate());
+  // toZonedTime equivalent: convert UTC now to timezone tz, get date components
+  const zonedDate = dayjs(now).tz(tz);
+  return new Date(zonedDate.year(), zonedDate.month(), zonedDate.date());
 }
 
 function createDate(month: number, day: number, year?: number): Date {
