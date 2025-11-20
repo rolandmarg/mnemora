@@ -186,30 +186,7 @@ class WhatsAppClient {
           '4. Scan the QR code below',
         ];
         
-        // Generate QR code for local environment
-        if (!this.isLambda) {
-          try {
-            console.log('\n\n');
-            console.log(`\n${'='.repeat(60)}`);
-            console.log('🔐 WHATSAPP AUTHENTICATION REQUIRED');
-            console.log('='.repeat(60));
-            console.log('\n📱 Please scan the QR code below with your WhatsApp mobile app:');
-            instructions.forEach(instruction => console.log(`   ${instruction}`));
-            console.log('\n');
-            console.log('-'.repeat(60));
-            console.log(''); // Extra blank line before QR code
-            displayQRCode(qr);
-            console.log(''); // Extra blank line after QR code
-            console.log('-'.repeat(60));
-            console.log('\n⏳ Waiting for you to scan the QR code...');
-            console.log('💡 Keep this terminal open while scanning\n');
-          } catch (error) {
-            console.error('Error generating QR code:', error);
-            console.log('\nQR Code string (fallback):', qr);
-            console.log('Please use a QR code generator with the string above');
-          }
-        } else {
-          // In Lambda, log QR code to CloudWatch and continue waiting for scanning
+        try {
           console.log('\n\n');
           console.log('='.repeat(60));
           console.log('🔐 WHATSAPP AUTHENTICATION REQUIRED');
@@ -218,14 +195,19 @@ class WhatsAppClient {
           instructions.forEach(instruction => console.log(`   ${instruction}`));
           console.log('\n');
           console.log('-'.repeat(60));
-          console.log('QR Code (use a QR code generator with this string):');
-          console.log(qr);
+          console.log(''); // Extra blank line before QR code
+          displayQRCode(qr);
+          console.log(''); // Extra blank line after QR code
           console.log('-'.repeat(60));
-          console.log('\n⏳ Lambda is waiting for you to scan the QR code...');
-          console.log('💡 You have up to 15 minutes to scan the QR code\n');
-          // Continue waiting - don't reject, don't return
-          // The connection.update handler will resolve when connection === 'open'
+          console.log('\n⏳ Waiting for you to scan the QR code...\n');
+        } catch (error) {
+          console.error('Error generating QR code:', error);
+          console.log('\nQR Code string (fallback):');
+          console.log(qr);
+          console.log('Please use a QR code generator with the string above');
         }
+        // Continue waiting - don't reject, don't return
+        // The connection.update handler will resolve when connection === 'open'
       }
 
       // Handle connection open
