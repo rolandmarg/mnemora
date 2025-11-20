@@ -627,12 +627,21 @@ aws logs filter-log-events \
   --filter-pattern "QR_CODE" \
   --max-items 5
 
-# 3. Delete session to force re-authentication
+# 3. Display QR code in terminal (simplest method)
+yarn show-qr-code
+
+# Or run directly:
+# ./scripts/show-qr-code.sh
+
+# Alternative: If you need to specify a different region or log group
+# LOG_GROUP="/aws/lambda/mnemora-birthday-bot-prod" REGION="us-west-1" yarn show-qr-code
+
+# 4. Delete session to force re-authentication
 aws s3 rm s3://mnemora-whatsapp-sessions-prod-YOUR_ACCOUNT_ID/.wwebjs_auth/ \
   --region us-west-1 \
   --recursive
 
-# 4. Manually trigger to get new QR code
+# 5. Manually trigger to get new QR code
 aws lambda invoke \
   --function-name mnemora-birthday-bot-prod \
   --region us-west-1 \
