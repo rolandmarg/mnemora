@@ -44,7 +44,7 @@ parameter_overrides = [
 ]
 ```
 
-**Important**: For production, use AWS Systems Manager Parameter Store or Secrets Manager for sensitive values like `GooglePrivateKey`.
+**Note**: Configuration values are passed as environment variables via CloudFormation. For a Lambda that runs once daily, this approach is simpler and more cost-effective than using Parameter Store or Secrets Manager.
 
 ## Step 3: Deploy with SAM
 

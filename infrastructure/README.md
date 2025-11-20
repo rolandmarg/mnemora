@@ -55,5 +55,5 @@ All infrastructure files are centralized here for:
 
 - The `samconfig.toml` file contains sensitive values (base64-encoded private keys)
 - Never commit unencrypted secrets to version control
-- For production, consider using AWS Secrets Manager or Parameter Store
+- Configuration is managed via CloudFormation environment variables (simpler for a daily Lambda function)
 

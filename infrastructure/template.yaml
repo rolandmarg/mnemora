@@ -183,13 +183,6 @@ Resources:
               Action:
                 - sns:Publish
               Resource: !Ref AlertTopic
-        - Version: '2012-10-17'
-          Statement:
-            - Effect: Allow
-              Action:
-                - ssm:GetParameter
-                - ssm:GetParameters
-              Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/mnemora/${Environment}/*'
       Events:
         DailySchedule:
           Type: Schedule
@@ -242,13 +235,6 @@ Resources:
               Action:
                 - sns:Publish
               Resource: !Ref AlertTopic
-        - Version: '2012-10-17'
-          Statement:
-            - Effect: Allow
-              Action:
-                - ssm:GetParameter
-                - ssm:GetParameters
-              Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/mnemora/${Environment}/*'
       Events:
         DailySummarySchedule:
           Type: Schedule

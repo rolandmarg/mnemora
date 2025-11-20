@@ -168,11 +168,6 @@ Quick reference guide with useful links, CLI commands, and helpers for managing 
 
 ---
 
-### AWS Systems Manager (Parameter Store / Secrets)
-
-- **Parameter Store**: https://us-west-1.console.aws.amazon.com/systems-manager/parameters?region=us-west-1
-- **Secrets Manager**: https://us-west-1.console.aws.amazon.com/secretsmanager/list?region=us-west-1
-
 ---
 
 ### Quick Links by Category

@@ -30,10 +30,7 @@
     "deploy:lambda": "./scripts/deploy.sh",
     "deploy:force": "rm -rf .aws-sam && ./scripts/deploy.sh --force-upload",
     "invoke:local": "sam local invoke BirthdayBotFunction --event events/event.json",
-    "invoke:lambda": "aws lambda invoke --function-name mnemora-birthday-bot-prod --payload '{}' /dev/stdout | cat",
-    "update-config": "tsx src/scripts/update-config.ts",
-    "setup-parameter-store": "./scripts/setup-parameter-store.sh",
-    "test:dynamic-config": "tsx src/scripts/test-dynamic-config.ts"
+    "invoke:lambda": "aws lambda invoke --function-name mnemora-birthday-bot-prod --payload '{}' /dev/stdout | cat"
   },
   "keywords": [
     "calendar",
@@ -48,7 +45,6 @@
     "@aws-sdk/client-cloudwatch-logs": "^3.932.0",
     "@aws-sdk/client-s3": "^3.932.0",
     "@aws-sdk/client-sns": "^3.932.0",
-    "@aws-sdk/client-ssm": "^3.936.0",
     "@whiskeysockets/baileys": "^6.7.21",
     "dotenv": "^17.2.3",
     "googleapis": "^166.0.0",
