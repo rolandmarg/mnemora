@@ -52,6 +52,16 @@
       "skipFiles": ["<node_internals>/**"]
     },
     {
+      "name": "Check Sync Status",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "yarn",
+      "runtimeArgs": ["check-sync-status"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
       "name": "Delete Events",
       "type": "node",
       "request": "launch",

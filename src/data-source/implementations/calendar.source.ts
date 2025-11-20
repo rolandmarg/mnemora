@@ -2,7 +2,6 @@ import { BaseDataSource } from '../data-source.base.js';
 import { extractNameFromEvent, isBirthdayEvent } from '../../utils/event-helpers.util.js';
 import { extractNameParts, getFullName } from '../../utils/name-helpers.util.js';
 import { parseDateFromString, formatDateISO, today } from '../../utils/date-helpers.util.js';
-import { getDateRangeForBirthdays } from '../../utils/birthday-helpers.util.js';
 import { auditDeletionAttempt, SecurityError } from '../../utils/security.util.js';
 import type { BirthdayRecord } from '../../types/birthday.types.js';
 import type { Event } from '../../types/event.types.js';
@@ -84,16 +83,28 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
 
   async checkForDuplicates(birthday: BirthdayRecord): Promise<BirthdayRecord[]> {
     try {
-      const eventDate = new Date(birthday.birthday);
+      // Check in current year range, not just the birth date
+      // Birthday events are recurring and appear in the current year
+      const currentYear = new Date().getFullYear();
+      const checkStartDate = new Date(currentYear, 0, 1);
+      const checkEndDate = new Date(currentYear + 1, 11, 31);
+      
       const existingBirthdays = await this.read({
-        startDate: eventDate,
-        endDate: eventDate,
+        startDate: checkStartDate,
+        endDate: checkEndDate,
       });
+      
+      // Match by name and date (month/day), regardless of year
+      // Since events are recurring, we match the date pattern, not the exact year
+      const birthdayMonth = birthday.birthday.getMonth();
+      const birthdayDay = birthday.birthday.getDate();
       
       return existingBirthdays.filter(existing => {
         const firstNameMatch = existing.firstName.toLowerCase() === birthday.firstName.toLowerCase();
         const lastNameMatch = (existing.lastName ?? '').toLowerCase() === (birthday.lastName ?? '').toLowerCase();
-        return firstNameMatch && lastNameMatch;
+        const dateMatch = existing.birthday.getMonth() === birthdayMonth && 
+                         existing.birthday.getDate() === birthdayDay;
+        return firstNameMatch && lastNameMatch && dateMatch;
       });
     } catch (error) {
       this.ctx.logger.error('Error checking for duplicates', error);
@@ -127,22 +138,30 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
     const getLookupKey = (b: BirthdayRecord) => 
       `${formatDateISO(new Date(b.birthday))}|${b.firstName.toLowerCase()}|${(b.lastName ?? '').toLowerCase()}`;
     
-    const dateRange = getDateRangeForBirthdays(data);
+    // IMPORTANT: Check for duplicates in current year, not birth year
+    // Birthday events are recurring and appear in the current year, not the birth year
+    // If we check the birth year (e.g., 1990), we'll miss events that exist in 2024/2025
+    const currentYear = new Date().getFullYear();
+    const checkStartDate = new Date(currentYear, 0, 1);
+    const checkEndDate = new Date(currentYear + 1, 11, 31); // Check current year + next year to catch all recurring instances
+    
     this.ctx.logger.info('Checking for existing birthdays in calendar', {
-      dateRange: dateRange ? {
-        min: dateRange.minDate.toISOString().split('T')[0],
-        max: dateRange.maxDate.toISOString().split('T')[0],
-      } : null,
+      dateRange: {
+        min: checkStartDate.toISOString().split('T')[0],
+        max: checkEndDate.toISOString().split('T')[0],
+      },
+      note: 'Checking current year range (not birth year) because events are recurring',
     });
 
-    const existingBirthdays = dateRange 
-      ? await this.read({ startDate: dateRange.minDate, endDate: dateRange.maxDate }).catch((error) => {
-          this.ctx.logger.error('Error reading existing birthdays for duplicate check', error);
-          return [];
-        })
-      : [];
+    const existingBirthdays = await this.read({ 
+      startDate: checkStartDate, 
+      endDate: checkEndDate 
+    }).catch((error) => {
+      this.ctx.logger.error('Error reading existing birthdays for duplicate check', error);
+      return [];
+    });
     
-    this.ctx.logger.info(`Found ${existingBirthdays.length} existing birthday(s) in calendar date range`);
+    this.ctx.logger.info(`Found ${existingBirthdays.length} existing birthday event(s) in calendar (current year range)`);
     
     const existingBirthdaysMap = existingBirthdays.reduce((map, b) => {
       const key = getLookupKey(b);

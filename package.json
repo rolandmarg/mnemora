@@ -14,6 +14,7 @@
     "get-monthly-digest": "tsx src/scripts/get-monthly-digest.ts",
     "get-todays-birthdays-with-digest": "tsx src/scripts/get-todays-birthdays-with-digest.ts",
     "get-all-birthdays": "tsx src/scripts/get-all-birthdays.ts",
+    "check-sync-status": "tsx src/scripts/check-sync-status.ts",
     "send-monthly-digest-whatsapp": "tsx src/scripts/send-monthly-digest-whatsapp.ts",
     "manual-send": "tsx src/scripts/manual-send.ts",
     "delete-all-events": "tsx src/scripts/delete-all-events.ts",

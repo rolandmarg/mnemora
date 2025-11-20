@@ -30,6 +30,9 @@ Each bug fix document follows this structure:
 - [Lambda Duplicates and Date Range Bug](./2025-11-20-lambda-duplicates-and-date-range-bug.md)
   - Fixed Lambda concurrent execution causing duplicate events
   - Fixed `fetchEvents` date range filtering bug
+- [Sync Logic Bug - Duplicate Check Using Wrong Date Range](./2025-11-20-sync-logic-bug.md)
+  - Fixed duplicate check using birth year range instead of current year range
+  - Fixed recurring event duplicate detection
 
 ## Contributing
 

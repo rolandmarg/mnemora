@@ -87,6 +87,20 @@ yarn dev            # Development mode with auto-reload
 
 ### CLI Scripts
 
+#### Check Sync Status
+
+Check the sync status between Google Sheets and Google Calendar:
+
+```bash
+yarn check-sync-status
+```
+
+This script will:
+- Show what birthdays are in Sheets vs Calendar
+- Identify missing birthdays that need to be synced
+- Detect duplicates in the calendar
+- Analyze potential sync issues
+
 #### Delete All Events ⚠️ DESTRUCTIVE
 
 **⚠️ WARNING: This will delete ALL events from your Google Calendar! This cannot be undone!**
@@ -118,6 +132,7 @@ yarn get-todays-birthdays                    # Get today's birthdays
 yarn get-monthly-digest                      # Get monthly digest
 yarn get-todays-birthdays-with-digest        # Get today's birthdays + monthly digest (if 1st)
 yarn get-all-birthdays                       # Read from Sheets, sync to Calendar, display all
+yarn check-sync-status                       # Check sync status between Sheets and Calendar
 yarn delete-events --all                     # Delete all birthday events
 yarn delete-events --all --date-range "2024-01-01" "2024-12-31"  # Delete in date range
 yarn manual-send                             # Manually send monthly digest + today's birthdays

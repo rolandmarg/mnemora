@@ -37,8 +37,13 @@ Fixed critical bugs that caused:
 
 **Files Changed:**
 - `infrastructure/template.yaml` - Attempted reserved concurrency (removed due to account limits)
-- `src/data-source/implementations/calendar.source.ts` - Added race condition protection and deduplication
+- `src/data-source/implementations/calendar.source.ts` - Added race condition protection, deduplication, and fixed duplicate check to use current year range instead of birth year range
 - `src/lambda/handler.ts` - Improved logging for invocation source
+
+**Additional Fix - Sync Logic Bug:**
+- **Issue**: Duplicate check in `write()` and `checkForDuplicates()` was using birth year range (e.g., 1990) instead of current year range
+- **Impact**: Recurring birthday events appear in current year (2024/2025), not birth year, so duplicates were missed
+- **Fix**: Changed duplicate check to query current year + next year range, and match by month/day pattern instead of exact date
 
 **Testing:**
 - Verified Lambda can only run one instance at a time
@@ -80,6 +85,7 @@ Fixed critical bugs that caused:
 
 - Duplicate birthday events created during Lambda concurrent execution
 - Deduplication script unable to find events due to date range bug
+- **Sync logic bug**: Duplicate check was using birth year range instead of current year range (fixed in same update)
 
 ## Prevention
 
