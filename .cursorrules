@@ -76,6 +76,7 @@ You are an expert in TypeScript, Node.js.
 - Scripts should be standalone executable files
 - Utilities should be pure functions when possible
 - Always handle errors with try/catch and meaningful error messages
+- **Function Parameters**: Functions with 4 or more parameters MUST use an object parameter instead of positional arguments for better readability and maintainability
 
 ## Utilities Available
 
@@ -146,6 +147,7 @@ You are an expert in TypeScript, Node.js.
 7. **Scripts**: Always add new scripts to `package.json` and `launch.json` - keep them in sync
 8. **Linting**: Follow ESLint rules - use `yarn lint:fix` to auto-fix issues
 9. **Documentation**: Do NOT add JSDoc type comments - TypeScript types are sufficient
+10. **Function Parameters**: Functions with 4+ arguments MUST use an object parameter pattern. Create an interface/type for the options object. This improves readability, allows optional parameters, and makes the API more maintainable.
 
 ## Environment Variables
 - `GOOGLE_CALENDAR_ID` - Calendar ID (defaults to 'primary')

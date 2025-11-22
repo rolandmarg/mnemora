@@ -2,20 +2,22 @@ import { CalendarDataSource } from './implementations/calendar.source.js';
 import { SheetsDataSource } from './implementations/sheets.source.js';
 import type { AppConfig } from '../config.js';
 import type { Logger } from '../types/logger.types.js';
-import calendarClientDefault from '../clients/google-calendar.client.js';
+import GoogleCalendarClient from '../clients/google-calendar.client.js';
 import sheetsClientDefault from '../clients/google-sheets.client.js';
+import xrayClient from '../clients/xray.client.js';
 
-type CalendarClient = typeof calendarClientDefault;
+type CalendarClient = GoogleCalendarClient;
 type SheetsClient = typeof sheetsClientDefault;
 
 export class DataSourceFactory {
 
   static createCalendarDataSource(
     config: AppConfig,
-    calendarClient: CalendarClient,
+    calendarClient: CalendarClient | null,
     logger: Logger
   ): CalendarDataSource {
-    return new CalendarDataSource(config, calendarClient, logger);
+    const client = calendarClient ?? new GoogleCalendarClient(config, xrayClient);
+    return new CalendarDataSource(config, client, logger);
   }
 
   static createSheetsDataSource(

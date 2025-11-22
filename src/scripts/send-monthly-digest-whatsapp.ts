@@ -3,7 +3,7 @@ import { AlertingService } from '../services/alerting.service.js';
 import { OutputChannelFactory } from '../output-channel/output-channel.factory.js';
 import { logger } from '../utils/logger.util.js';
 import { config } from '../config.js';
-import calendarClient from '../clients/google-calendar.client.js';
+import GoogleCalendarClient from '../clients/google-calendar.client.js';
 import xrayClient from '../clients/xray.client.js';
 import whatsappClient from '../clients/whatsapp.client.js';
 import cloudWatchMetricsClient from '../clients/cloudwatch.client.js';
@@ -11,6 +11,7 @@ import snsClient from '../clients/sns.client.js';
 import { requireDevelopment, auditManualSend, SecurityError } from '../utils/security.util.js';
 
 async function sendMonthlyDigestWhatsApp(): Promise<void> {
+  const calendarClient = new GoogleCalendarClient(config, xrayClient);
   const alerting = new AlertingService({ logger, config, snsClient });
   const birthdayService = new BirthdayService({ logger, config, calendarClient, xrayClient, alerting });
   

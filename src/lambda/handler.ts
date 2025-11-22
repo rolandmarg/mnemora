@@ -3,7 +3,7 @@ import { AlertingService } from '../services/alerting.service.js';
 import { MetricsCollector } from '../services/metrics.service.js';
 import { logger } from '../utils/logger.util.js';
 import { config } from '../config.js';
-import calendarClient from '../clients/google-calendar.client.js';
+import GoogleCalendarClient from '../clients/google-calendar.client.js';
 import xrayClient from '../clients/xray.client.js';
 import cloudWatchClient from '../clients/cloudwatch.client.js';
 import whatsappClient from '../clients/whatsapp.client.js';
@@ -54,6 +54,8 @@ export async function handler(
       }, (context.getRemainingTimeInMillis() - 60000));
 
       try {
+        const calendarClient = new GoogleCalendarClient(config, xrayClient);
+        
         await runBirthdayCheck({
           logger,
           config,

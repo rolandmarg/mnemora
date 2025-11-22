@@ -8,9 +8,9 @@ import type { Event } from '../../types/event.types.js';
 import type { ReadOptions, WriteOptions, WriteResult, DeleteResult, DataSourceMetadata } from '../data-source.interface.js';
 import type { AppConfig } from '../../config.js';
 import type { Logger } from '../../types/logger.types.js';
-import calendarClientDefault from '../../clients/google-calendar.client.js';
+import GoogleCalendarClient from '../../clients/google-calendar.client.js';
 
-type CalendarClient = typeof calendarClientDefault;
+type CalendarClient = GoogleCalendarClient;
 
 function eventToBirthdayRecord(event: Event): BirthdayRecord | null {
   const startDate = event.start?.date ?? event.start?.dateTime;

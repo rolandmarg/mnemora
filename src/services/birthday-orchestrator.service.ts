@@ -29,11 +29,11 @@ import { initializeCorrelationId } from '../utils/runtime.util.js';
 import { QRAuthenticationRequiredError } from '../types/qr-auth-error.js';
 import type { Logger } from '../types/logger.types.js';
 import type { AppConfig } from '../config.js';
-import calendarClientDefault from '../clients/google-calendar.client.js';
+import GoogleCalendarClient from '../clients/google-calendar.client.js';
 import xrayClientDefault from '../clients/xray.client.js';
 import cloudWatchMetricsClientDefault from '../clients/cloudwatch.client.js';
 
-type CalendarClient = typeof calendarClientDefault;
+type CalendarClient = GoogleCalendarClient;
 type XRayClient = typeof xrayClientDefault;
 type CloudWatchClient = typeof cloudWatchMetricsClientDefault;
 

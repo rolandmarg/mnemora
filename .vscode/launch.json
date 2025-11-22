@@ -72,16 +72,6 @@
       "skipFiles": ["<node_internals>/**"]
     },
     {
-      "name": "Manual Send",
-      "type": "node",
-      "request": "launch",
-      "runtimeExecutable": "yarn",
-      "runtimeArgs": ["manual-send"],
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
-      "skipFiles": ["<node_internals>/**"]
-    },
-    {
       "name": "Delete All Events (Dry Run)",
       "type": "node",
       "request": "launch",

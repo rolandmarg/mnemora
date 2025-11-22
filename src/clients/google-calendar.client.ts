@@ -2,9 +2,9 @@ import { google, type calendar_v3 } from 'googleapis';
 import { auditDeletionAttempt, SecurityError } from '../utils/security.util.js';
 import { startOfDay, endOfDay } from '../utils/date-helpers.util.js';
 import { logger } from '../utils/logger.util.js';
-import { config } from '../config.js';
-import xrayClient from './xray.client.js';
 import type { Event, DeletionResult } from '../types/event.types.js';
+import { BaseClient, type XRayClientInterface } from './base.client.js';
+import type { AppConfig } from '../config.js';
 
 type CalendarClient = calendar_v3.Calendar;
 type CalendarEvent = calendar_v3.Schema$Event;
@@ -30,29 +30,36 @@ function calendarEventToEvent(calendarEvent: CalendarEvent): Event {
   };
 }
 
-interface EventListOptions {
+export interface EventListOptions {
   startDate: Date;
   endDate: Date;
   maxResults?: number;
 }
 
-class GoogleCalendarClient {
+class GoogleCalendarClient extends BaseClient {
   private _readOnlyCalendar: CalendarClient | null = null;
   private _readWriteCalendar: CalendarClient | null = null;
   private _calendarId: string | null = null;
   private _initialized = false;
+
+  constructor(config: AppConfig, xrayClient: XRayClientInterface) {
+    super(config, xrayClient);
+  }
 
   private initialize(): void {
     if (this._initialized) {
       return;
     }
 
-    const clientEmail = config.google.clientEmail;
-    const privateKey = config.google.privateKey;
-    const calendarId = config.google.calendarId;
+    const clientEmail = this.config.google.clientEmail;
+    const privateKey = this.config.google.privateKey;
+    const calendarId = this.config.google.calendarId;
     
     if (!clientEmail || !privateKey) {
-      throw new Error('Google Calendar credentials not configured. Please set GOOGLE_CLIENT_EMAIL and GOOGLE_PRIVATE_KEY in .env');
+      throw this.createError(
+        'GoogleCalendar',
+        'Google Calendar credentials not configured. Please set GOOGLE_CLIENT_EMAIL and GOOGLE_PRIVATE_KEY in .env'
+      );
     }
 
     this._calendarId = calendarId;
@@ -77,7 +84,7 @@ class GoogleCalendarClient {
   private get readOnlyCalendar(): CalendarClient {
     this.initialize();
     if (!this._readOnlyCalendar) {
-      throw new Error('Calendar client not initialized');
+      throw this.createError('GoogleCalendar', 'Read-only calendar client not initialized');
     }
     return this._readOnlyCalendar;
   }
@@ -85,7 +92,7 @@ class GoogleCalendarClient {
   private get readWriteCalendar(): CalendarClient {
     this.initialize();
     if (!this._readWriteCalendar) {
-      throw new Error('Calendar client not initialized');
+      throw this.createError('GoogleCalendar', 'Read-write calendar client not initialized');
     }
     return this._readWriteCalendar;
   }
@@ -93,14 +100,14 @@ class GoogleCalendarClient {
   private get calendarId(): string {
     this.initialize();
     if (!this._calendarId) {
-      throw new Error('Calendar client not initialized');
+      throw this.createError('GoogleCalendar', 'Calendar ID not initialized');
     }
     return this._calendarId;
   }
 
   async fetchEvents(options: EventListOptions): Promise<Event[]> {
     const { startDate, endDate, maxResults } = options;
-    return xrayClient.captureAsyncSegment('GoogleCalendar.fetchEvents', async () => {
+    return this.captureSegment('GoogleCalendar', 'fetchEvents', async () => {
       const start = startOfDay(startDate);
       const end = endOfDay(endDate);
       
@@ -166,7 +173,7 @@ class GoogleCalendarClient {
   }
 
   async deleteEvent(eventId: string): Promise<boolean> {
-    return xrayClient.captureAsyncSegment('GoogleCalendar.deleteEvent', async () => {
+    return this.captureSegment('GoogleCalendar', 'deleteEvent', async () => {
       auditDeletionAttempt(logger, 'GoogleCalendarClient.deleteEvent', { eventId });
       throw new SecurityError('Deletion of calendar events is disabled for security reasons');
     }, {
@@ -176,7 +183,7 @@ class GoogleCalendarClient {
   }
 
   async deleteAllEvents(events: Event[]): Promise<DeletionResult> {
-    return xrayClient.captureAsyncSegment('GoogleCalendar.deleteAllEvents', async () => {
+    return this.captureSegment('GoogleCalendar', 'deleteAllEvents', async () => {
       auditDeletionAttempt(logger, 'GoogleCalendarClient.deleteAllEvents', {
         eventCount: events.length,
         eventIds: events.map(e => e.id).filter(Boolean),
@@ -189,7 +196,7 @@ class GoogleCalendarClient {
   }
 
   async insertEvent(event: Event): Promise<{ id: string }> {
-    return xrayClient.captureAsyncSegment('GoogleCalendar.insertEvent', async () => {
+    return this.captureSegment('GoogleCalendar', 'insertEvent', async () => {
       const calendarEvent = {
         summary: event.summary,
         description: event.description,
@@ -206,7 +213,7 @@ class GoogleCalendarClient {
       });
 
       if (!response.data.id) {
-        throw new Error('Event created but no ID returned');
+        throw this.createError('GoogleCalendar', 'Event created but no ID returned');
       }
 
       return { id: response.data.id };
@@ -218,7 +225,4 @@ class GoogleCalendarClient {
   }
 }
 
-// Lazy initialization: create instance but don't initialize until first use
-// This allows handlers that don't need calendar (like daily-summary) to load without errors
-const calendarClient = new GoogleCalendarClient();
-export default calendarClient;
+export default GoogleCalendarClient;

@@ -18,12 +18,12 @@ import type { AppConfig } from '../config.js';
 import type { BirthdayRecord } from '../types/birthday.types.js';
 import type { OutputChannel } from '../output-channel/output-channel.interface.js';
 import type { WriteResult } from '../data-source/data-source.interface.js';
-import calendarClientDefault from '../clients/google-calendar.client.js';
+import GoogleCalendarClient from '../clients/google-calendar.client.js';
 import xrayClientDefault from '../clients/xray.client.js';
 import cloudWatchMetricsClientDefault from '../clients/cloudwatch.client.js';
 import sheetsClientDefault from '../clients/google-sheets.client.js';
 
-type CalendarClient = typeof calendarClientDefault;
+type CalendarClient = GoogleCalendarClient;
 type XRayClient = typeof xrayClientDefault;
 
 interface BirthdayServiceOptions {
