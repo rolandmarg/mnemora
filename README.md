@@ -97,22 +97,33 @@ Install/update SAM CLI:
 brew install aws-sam-cli  # or brew upgrade aws-sam-cli
 ```
 
-### ⚠️ Important: Baileys Version
+### ⚠️ Critical: Baileys Version Must Be Locked
 
-**Do NOT upgrade `@whiskeysockets/baileys` beyond 6.7.21.**
+**DO NOT use `^` or `~` for `@whiskeysockets/baileys`. It MUST be locked to exactly `6.7.21`.**
 
-Versions 6.17.16+ introduce audio decoder dependencies (~22MB) that are unnecessary for text-only WhatsApp messaging:
-- `@wasm-audio-decoders` (~9MB)
-- `node-wav` (~8MB)
-- `ogg-opus-decoder` (~5MB)
+Versions 6.17.16+ introduce:
+- Audio decoder dependencies (~22MB): `@wasm-audio-decoders`, `node-wav`, `ogg-opus-decoder`
+- Additional dependencies (~10MB): `lodash` (4.9MB) and `libphonenumber-js` (5.6MB)
 
-These dependencies significantly increase Lambda package size. The current version `^6.7.21` is sufficient for text messaging and keeps the package size optimal (~40MB vs ~60MB+ with audio decoders).
+**Impact**: Package size increases from ~37MB to ~60MB+, which can cause Lambda deployment issues.
+
+**Correct configuration:**
+```json
+"@whiskeysockets/baileys": "6.7.21"  // ✅ Exact version (no ^ or ~)
+```
+
+**Wrong configuration:**
+```json
+"@whiskeysockets/baileys": "^6.7.21"  // ❌ Allows 6.17.16+ to be installed
+"@whiskeysockets/baileys": "~6.7.21"  // ❌ Also allows updates
+```
 
 **If you need to upgrade Baileys:**
 1. Check if audio features are actually needed
 2. Test package size impact: `yarn package:lambda`
 3. Verify size stays under 100MB
 4. Update cleanup script if needed
+5. Document why the upgrade is necessary
 
 ### Deploy
 

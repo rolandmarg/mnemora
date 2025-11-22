@@ -47,12 +47,15 @@
     "aws-sam-cli": ">=1.148.0",
     "note": "SAM CLI 1.148.0+ required for nodejs24.x runtime support. Checked automatically in deploy.sh"
   },
+  "_importantNotes": {
+    "@whiskeysockets/baileys": "MUST be locked to exactly 6.7.21 (no ^ or ~). Versions 6.17.16+ add audio decoders (~22MB) and lodash+libphonenumber-js (~10MB), significantly increasing Lambda package size from ~37MB to ~60MB+."
+  },
   "dependencies": {
     "@aws-lambda-powertools/tracer": "^2.29.0",
     "@aws-sdk/client-cloudwatch": "^3.936.0",
     "@aws-sdk/client-s3": "^3.937.0",
     "@aws-sdk/client-sns": "^3.936.0",
-    "@whiskeysockets/baileys": "^6.7.21",
+    "@whiskeysockets/baileys": "6.7.21",
     "dayjs": "^1.11.19",
     "dotenv": "^17.2.3",
     "googleapis": "^166.0.0",

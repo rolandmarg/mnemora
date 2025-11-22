@@ -5,7 +5,7 @@
  */
 
 import { execSync } from 'node:child_process';
-import { existsSync, rmSync, cpSync } from 'node:fs';
+import { existsSync, rmSync, cpSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 // Get project root - scripts are run from project root, so use process.cwd()
@@ -77,39 +77,48 @@ if (existsSync(distNodeModules)) {
   rmSync(distNodeModules, { recursive: true, force: true });
 }
 
-// Install dependencies in dist (devDependencies will be removed in cleanup)
+// Install dependencies in dist (will remove devDependencies manually after)
 console.log('Installing dependencies in dist...');
 exec('NODE_ENV=production YARN_ENABLE_SCRIPTS=false yarn install --immutable', {
   cwd: join(PROJECT_ROOT, 'dist')
 });
+
+// Remove devDependencies manually (yarn workspaces focus doesn't work reliably for single packages)
+console.log('Removing devDependencies...');
+const distPackageJsonPath = join(PROJECT_ROOT, 'dist/package.json');
+const packageJson = JSON.parse(readFileSync(distPackageJsonPath, 'utf-8'));
+const devDepsToRemove = Object.keys(packageJson.devDependencies || {});
+for (const dep of devDepsToRemove) {
+  removeIfExists(join(distNodeModules, dep));
+  // Also remove scoped packages
+  if (dep.includes('/')) {
+    const [scope, name] = dep.split('/');
+    removeIfExists(join(distNodeModules, scope, name));
+  }
+}
+// Remove wildcard patterns for common dev dependency scopes and transitive dependencies
+removeDirs('@typescript-eslint*', distNodeModules);
+removeDirs('@eslint*', distNodeModules);
+removeDirs('@esbuild*', distNodeModules);
+removeDirs('*typescript*', distNodeModules);
+removeDirs('*vitest*', distNodeModules);
+removeDirs('*eslint*', distNodeModules);
+// Remove transitive dev dependencies (from vitest, etc.)
+removeDirs('*rollup*', distNodeModules);
+removeDirs('*vite*', distNodeModules);
+removeDirs('*node-gyp*', distNodeModules);
+// Explicitly remove known dev dependencies that might be transitive
+const knownTransitiveDevDeps = ['rollup', 'vite', 'node-gyp', '@rollup'];
+for (const dep of knownTransitiveDevDeps) {
+  removeIfExists(join(distNodeModules, dep));
+}
 
 // Clean up dist/node_modules to reduce package size
 if (existsSync(distNodeModules)) {
   console.log('');
   console.log('Cleaning up dist/node_modules to reduce package size...');
   
-  // Remove devDependencies
-  console.log('   Removing devDependencies...');
-  const devDeps = [
-    'typescript',
-    '@typescript-eslint',
-    'eslint',
-    '@eslint',
-    '@eslint-community',
-    '@types',
-    'vitest',
-    '@vitest',
-    'tsx',
-    'pino-pretty',
-    'globals'
-  ];
-  
-  for (const dep of devDeps) {
-    removeIfExists(join(distNodeModules, dep));
-  }
-  
-  removeDirs('eslint*', distNodeModules);
-  removeDirs('*typescript*', distNodeModules);
+  // Note: devDependencies are already removed by yarn workspaces focus --production
   
   // Clean up .bin directories
   console.log('   Cleaning up .bin directories (CLI tools not needed in Lambda)...');
