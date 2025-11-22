@@ -18,8 +18,7 @@ export NODE_ENV=production
 # Ensure production mode for SAM build
 # SAM will use existing node_modules from dist/ if present, which already has production deps only
 sam build \
-  --template-file "$PROJECT_ROOT/infrastructure/template.yaml" \
-  --use-container=false
+  --template-file "$PROJECT_ROOT/infrastructure/template.yaml"
 echo "✅ SAM build complete"
 
 echo ""
