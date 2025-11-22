@@ -12,6 +12,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+---
+## [1.0.5] - 2025-11-22
+
+## What's Changed
+
+### 🧪 Tests
+
+- Enhance date utilities tests with timezone support (8cffe96)
+
+### 🔧 Chores
+
+- Update README and enhance auto-release workflow (ea1dfe3)
+
+### 📦 Other Changes
+
+- Merge branch 'main' of https://github.com/rolandmarg/mnemora (b54de5e)
+
+**Full Changelog**: v1.0.4...v1.0.5
+
 ---
 ## [1.0.4] - 2025-11-22
 
