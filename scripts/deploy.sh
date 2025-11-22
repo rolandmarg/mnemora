@@ -61,10 +61,10 @@ else
 fi
 
 # Package Lambda functions (build + SAM build + cleanup)
-# Note: package-lambda.sh sets NODE_ENV=production and uses --production flags
+# Note: package-lambda.ts sets NODE_ENV=production and uses --production flags
 echo ""
 echo "Building and packaging Lambda functions (production mode)..."
-./scripts/package-lambda.sh
+yarn package:lambda
 
 # Deploy
 echo ""
