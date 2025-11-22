@@ -1,12 +1,15 @@
 # Cursor Rules for Mnemora
 
 ## Project Overview
-Mnemora is a TypeScript bot that fetches Google Calendar birthdays and sends WhatsApp notifications. The project uses:
+Mnemora is a TypeScript bot that fetches Google Calendar birthdays and sends WhatsApp notifications. The application is **primarily deployed on AWS Lambda** and **runs once per day** via scheduled execution. The project uses:
 - **TypeScript** with strict type checking
 - **ES Modules** (ESM) - all imports use `.js` extension
 - **Yarn** as package manager
+- **AWS Lambda** as the primary deployment platform (runs once daily)
 - **Google Calendar API** for calendar operations
 - **WhatsApp Web.js** for WhatsApp messaging
+- **macOS** as the primary development platform
+- **zsh** as the preferred shell (macOS default since Catalina)
 
 ## Project Structure
 ```
@@ -201,3 +204,23 @@ You are an expert in TypeScript, Node.js.
 - **After significant changes**: Run `yarn test && yarn type-check && yarn lint` to ensure everything is working
 - **Keep `package.json` and `.vscode/launch.json` synchronized** - When adding scripts, update both files
 - **⚠️ Baileys Version Warning**: Do NOT upgrade `@whiskeysockets/baileys` beyond 6.7.21. Versions 6.17.16+ introduce audio decoder dependencies (~22MB) that are unnecessary for text-only WhatsApp messaging. This significantly increases Lambda package size. Current version: `^6.7.21`
+
+## Deployment & Runtime
+
+- **Primary Deployment**: AWS Lambda
+- **Execution Schedule**: Runs once per day (scheduled execution)
+- **Lambda Handlers**: Located in `src/lambda/`
+  - `handler.ts` - Main Lambda entry point
+  - `daily-summary-handler.ts` - Daily summary handler
+- **Package Size**: Keep Lambda package size minimal (see Baileys version warning below)
+- **Build Scripts**: Use `yarn build:lambda` and `yarn package:lambda` (TypeScript scripts in `src/scripts/`)
+- **No Backward Compatibility**: This is a single-purpose application running once per day in Lambda. We don't maintain backward compatibility - feel free to refactor, modernize, and improve code without worrying about breaking changes for external consumers.
+
+## Shell Scripts & Development Environment
+
+- **Platform**: macOS is the primary development platform
+- **Shell**: Prefer **zsh** for new shell scripts (macOS default since Catalina 10.15)
+  - Use `#!/bin/zsh` shebang for new scripts
+  - For Lambda-related build/deployment scripts, prefer zsh or Node.js/TypeScript
+  - Use zsh-specific features when beneficial (e.g., better array handling, globbing)
+- **Build/Deployment Scripts**: Complex build and deployment scripts are written in TypeScript (located in `src/scripts/`) rather than shell scripts for better maintainability and type safety

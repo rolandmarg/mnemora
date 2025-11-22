@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/zsh
 
 # Installation script for launchd LaunchAgents
 # Sets up daily birthday check at 9:00 AM Los Angeles time using native macOS launchd
@@ -7,7 +7,7 @@
 set -e
 
 # Get the directory where this script is located
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+SCRIPT_DIR="$( cd "$( dirname "${(%):-%x}" )" && pwd )"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 echo "Installing Mnemora Birthday Bot (using native macOS launchd)..."

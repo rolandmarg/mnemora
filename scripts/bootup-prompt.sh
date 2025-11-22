@@ -1,10 +1,10 @@
-#!/bin/bash
+#!/bin/zsh
 
 # Bootup prompt script - asks user if they want to send birthday messages now
 # This script is run by LaunchAgent on user login
 
 # Get the directory where this script is located
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+SCRIPT_DIR="$( cd "$( dirname "${(%):-%x}" )" && pwd )"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Change to project directory

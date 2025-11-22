@@ -1,10 +1,10 @@
-#!/bin/bash
+#!/bin/zsh
 
 # Daily birthday check script for cron
 # This script runs the birthday check and logs output
 
 # Get the directory where this script is located
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+SCRIPT_DIR="$( cd "$( dirname "${(%):-%x}" )" && pwd )"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Change to project directory

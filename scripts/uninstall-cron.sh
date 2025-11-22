@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/zsh
 
 # Uninstallation script for launchd LaunchAgents
 # Removes the daily birthday check LaunchAgents
