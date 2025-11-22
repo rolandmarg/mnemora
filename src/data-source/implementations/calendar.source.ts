@@ -148,8 +148,14 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
         // Check if this event matches any of the dates we're syncing
         const matchingDates = uniqueDates.get(eventDateKey);
         if (matchingDates) {
-          if (event.recurrence) {
+          // Check if this is a recurring event (either has recurrence rule or is an instance of one)
+          // When singleEvents: true, Google Calendar expands recurring events into instances
+          // with recurringEventId but without the recurrence field
+          const isRecurring = !!event.recurrence || !!event.recurringEventId;
+          
+          if (isRecurring) {
             // Recurring event: add keys for all dates with same month/day
+            // This handles both the master recurring event and expanded instances
             for (const date of matchingDates) {
               const key = this.createDuplicateKey(date, eventName);
               existingBirthdayMap.set(key, true);
