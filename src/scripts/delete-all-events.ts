@@ -7,18 +7,29 @@
  * Use with extreme caution!
  * 
  * Usage:
- *   yarn delete-all-events              # Dry run (shows what would be deleted)
- *   yarn delete-all-events --confirm    # Actually delete all events
+ *   yarn delete-all-events                    # Dry run (shows what would be deleted)
+ *   yarn delete-all-events --confirm          # Actually delete all events
  */
 
 import { logger } from '../utils/logger.util.js';
 import { auditDeletionAttempt } from '../utils/security.util.js';
-import { isBirthdayEvent } from '../utils/event-helpers.util.js';
 import { google } from 'googleapis';
 import { config } from '../config.js';
-import { startOfYear, endOfYear } from '../utils/date-helpers.util.js';
 
-async function getAllEvents(): Promise<Array<{ id: string; summary: string; start?: string }>> {
+interface EventWithRecurrence {
+  id: string;
+  summary: string;
+  start?: string;
+  recurrence?: string[] | null;
+  recurringEventId?: string | null;
+}
+
+/**
+ * Fetches all events from Google Calendar (master recurring events + standalone events).
+ * Uses singleEvents: false to get master recurring events directly (not expanded instances).
+ * Uses a wide date range (1900-2100) since Google Calendar API requires timeMin/timeMax.
+ */
+async function getAllEvents(): Promise<EventWithRecurrence[]> {
   const clientEmail = config.google.clientEmail;
   const privateKey = config.google.privateKey;
   const calendarId = config.google.calendarId;
@@ -27,18 +38,16 @@ async function getAllEvents(): Promise<Array<{ id: string; summary: string; star
     throw new Error('Google Calendar credentials not configured');
   }
 
-  // Fetch events for a wide range to catch all events
-  const today = new Date();
-  const startYear = today.getFullYear() - 5; // 5 years ago
-  const endYear = today.getFullYear() + 5;   // 5 years ahead
-  const yearStart = startOfYear(new Date(startYear, 0, 1));
-  const yearEnd = endOfYear(new Date(endYear, 0, 1));
+  // Use date range 2025-2100 (we don't care about the past)
+  // Google Calendar API requires timeMin and timeMax, but with singleEvents: false,
+  // we get master recurring events directly regardless of when instances occur
+  const yearStart = new Date('2025-01-01T00:00:00Z');
+  const yearEnd = new Date('2100-12-31T23:59:59Z');
 
-  logger.info('Fetching all events from calendar', {
-    startYear,
-    endYear,
+  logger.info('Fetching all events from calendar (master recurring + standalone)', {
     startDate: yearStart.toISOString().split('T')[0],
     endDate: yearEnd.toISOString().split('T')[0],
+    singleEvents: false,
   });
 
   const auth = new google.auth.JWT({
@@ -50,40 +59,39 @@ async function getAllEvents(): Promise<Array<{ id: string; summary: string; star
   const calendar = google.calendar({ version: 'v3', auth });
 
   // Fetch all events (Google Calendar API limit is 2500 per request)
-  // We'll need to handle pagination if there are more
-  let allEvents: Array<{ id: string; summary: string; start?: string }> = [];
+  // Using singleEvents: false to get master recurring events directly (not expanded instances)
+  let allEvents: EventWithRecurrence[] = [];
   let pageToken: string | undefined = undefined;
 
   while (true) {
-    const timeMinUTC = new Date(Date.UTC(
-      yearStart.getFullYear(),
-      yearStart.getMonth(),
-      yearStart.getDate(),
-      0, 0, 0, 0
-    ));
-    const timeMaxUTC = new Date(Date.UTC(
-      yearEnd.getFullYear(),
-      yearEnd.getMonth(),
-      yearEnd.getDate() + 1,
-      0, 0, 0, 0
-    ));
-
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const response = await calendar.events.list({
       calendarId: calendarId || 'primary',
-      timeMin: timeMinUTC.toISOString(),
-      timeMax: timeMaxUTC.toISOString(),
-      singleEvents: true,
-      orderBy: 'startTime',
+      timeMin: yearStart.toISOString(),
+      timeMax: yearEnd.toISOString(),
+      singleEvents: false, // Get master recurring events directly, not expanded instances
       maxResults: 2500,
       pageToken,
-    }) as { data: { items?: Array<{ id?: string | null; summary?: string | null; start?: { date?: string | null; dateTime?: string | null } | null }> | null; nextPageToken?: string | null } };
+    }) as { 
+      data: { 
+        items?: Array<{ 
+          id?: string | null; 
+          summary?: string | null; 
+          start?: { date?: string | null; dateTime?: string | null } | null;
+          recurrence?: string[] | null;
+          recurringEventId?: string | null;
+        }> | null; 
+        nextPageToken?: string | null;
+      } 
+    };
 
     const items = response.data.items ?? [];
-    const events: Array<{ id: string; summary: string; start?: string }> = items.map((event) => ({
+    const events: EventWithRecurrence[] = items.map((event) => ({
       id: event.id ?? '',
       summary: event.summary ?? 'Untitled Event',
       start: event.start?.date ?? event.start?.dateTime ?? undefined,
+      recurrence: event.recurrence ?? undefined,
+      recurringEventId: event.recurringEventId ?? undefined,
     }));
 
     allEvents = allEvents.concat(events);
@@ -96,7 +104,7 @@ async function getAllEvents(): Promise<Array<{ id: string; summary: string; star
     }
   }
 
-  logger.info(`Total events found: ${allEvents.length}`);
+  logger.info(`Total events found: ${allEvents.length} (masters + standalone)`);
 
   return allEvents;
 }
@@ -137,7 +145,35 @@ function isRateLimitError(error: unknown): boolean {
 }
 
 /**
+ * Check if error indicates resource is already deleted (410 Gone)
+ */
+function isAlreadyDeletedError(error: unknown): boolean {
+  if (error && typeof error === 'object' && 'code' in error) {
+    return error.code === 410;
+  }
+  if (error && typeof error === 'object' && 'response' in error) {
+    interface ErrorResponse {
+      response?: {
+        data?: {
+          error?: {
+            code?: number;
+            message?: string;
+          };
+        };
+      };
+    }
+    const response = (error as ErrorResponse).response;
+    if (response?.data?.error) {
+      const err = response.data.error;
+      return err.code === 410 || err.message === 'Resource has been deleted';
+    }
+  }
+  return false;
+}
+
+/**
  * Delete an event with exponential backoff retry logic
+ * Returns true if deleted successfully or already deleted (410), false otherwise
  */
 async function deleteEvent(eventId: string, summary: string, maxRetries = 5): Promise<boolean> {
   auditDeletionAttempt(logger, 'delete-all-events.ts', { eventId });
@@ -170,6 +206,12 @@ async function deleteEvent(eventId: string, summary: string, maxRetries = 5): Pr
       return true;
     } catch (error) {
       lastError = error;
+
+      // If resource is already deleted, treat as success
+      if (isAlreadyDeletedError(error)) {
+        logger.info('Event already deleted (410)', { eventId, summary });
+        return true;
+      }
 
       // If it's a rate limit error, wait and retry
       if (isRateLimitError(error) && attempt < maxRetries - 1) {
@@ -219,74 +261,39 @@ async function main(): Promise<void> {
       process.exit(0);
     }
 
-    // Separate birthday events from other events
-    const birthdayEvents: typeof allEvents = [];
-    const otherEvents: typeof allEvents = [];
+    const masters = allEvents.filter(e => e.recurrence && e.recurrence.length > 0);
+    const standalone = allEvents.filter(e => !e.recurrence || e.recurrence.length === 0);
 
-    // We need to check if events are birthday events
-    // For now, we'll use a simple heuristic based on summary
-    for (const event of allEvents) {
-      // Create a minimal event object for isBirthdayEvent check
-      interface EventForCheck {
-        summary?: string;
-        description?: string;
-        recurrence?: string[];
-        start?: { date?: string; dateTime?: string };
-      }
-      const eventObj: EventForCheck = {
-        summary: event.summary,
-        description: undefined,
-        recurrence: undefined,
-        start: event.start ? { date: event.start.includes('T') ? undefined : event.start } : undefined,
-      };
-      
-      if (isBirthdayEvent(eventObj)) {
-        birthdayEvents.push(event);
-      } else {
-        otherEvents.push(event);
-      }
-    }
-
-    // Deduplicate birthday events to count unique birthdays
-    // Since recurring events are expanded with singleEvents: true, we need to group by name
-    const uniqueBirthdays = new Set<string>();
-    for (const event of birthdayEvents) {
-      // Extract name from summary (e.g., "John's Birthday" -> "John")
-      const nameMatch = event.summary.match(/^(.+?)(?:'s)?\s*Birthday/i);
-      if (nameMatch) {
-        uniqueBirthdays.add(nameMatch[1].toLowerCase().trim());
-      }
-    }
-
-    console.log(`\n📊 Found ${allEvents.length} total event(s):`);
-    console.log(`   - Birthday event instances: ${birthdayEvents.length} (${uniqueBirthdays.size} unique birthdays)`);
-    console.log(`   - Other events: ${otherEvents.length}`);
-    if (birthdayEvents.length > uniqueBirthdays.size) {
-      console.log(`   ⚠️  Note: Birthday events are expanded due to recurring instances across the date range`);
-    }
+    console.log(`\n📊 Found ${allEvents.length} total event(s) (master recurring + standalone):`);
+    console.log(`   - Master recurring events: ${masters.length}`);
+    console.log(`   - Standalone events: ${standalone.length}`);
     console.log();
+    if (masters.length > 0) {
+      console.log(`ℹ️  Note: Deleting ${masters.length} master recurring event(s) will cascade delete all past and future instances.`);
+      console.log();
+    }
 
     if (isDryRun) {
       console.log('🔍 DRY RUN - Would delete the following events:\n');
       
-      if (birthdayEvents.length > 0) {
-        console.log(`Birthday Events (${birthdayEvents.length}):`);
-        birthdayEvents.slice(0, 10).forEach((event, i) => {
-          console.log(`  ${i + 1}. ${event.summary} (${event.start ?? 'no date'})`);
+      if (masters.length > 0) {
+        console.log(`Master Recurring Events (${masters.length}):`);
+        masters.slice(0, 20).forEach((event, i) => {
+          console.log(`  ${i + 1}. ${event.summary} (${event.start ?? 'no date'}) [recurring - all instances will be cascade deleted]`);
         });
-        if (birthdayEvents.length > 10) {
-          console.log(`  ... and ${birthdayEvents.length - 10} more birthday events`);
+        if (masters.length > 20) {
+          console.log(`  ... and ${masters.length - 20} more master events`);
         }
         console.log();
       }
-
-      if (otherEvents.length > 0) {
-        console.log(`Other Events (${otherEvents.length}):`);
-        otherEvents.slice(0, 10).forEach((event, i) => {
+      
+      if (standalone.length > 0) {
+        console.log(`Standalone Events (${standalone.length}):`);
+        standalone.slice(0, 20).forEach((event, i) => {
           console.log(`  ${i + 1}. ${event.summary} (${event.start ?? 'no date'})`);
         });
-        if (otherEvents.length > 10) {
-          console.log(`  ... and ${otherEvents.length - 10} more events`);
+        if (standalone.length > 20) {
+          console.log(`  ... and ${standalone.length - 20} more standalone events`);
         }
         console.log();
       }
@@ -296,21 +303,24 @@ async function main(): Promise<void> {
       process.exit(0);
     }
 
-    // Actually delete events
+    // Actually delete all events
+    const allEventsToDelete = allEvents.map(e => ({ id: e.id, summary: e.summary }));
+    
     console.log('⚠️  Starting deletion of ALL events...\n');
+    console.log(`   Will delete ${allEventsToDelete.length} master/standalone events (cascade deletion will handle all instances).`);
     console.log('   Using parallel deletion with rate limiting (3 concurrent requests)...\n');
 
     let deleted = 0;
-    const failedEvents: Array<{ id: string; summary: string; start?: string }> = [];
-    const totalEvents = allEvents.length;
+    const failedEvents: Array<{ id: string; summary: string }> = [];
+    const totalEvents = allEventsToDelete.length;
     const CONCURRENT_DELETES = 3; // Reduced from 10 to 3 to avoid rate limits
     const DELAY_BETWEEN_BATCHES_MS = 1000; // 1 second delay between batches
     const BATCH_SIZE = 100; // Process in batches to avoid memory issues
 
     // Process events in batches with parallel deletion
-    for (let batchStart = 0; batchStart < allEvents.length; batchStart += BATCH_SIZE) {
-      const batchEnd = Math.min(batchStart + BATCH_SIZE, allEvents.length);
-      const batch = allEvents.slice(batchStart, batchEnd);
+    for (let batchStart = 0; batchStart < allEventsToDelete.length; batchStart += BATCH_SIZE) {
+      const batchEnd = Math.min(batchStart + BATCH_SIZE, allEventsToDelete.length);
+      const batch = allEventsToDelete.slice(batchStart, batchEnd);
       
       // Process batch with concurrent deletions
       for (let i = 0; i < batch.length; i += CONCURRENT_DELETES) {
@@ -360,7 +370,7 @@ async function main(): Promise<void> {
         process.stdout.write(`\r   Progress: ${processed}/${totalEvents} (${percent}%) - Deleted: ${deleted}, Failed: ${failedEvents.length}`);
         
         // Delay between batches to avoid hitting rate limits
-        if (i + CONCURRENT_DELETES < batch.length || batchEnd < allEvents.length) {
+        if (i + CONCURRENT_DELETES < batch.length || batchEnd < allEventsToDelete.length) {
           await sleep(DELAY_BETWEEN_BATCHES_MS);
         }
       }
@@ -370,7 +380,7 @@ async function main(): Promise<void> {
     if (failedEvents.length > 0) {
       console.log(`\n\n⚠️  Retrying ${failedEvents.length} failed deletions with exponential backoff...\n`);
       
-      const retryFailed: Array<{ id: string; summary: string; start?: string }> = [];
+      const retryFailed: Array<{ id: string; summary: string }> = [];
       const initialDeleted = deleted;
       
       for (const event of failedEvents) {
@@ -409,16 +419,16 @@ async function main(): Promise<void> {
 
     const errors = failedEvents.length;
     console.log(`\n✅ Deletion complete:`);
-    console.log(`   Total events: ${totalEvents}`);
-    console.log(`   Deleted: ${deleted}`);
-    console.log(`   Errors: ${errors}\n`);
-
+    console.log(`   Events deleted: ${deleted}/${totalEvents}`);
+    console.log(`   Note: Deleting recurring master events also cascade deletes all past and future instances.`);
     if (errors > 0) {
+      console.log(`   Errors: ${errors}`);
       console.log('⚠️  Some events could not be deleted. Check logs for details.\n');
       process.exit(1);
+    } else {
+      console.log('   All events successfully deleted.\n');
+      process.exit(0);
     }
-
-    process.exit(0);
   } catch (error) {
     logger.error('Error during deletion', error);
     console.error('\n❌ Error during deletion:', error instanceof Error ? error.message : String(error));
