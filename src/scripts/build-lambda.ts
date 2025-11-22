@@ -77,9 +77,9 @@ if (existsSync(distNodeModules)) {
   rmSync(distNodeModules, { recursive: true, force: true });
 }
 
-// Install production dependencies in dist
-console.log('Installing production dependencies in dist...');
-exec('NODE_ENV=production YARN_ENABLE_SCRIPTS=false yarn install --production --immutable', {
+// Install dependencies in dist (devDependencies will be removed in cleanup)
+console.log('Installing dependencies in dist...');
+exec('NODE_ENV=production YARN_ENABLE_SCRIPTS=false yarn install --immutable', {
   cwd: join(PROJECT_ROOT, 'dist')
 });
 
