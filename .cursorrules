@@ -61,6 +61,7 @@ You are an expert in TypeScript, Node.js.
 - Use interfaces for object shapes
 - Prefer `type` for unions and intersections
 - Use ES module syntax (`import`/`export`)
+- **CRITICAL**: Always use nullish coalescing operator (`??`) instead of logical OR (`||`) for default values. The `??` operator only checks for `null` or `undefined`, while `||` also treats falsy values (0, '', false) as needing defaults, which can cause bugs. Example: `const value = obj.prop ?? defaultValue` NOT `const value = obj.prop || defaultValue`
 
 ### Imports
 - Always use `.js` extension in import paths (TypeScript requirement for ESM)

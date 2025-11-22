@@ -87,7 +87,7 @@ exec('NODE_ENV=production YARN_ENABLE_SCRIPTS=false yarn install --immutable', {
 console.log('Removing devDependencies...');
 const distPackageJsonPath = join(PROJECT_ROOT, 'dist/package.json');
 const packageJson = JSON.parse(readFileSync(distPackageJsonPath, 'utf-8'));
-const devDepsToRemove = Object.keys(packageJson.devDependencies || {});
+const devDepsToRemove = Object.keys(packageJson.devDependencies ?? {});
 for (const dep of devDepsToRemove) {
   removeIfExists(join(distNodeModules, dep));
   // Also remove scoped packages
