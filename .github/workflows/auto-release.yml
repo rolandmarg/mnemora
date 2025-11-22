@@ -1,0 +1,99 @@
+name: Auto Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'yarn'
+      
+      - name: Install Yarn
+        run: corepack enable && corepack prepare yarn@stable --activate
+      
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+      
+      - name: Setup GitHub CLI
+        uses: github/setup-gh@v1
+      
+      - name: Authenticate GitHub CLI
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GITHUB_TOKEN" | gh auth login --with-token
+      
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Check if commit should skip release
+        id: check-skip
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          if echo "$COMMIT_MSG" | grep -qiE '\[skip release\]'; then
+            echo "should_skip=true" >> $GITHUB_OUTPUT
+            echo "Commit message contains [skip release], skipping release"
+          else
+            echo "should_skip=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Check if commit already has a version tag
+        id: check-tag
+        if: steps.check-skip.outputs.should_skip == 'false'
+        run: |
+          if git describe --exact-match HEAD 2>/dev/null | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "has_tag=true" >> $GITHUB_OUTPUT
+            echo "Commit already has a version tag, skipping release"
+          else
+            echo "has_tag=false" >> $GITHUB_OUTPUT
+            echo "No version tag found, proceeding with release"
+          fi
+      
+      - name: Parse commit message for version type
+        id: parse-version
+        if: steps.check-skip.outputs.should_skip == 'false' && steps.check-tag.outputs.has_tag == 'false'
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "Commit message: $COMMIT_MSG"
+          
+          # Check for version indicators (case-insensitive)
+          if echo "$COMMIT_MSG" | grep -qiE '\[major\]'; then
+            VERSION_TYPE="major"
+          elif echo "$COMMIT_MSG" | grep -qiE '\[minor\]'; then
+            VERSION_TYPE="minor"
+          elif echo "$COMMIT_MSG" | grep -qiE '\[patch\]'; then
+            VERSION_TYPE="patch"
+          else
+            VERSION_TYPE="patch"
+            echo "No version indicator found, defaulting to patch"
+          fi
+          
+          echo "version_type=$VERSION_TYPE" >> $GITHUB_OUTPUT
+          echo "Detected version type: $VERSION_TYPE"
+      
+      - name: Run release script
+        if: steps.check-skip.outputs.should_skip == 'false' && steps.check-tag.outputs.has_tag == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          yarn release:${{ steps.parse-version.outputs.version_type }}
+
