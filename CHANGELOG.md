@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial changelog
 
 
+
+---
+## [1.0.4] - 2025-11-22
+
+## What's Changed
+
+### 📝 Documentation
+
+- Add technical capabilities section to README (c1743cf)
+
+**Full Changelog**: v1.0.3...v1.0.4
+
 ---
 ## [1.0.3] - 2025-11-22
 
