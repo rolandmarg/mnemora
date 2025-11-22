@@ -47,6 +47,12 @@ for FUNCTION_DIR in .aws-sam/build/*Function; do
     # Remove TypeScript-related packages (catch-all)
     find "$FUNCTION_DIR/node_modules" -maxdepth 1 -type d -name "*typescript*" -exec rm -rf {} + 2>/dev/null || true
     
+    # Clean up .bin directories (CLI tools not needed in Lambda)
+    # First remove broken symlinks, then remove entire .bin directories to save space
+    echo "      Cleaning up .bin directories (CLI tools not needed in Lambda)..."
+    find "$FUNCTION_DIR/node_modules" -type d -name ".bin" -exec sh -c 'for link in "$1"/*; do [ -L "$link" ] && [ ! -e "$link" ] && rm -f "$link"; done' _ {} \; 2>/dev/null || true
+    find "$FUNCTION_DIR/node_modules" -type d -name ".bin" -exec rm -rf {} + 2>/dev/null || true
+    
     # Remove audio decoders (only needed for Baileys 6.17.16+, we're using 6.7.21)
     echo "      Removing audio decoders (not needed with Baileys 6.7.21)..."
     rm -rf "$FUNCTION_DIR/node_modules/@wasm-audio-decoders" 2>/dev/null || true
