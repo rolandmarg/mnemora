@@ -20,7 +20,7 @@ fi
 osascript <<EOF
 tell application "Terminal"
   activate
-  set newTab to do script "cd '$PROJECT_DIR' && echo 'Send birthday messages now? (y/n)' && read -r response && if [ \"\$response\" = \"y\" ] || [ \"\$response\" = \"Y\" ]; then yarn manual-send; else echo 'Skipped.'; fi"
+  set newTab to do script "cd '$PROJECT_DIR' && echo 'Send birthday messages now? (y/n)' && read -r response && if [ \"\$response\" = \"y\" ] || [ \"\$response\" = \"Y\" ]; then yarn start; else echo 'Skipped.'; fi"
 end tell
 EOF
 

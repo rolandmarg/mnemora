@@ -191,9 +191,6 @@ yarn start
 
 # Development mode (auto-reload on changes)
 yarn dev
-
-# Manual send (test notifications)
-yarn manual-send
 ```
 
 ## 📖 Setup
@@ -289,23 +286,25 @@ yarn start          # Run once (check birthdays and send notifications)
 yarn dev            # Development mode with auto-reload
 ```
 
-### CLI Scripts
+### Local Execution
 
-Mnemora includes several utility scripts for managing birthdays:
+**Primary Method**: Use `yarn start` to run the full birthday check locally. This replicates the Lambda functionality without deployment delays:
 
 ```bash
-# Query birthdays
-yarn get-todays-birthdays              # Get today's birthdays
-yarn get-monthly-digest                # Get monthly digest for current month
-yarn get-todays-birthdays-with-digest  # Get both (if 1st of month, includes digest)
-yarn get-all-birthdays                 # Read from Sheets, sync to Calendar, display all
+yarn start          # Run full birthday check (monthly digest + today's birthdays)
+yarn dev            # Development mode with auto-reload
+```
 
-# Management
-yarn check-sync-status                 # Check sync status between Sheets and Calendar
-yarn manual-send                       # Manually send monthly digest + today's birthdays
+This runs the same `runBirthdayCheck()` function that the Lambda uses, including:
+- Checking for missed days and recovering monthly digests
+- Syncing from Sheets to Calendar (if configured)
+- Sending monthly digest (if 1st of month)
+- Sending today's birthday messages
 
-# WhatsApp-only
-yarn send-monthly-digest-whatsapp      # Send monthly digest to WhatsApp group
+### Utility Scripts
+
+```bash
+yarn delete-all-events              # Bulk deletion utility (dry run by default)
 ```
 
 ### Local Scheduling (macOS)
@@ -477,9 +476,7 @@ src/
 │   └── xray.client.ts            # X-Ray tracing
 │
 ├── scripts/              # CLI utilities
-│   ├── get-todays-birthdays.ts
-│   ├── get-monthly-digest.ts
-│   ├── manual-send.ts
+│   ├── delete-all-events.ts
 │   └── ...
 │
 ├── utils/                # Shared utilities

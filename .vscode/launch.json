@@ -12,66 +12,6 @@
       "skipFiles": ["<node_internals>/**"]
     },
     {
-      "name": "Get Today's Birthdays",
-      "type": "node",
-      "request": "launch",
-      "runtimeExecutable": "yarn",
-      "runtimeArgs": ["get-todays-birthdays"],
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
-      "skipFiles": ["<node_internals>/**"]
-    },
-    {
-      "name": "Get Monthly Digest",
-      "type": "node",
-      "request": "launch",
-      "runtimeExecutable": "yarn",
-      "runtimeArgs": ["get-monthly-digest"],
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
-      "skipFiles": ["<node_internals>/**"]
-    },
-    {
-      "name": "Get Today's Birthdays with Digest",
-      "type": "node",
-      "request": "launch",
-      "runtimeExecutable": "yarn",
-      "runtimeArgs": ["get-todays-birthdays-with-digest"],
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
-      "skipFiles": ["<node_internals>/**"]
-    },
-    {
-      "name": "Get All Birthdays",
-      "type": "node",
-      "request": "launch",
-      "runtimeExecutable": "yarn",
-      "runtimeArgs": ["get-all-birthdays"],
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
-      "skipFiles": ["<node_internals>/**"]
-    },
-    {
-      "name": "Delete Events",
-      "type": "node",
-      "request": "launch",
-      "runtimeExecutable": "yarn",
-      "runtimeArgs": ["delete-events", "--all"],
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
-      "skipFiles": ["<node_internals>/**"]
-    },
-    {
-      "name": "Send Monthly Digest to WhatsApp",
-      "type": "node",
-      "request": "launch",
-      "runtimeExecutable": "yarn",
-      "runtimeArgs": ["send-monthly-digest-whatsapp"],
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
-      "skipFiles": ["<node_internals>/**"]
-    },
-    {
       "name": "Delete All Events (Dry Run)",
       "type": "node",
       "request": "launch",
