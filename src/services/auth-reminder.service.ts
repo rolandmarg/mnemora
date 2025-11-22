@@ -4,17 +4,27 @@ import type { Logger } from '../types/logger.types.js';
 import type { AppConfig } from '../config.js';
 import cloudWatchMetricsClient from '../clients/cloudwatch.client.js';
 
+interface AuthReminderServiceOptions {
+  logger: Logger;
+  config: AppConfig;
+  cloudWatchClient: typeof cloudWatchMetricsClient;
+}
+
 class AuthReminderService {
+  private readonly logger: Logger;
+  private readonly config: AppConfig;
+  private readonly cloudWatchClient: typeof cloudWatchMetricsClient;
   private readonly storage = StorageService.getAppStorage();
   private readonly reminderDays: number = 7;
   private readonly authKey: string = 'whatsapp-auth.json';
   private pendingAuthTimestamp: string | null = null;
 
-  constructor(
-    private readonly logger: Logger,
-    private readonly config: AppConfig,
-    private readonly cloudWatchClient: typeof cloudWatchMetricsClient
-  ) {}
+  constructor(options: AuthReminderServiceOptions) {
+    const { logger, config, cloudWatchClient } = options;
+    this.logger = logger;
+    this.config = config;
+    this.cloudWatchClient = cloudWatchClient;
+  }
 
   recordAuthentication(): void {
     const now = new Date();

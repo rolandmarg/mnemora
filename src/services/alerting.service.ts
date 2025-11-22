@@ -12,6 +12,12 @@ interface ActiveAlerts {
   [alertId: string]: AlertState;
 }
 
+interface AlertingServiceOptions {
+  logger: Logger;
+  config: AppConfig;
+  snsClient: SNSClient;
+}
+
 function getCloudWatchLogsUrl(config: AppConfig): string | undefined {
   if (!isLambda()) {
     return undefined;
@@ -29,16 +35,19 @@ function getCloudWatchLogsUrl(config: AppConfig): string | undefined {
 }
 
 export class AlertingService {
+  private readonly logger: Logger;
+  private readonly config: AppConfig;
+  private readonly snsClient: SNSClient;
   private readonly topicArn: string | undefined;
   private readonly storage = StorageService.getAppStorage();
   private readonly alertStateKey = 'alerts/active-alerts.json';
   private readonly deduplicationWindowMs = 60 * 60 * 1000;
 
-  constructor(
-    private readonly logger: Logger,
-    private readonly config: AppConfig,
-    private readonly snsClient: SNSClient
-  ) {
+  constructor(options: AlertingServiceOptions) {
+    const { logger, config, snsClient } = options;
+    this.logger = logger;
+    this.config = config;
+    this.snsClient = snsClient;
     this.topicArn = config.aws.snsTopicArn;
   }
 

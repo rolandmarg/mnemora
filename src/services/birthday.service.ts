@@ -12,7 +12,7 @@ import {
   startOfYear,
   endOfYear,
 } from '../utils/date-helpers.util.js';
-import { AlertingService } from './alerting.service.js';
+import type { AlertingService } from './alerting.service.js';
 import type { Logger } from '../types/logger.types.js';
 import type { AppConfig } from '../config.js';
 import type { BirthdayRecord } from '../types/birthday.types.js';
@@ -20,12 +20,19 @@ import type { OutputChannel } from '../output-channel/output-channel.interface.j
 import type { WriteResult } from '../data-source/data-source.interface.js';
 import calendarClientDefault from '../clients/google-calendar.client.js';
 import xrayClientDefault from '../clients/xray.client.js';
-import snsClientDefault from '../clients/sns.client.js';
 import cloudWatchMetricsClientDefault from '../clients/cloudwatch.client.js';
 import sheetsClientDefault from '../clients/google-sheets.client.js';
 
 type CalendarClient = typeof calendarClientDefault;
 type XRayClient = typeof xrayClientDefault;
+
+interface BirthdayServiceOptions {
+  logger: Logger;
+  config: AppConfig;
+  calendarClient: CalendarClient;
+  xrayClient: XRayClient;
+  alerting: AlertingService;
+}
 
 const BIRTHDAY_EMOJIS = ['🎂', '🎉', '🎈', '🎁', '🎊', '🥳', '🎀', '🎆', '🎇', '✨', '🌟', '💫', '🎪', '🎭', '🎨', '🎵', '🎶', '🎸', '🎹', '🎺', '🎻', '🥁', '🎤', '🎧', '🎬', '🎮', '🎯', '🎲', '🎰', '🎳'];
 
@@ -36,19 +43,26 @@ function getRandomEmoji(_index: number): string {
 
 
 class BirthdayService {
+  private readonly logger: Logger;
+  private readonly xrayClient: XRayClient;
+  private readonly alerting: AlertingService;
   private readonly calendarSource: ReturnType<typeof DataSourceFactory.createCalendarDataSource>;
   private readonly sheetsSource: ReturnType<typeof DataSourceFactory.createSheetsDataSource>;
   private readonly metrics: MetricsCollector;
 
-  constructor(
-    private readonly logger: Logger,
-    private readonly config: AppConfig,
-    _calendarClient: CalendarClient,
-    private readonly xrayClient: XRayClient
-  ) {
-    this.calendarSource = DataSourceFactory.createCalendarDataSource(config, _calendarClient, logger);
+  constructor(options: BirthdayServiceOptions) {
+    const { logger, config, calendarClient, xrayClient, alerting } = options;
+    this.logger = logger;
+    this.xrayClient = xrayClient;
+    this.alerting = alerting;
+    this.calendarSource = DataSourceFactory.createCalendarDataSource(config, calendarClient, logger);
     this.sheetsSource = DataSourceFactory.createSheetsDataSource(config, sheetsClientDefault, logger);
-    this.metrics = new MetricsCollector(logger, config, cloudWatchMetricsClientDefault);
+    this.metrics = new MetricsCollector({
+      logger,
+      config,
+      cloudWatchClient: cloudWatchMetricsClientDefault,
+      alerting,
+    });
   }
 
   async getTodaysBirthdays(): Promise<BirthdayRecord[]> {
@@ -74,24 +88,23 @@ class BirthdayService {
         const isQuotaError = errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate limit');
         const isNetworkError = errorMessage.includes('timeout') || errorMessage.includes('ECONNREFUSED') || errorMessage.includes('network');
         
-        const alerting = new AlertingService(this.logger, this.config, snsClientDefault);
         if (isAuthError) {
-          alerting.sendGoogleCalendarApiFailedAlert(error, {
+          this.alerting.sendGoogleCalendarApiFailedAlert(error, {
             errorType: 'authentication',
             operation: 'getTodaysBirthdays',
           });
         } else if (isQuotaError) {
-          alerting.sendApiQuotaWarningAlert('calendar', 100, {
+          this.alerting.sendApiQuotaWarningAlert('calendar', 100, {
             errorMessage,
             operation: 'getTodaysBirthdays',
           });
         } else if (isNetworkError) {
-          alerting.sendGoogleCalendarApiFailedAlert(error, {
+          this.alerting.sendGoogleCalendarApiFailedAlert(error, {
             errorType: 'network',
             operation: 'getTodaysBirthdays',
           });
         } else {
-          alerting.sendGoogleCalendarApiFailedAlert(error, {
+          this.alerting.sendGoogleCalendarApiFailedAlert(error, {
             errorType: 'unknown',
             operation: 'getTodaysBirthdays',
           });
@@ -198,28 +211,27 @@ class BirthdayService {
       const isQuotaError = errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate limit');
       const isNetworkError = errorMessage.includes('timeout') || errorMessage.includes('ECONNREFUSED') || errorMessage.includes('network');
       
-      const alerting = new AlertingService(this.logger, this.config, snsClientDefault);
-      if (isAuthError) {
-        alerting.sendGoogleCalendarApiFailedAlert(error, {
-          errorType: 'authentication',
-          operation: 'getTodaysBirthdaysWithMonthlyDigest',
-        });
-      } else if (isQuotaError) {
-        alerting.sendApiQuotaWarningAlert('calendar', 100, {
-          errorMessage,
-          operation: 'getTodaysBirthdaysWithMonthlyDigest',
-        });
-      } else if (isNetworkError) {
-        alerting.sendGoogleCalendarApiFailedAlert(error, {
-          errorType: 'network',
-          operation: 'getTodaysBirthdaysWithMonthlyDigest',
-        });
-      } else {
-        alerting.sendGoogleCalendarApiFailedAlert(error, {
-          errorType: 'unknown',
-          operation: 'getTodaysBirthdaysWithMonthlyDigest',
-        });
-      }
+        if (isAuthError) {
+          this.alerting.sendGoogleCalendarApiFailedAlert(error, {
+            errorType: 'authentication',
+            operation: 'getTodaysBirthdaysWithMonthlyDigest',
+          });
+        } else if (isQuotaError) {
+          this.alerting.sendApiQuotaWarningAlert('calendar', 100, {
+            errorMessage,
+            operation: 'getTodaysBirthdaysWithMonthlyDigest',
+          });
+        } else if (isNetworkError) {
+          this.alerting.sendGoogleCalendarApiFailedAlert(error, {
+            errorType: 'network',
+            operation: 'getTodaysBirthdaysWithMonthlyDigest',
+          });
+        } else {
+          this.alerting.sendGoogleCalendarApiFailedAlert(error, {
+            errorType: 'unknown',
+            operation: 'getTodaysBirthdaysWithMonthlyDigest',
+          });
+        }
       
       throw error;
     }
@@ -245,24 +257,23 @@ class BirthdayService {
         const isQuotaError = errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate limit');
         const isNetworkError = errorMessage.includes('timeout') || errorMessage.includes('ECONNREFUSED') || errorMessage.includes('network');
         
-        const alerting = new AlertingService(this.logger, this.config, snsClientDefault);
         if (isAuthError) {
-          alerting.sendGoogleCalendarApiFailedAlert(error, {
+          this.alerting.sendGoogleCalendarApiFailedAlert(error, {
             errorType: 'authentication',
             operation: 'getBirthdays',
           });
         } else if (isQuotaError) {
-          alerting.sendApiQuotaWarningAlert('calendar', 100, {
+          this.alerting.sendApiQuotaWarningAlert('calendar', 100, {
             errorMessage,
             operation: 'getBirthdays',
           });
         } else if (isNetworkError) {
-          alerting.sendGoogleCalendarApiFailedAlert(error, {
+          this.alerting.sendGoogleCalendarApiFailedAlert(error, {
             errorType: 'network',
             operation: 'getBirthdays',
           });
         } else {
-          alerting.sendGoogleCalendarApiFailedAlert(error, {
+          this.alerting.sendGoogleCalendarApiFailedAlert(error, {
             errorType: 'unknown',
             operation: 'getBirthdays',
           });

@@ -1,4 +1,5 @@
 import { BirthdayService } from '../services/birthday.service.js';
+import { AlertingService } from '../services/alerting.service.js';
 import { OutputChannelFactory } from '../output-channel/output-channel.factory.js';
 import { logger } from '../utils/logger.util.js';
 import { config } from '../config.js';
@@ -6,10 +7,12 @@ import calendarClient from '../clients/google-calendar.client.js';
 import xrayClient from '../clients/xray.client.js';
 import whatsappClient from '../clients/whatsapp.client.js';
 import cloudWatchMetricsClient from '../clients/cloudwatch.client.js';
+import snsClient from '../clients/sns.client.js';
 import { requireDevelopment, auditManualSend, SecurityError } from '../utils/security.util.js';
 
 async function sendMonthlyDigestWhatsApp(): Promise<void> {
-  const birthdayService = new BirthdayService(logger, config, calendarClient, xrayClient);
+  const alerting = new AlertingService({ logger, config, snsClient });
+  const birthdayService = new BirthdayService({ logger, config, calendarClient, xrayClient, alerting });
   
   try {
     requireDevelopment(logger);
@@ -68,7 +71,13 @@ async function sendMonthlyDigestWhatsApp(): Promise<void> {
     });
 
     console.log('📱 Initializing WhatsApp connection...\n');
-    whatsappChannel = OutputChannelFactory.createWhatsAppOutputChannel(logger, config, whatsappClient, cloudWatchMetricsClient);
+    whatsappChannel = OutputChannelFactory.createWhatsAppOutputChannel({
+      logger,
+      config,
+      whatsappClient,
+      cloudWatchClient: cloudWatchMetricsClient,
+      alerting,
+    });
     
     if (!whatsappChannel.isAvailable()) {
       console.log('❌ WhatsApp channel is not available.');

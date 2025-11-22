@@ -11,7 +11,7 @@
  */
 
 import { BaseOutputChannel } from '../output-channel.base.js';
-import { AlertingService } from '../../services/alerting.service.js';
+import type { AlertingService } from '../../services/alerting.service.js';
 import { MetricsCollector, trackWhatsAppMessageSent, trackWhatsAppAuthRequired, trackOperationDuration } from '../../services/metrics.service.js';
 import { AuthReminderService } from '../../services/auth-reminder.service.js';
 import { WhatsAppSessionManagerService } from '../../services/whatsapp-session-manager.service.js';
@@ -21,29 +21,35 @@ import { isLambda } from '../../utils/runtime.util.js';
 import type { SendOptions, SendResult, OutputChannelMetadata } from '../output-channel.interface.js';
 import type { Logger } from '../../types/logger.types.js';
 import type { AppConfig } from '../../config.js';
-import whatsappClientDefault from '../../clients/whatsapp.client.js';
-import cloudWatchMetricsClientDefault from '../../clients/cloudwatch.client.js';
-import snsClientDefault from '../../clients/sns.client.js';
-
-type WhatsAppClient = typeof whatsappClientDefault;
-type CloudWatchClient = typeof cloudWatchMetricsClientDefault;
+import type { WhatsAppOutputChannelOptions, WhatsAppClient } from '../output-channel.factory.js';
 
 export class WhatsAppOutputChannel extends BaseOutputChannel {
+  private readonly logger: Logger;
+  private readonly config: AppConfig;
+  private readonly whatsappClient: WhatsAppClient;
   private readonly alerting: AlertingService;
   private readonly metrics: MetricsCollector;
   private readonly authReminder: AuthReminderService;
   private readonly sessionManager: WhatsAppSessionManagerService;
 
-  constructor(
-    private readonly logger: Logger,
-    private readonly config: AppConfig,
-    private readonly whatsappClient: WhatsAppClient,
-    cloudWatchClient: CloudWatchClient
-  ) {
+  constructor(options: WhatsAppOutputChannelOptions) {
     super();
-    this.alerting = new AlertingService(logger, config, snsClientDefault);
-    this.metrics = new MetricsCollector(logger, config, cloudWatchClient);
-    this.authReminder = new AuthReminderService(logger, config, cloudWatchClient);
+    const { logger, config, whatsappClient, alerting, cloudWatchClient } = options;
+    this.logger = logger;
+    this.config = config;
+    this.whatsappClient = whatsappClient;
+    this.alerting = alerting;
+    this.metrics = new MetricsCollector({
+      logger,
+      config,
+      cloudWatchClient,
+      alerting,
+    });
+    this.authReminder = new AuthReminderService({
+      logger,
+      config,
+      cloudWatchClient,
+    });
     this.sessionManager = new WhatsAppSessionManagerService(logger);
   }
 

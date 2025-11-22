@@ -1,4 +1,5 @@
 import { BirthdayService } from '../services/birthday.service.js';
+import { AlertingService } from '../services/alerting.service.js';
 import { OutputChannelFactory } from '../output-channel/output-channel.factory.js';
 import { LastRunTrackerService } from '../services/last-run-tracker.service.js';
 import { logger } from '../utils/logger.util.js';
@@ -7,13 +8,14 @@ import calendarClient from '../clients/google-calendar.client.js';
 import xrayClient from '../clients/xray.client.js';
 import whatsappClient from '../clients/whatsapp.client.js';
 import cloudWatchMetricsClient from '../clients/cloudwatch.client.js';
+import snsClient from '../clients/sns.client.js';
 import { getFullName } from '../utils/name-helpers.util.js';
 import { isFirstDayOfMonth, startOfMonth, endOfMonth } from '../utils/date-helpers.util.js';
 import { requireDevelopment, auditManualSend, SecurityError } from '../utils/security.util.js';
 
-async function checkAndSendMissedDays(): Promise<void> {
+async function checkAndSendMissedDays(alerting: AlertingService): Promise<void> {
   const lastRunTracker = new LastRunTrackerService(logger);
-  const birthdayService = new BirthdayService(logger, config, calendarClient, xrayClient);
+  const birthdayService = new BirthdayService({ logger, config, calendarClient, xrayClient, alerting });
   
   const missedDates = await lastRunTracker.getMissedDates();
   
@@ -35,7 +37,13 @@ async function checkAndSendMissedDays(): Promise<void> {
   let whatsappChannel: ReturnType<typeof OutputChannelFactory.createWhatsAppOutputChannel> | null = null;
 
   try {
-    whatsappChannel = OutputChannelFactory.createWhatsAppOutputChannel(logger, config, whatsappClient, cloudWatchMetricsClient);
+    whatsappChannel = OutputChannelFactory.createWhatsAppOutputChannel({
+      logger,
+      config,
+      whatsappClient,
+      cloudWatchClient: cloudWatchMetricsClient,
+      alerting,
+    });
     if (!whatsappChannel.isAvailable()) {
       logger.info('WhatsApp channel not available, skipping missed monthly digest recovery');
       return;
@@ -89,7 +97,8 @@ async function checkAndSendMissedDays(): Promise<void> {
 }
 
 async function manualSend(): Promise<void> {
-  const birthdayService = new BirthdayService(logger, config, calendarClient, xrayClient);
+  const alerting = new AlertingService({ logger, config, snsClient });
+  const birthdayService = new BirthdayService({ logger, config, calendarClient, xrayClient, alerting });
   const lastRunTracker = new LastRunTrackerService(logger);
   
   try {
@@ -121,7 +130,7 @@ async function manualSend(): Promise<void> {
 
   try {
     // First, check for and send missed days
-    await checkAndSendMissedDays();
+    await checkAndSendMissedDays(alerting);
 
     logger.info('Running manual send...');
     
@@ -131,7 +140,13 @@ async function manualSend(): Promise<void> {
       const monthlyDigest = birthdayService.formatMonthlyDigest(monthlyBirthdays);
       logger.info('Sending monthly digest to WhatsApp group...');
       try {
-        whatsappChannel = OutputChannelFactory.createWhatsAppOutputChannel(logger, config, whatsappClient, cloudWatchMetricsClient);
+        whatsappChannel = OutputChannelFactory.createWhatsAppOutputChannel({
+      logger,
+      config,
+      whatsappClient,
+      cloudWatchClient: cloudWatchMetricsClient,
+      alerting,
+    });
         if (whatsappChannel.isAvailable()) {
           const result = await whatsappChannel.send(monthlyDigest);
           if (result.success) {
@@ -159,7 +174,13 @@ async function manualSend(): Promise<void> {
       });
       
       try {
-        whatsappChannel ??= OutputChannelFactory.createWhatsAppOutputChannel(logger, config, whatsappClient, cloudWatchMetricsClient);
+        whatsappChannel ??= OutputChannelFactory.createWhatsAppOutputChannel({
+          logger,
+          config,
+          whatsappClient,
+          cloudWatchClient: cloudWatchMetricsClient,
+          alerting,
+        });
         if (whatsappChannel.isAvailable()) {
           const birthdayMessages = birthdayService.formatTodaysBirthdayMessages(todaysBirthdays);
           logger.info('Sending birthday messages to WhatsApp group...');

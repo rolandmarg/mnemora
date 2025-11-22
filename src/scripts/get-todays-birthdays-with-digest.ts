@@ -1,12 +1,15 @@
 import { BirthdayService } from '../services/birthday.service.js';
+import { AlertingService } from '../services/alerting.service.js';
 import { logger } from '../utils/logger.util.js';
 import { config } from '../config.js';
 import calendarClient from '../clients/google-calendar.client.js';
 import xrayClient from '../clients/xray.client.js';
+import snsClient from '../clients/sns.client.js';
 import { getFullName } from '../utils/name-helpers.util.js';
 
 async function getTodaysBirthdaysWithDigest(): Promise<void> {
-  const birthdayService = new BirthdayService(logger, config, calendarClient, xrayClient);
+  const alerting = new AlertingService({ logger, config, snsClient });
+  const birthdayService = new BirthdayService({ logger, config, calendarClient, xrayClient, alerting });
   
   try {
     logger.info('Getting birthdays...');

@@ -11,8 +11,7 @@
  */
 
 import { BirthdayService } from './birthday.service.js';
-import { OutputChannelFactory } from '../output-channel/output-channel.factory.js';
-import { MonitoringService } from './monitoring.service.js';
+import { OutputChannelFactory, type WhatsAppClient } from '../output-channel/output-channel.factory.js';
 import { logSentMessage } from './message-logger.service.js';
 import {
   MetricsCollector,
@@ -33,33 +32,56 @@ import type { AppConfig } from '../config.js';
 import calendarClientDefault from '../clients/google-calendar.client.js';
 import xrayClientDefault from '../clients/xray.client.js';
 import cloudWatchMetricsClientDefault from '../clients/cloudwatch.client.js';
-import whatsappClientDefault from '../clients/whatsapp.client.js';
-import snsClientDefault from '../clients/sns.client.js';
 
 type CalendarClient = typeof calendarClientDefault;
 type XRayClient = typeof xrayClientDefault;
 type CloudWatchClient = typeof cloudWatchMetricsClientDefault;
 
+interface BirthdayOrchestratorServiceOptions {
+  logger: Logger;
+  config: AppConfig;
+  calendarClient: CalendarClient;
+  xrayClient: XRayClient;
+  cloudWatchClient: CloudWatchClient;
+  whatsappClient: WhatsAppClient;
+  alerting: AlertingService;
+}
+
 class BirthdayOrchestratorService {
   private readonly birthdayService: BirthdayService;
-  private readonly monitoring: MonitoringService;
   private readonly metrics: MetricsCollector;
-  private readonly alerting: AlertingService;
   private readonly lastRunTracker: LastRunTrackerService;
 
-  constructor(
-    private readonly logger: Logger,
-    private readonly config: AppConfig,
-    _calendarClient: CalendarClient,
-    private readonly xrayClient: XRayClient,
-    private readonly cloudWatchClient: CloudWatchClient
-  ) {
-    this.birthdayService = new BirthdayService(logger, config, _calendarClient, xrayClient);
-    this.monitoring = new MonitoringService(logger, config, cloudWatchClient);
-    this.metrics = new MetricsCollector(logger, config, cloudWatchClient);
-    this.alerting = new AlertingService(logger, config, snsClientDefault);
+  constructor(options: BirthdayOrchestratorServiceOptions) {
+    const { logger, config, xrayClient, cloudWatchClient, whatsappClient, alerting, calendarClient } = options;
+    this.logger = logger;
+    this.config = config;
+    this.xrayClient = xrayClient;
+    this.cloudWatchClient = cloudWatchClient;
+    this.whatsappClient = whatsappClient;
+    this.alerting = alerting;
+    this.birthdayService = new BirthdayService({
+      logger,
+      config,
+      calendarClient,
+      xrayClient,
+      alerting,
+    });
+    this.metrics = new MetricsCollector({
+      logger,
+      config,
+      cloudWatchClient,
+      alerting,
+    });
     this.lastRunTracker = new LastRunTrackerService(logger);
   }
+
+  private readonly logger: Logger;
+  private readonly config: AppConfig;
+  private readonly xrayClient: XRayClient;
+  private readonly cloudWatchClient: CloudWatchClient;
+  private readonly whatsappClient: WhatsAppClient;
+  private readonly alerting: AlertingService;
 
   private getGroupId(channel: ReturnType<typeof OutputChannelFactory.createWhatsAppOutputChannel> | null): string {
     if (!channel?.isAvailable()) {
@@ -152,7 +174,13 @@ class BirthdayOrchestratorService {
       let whatsappChannel: ReturnType<typeof OutputChannelFactory.createWhatsAppOutputChannel> | null = null;
 
       try {
-        whatsappChannel = OutputChannelFactory.createWhatsAppOutputChannel(this.logger, this.config, whatsappClientDefault, this.cloudWatchClient);
+        whatsappChannel = OutputChannelFactory.createWhatsAppOutputChannel({
+          logger: this.logger,
+          config: this.config,
+          whatsappClient: this.whatsappClient,
+          cloudWatchClient: this.cloudWatchClient,
+          alerting: this.alerting,
+        });
         if (!whatsappChannel.isAvailable()) {
           this.logger.info('WhatsApp channel not available, skipping missed monthly digest recovery');
           return;
@@ -257,7 +285,13 @@ class BirthdayOrchestratorService {
         this.logger.info('Monthly digest', { monthlyDigest });
         
         try {
-          whatsappChannel = OutputChannelFactory.createWhatsAppOutputChannel(this.logger, this.config, whatsappClientDefault, this.cloudWatchClient);
+          whatsappChannel = OutputChannelFactory.createWhatsAppOutputChannel({
+          logger: this.logger,
+          config: this.config,
+          whatsappClient: this.whatsappClient,
+          cloudWatchClient: this.cloudWatchClient,
+          alerting: this.alerting,
+        });
           if (whatsappChannel.isAvailable()) {
             this.logger.info('Sending monthly digest to WhatsApp group...');
             const result = await whatsappChannel.send(monthlyDigest);
@@ -346,7 +380,13 @@ class BirthdayOrchestratorService {
         });
         
         try {
-          whatsappChannel ??= OutputChannelFactory.createWhatsAppOutputChannel(this.logger, this.config, whatsappClientDefault, this.cloudWatchClient);
+          whatsappChannel ??= OutputChannelFactory.createWhatsAppOutputChannel({
+            logger: this.logger,
+            config: this.config,
+            whatsappClient: this.whatsappClient,
+            cloudWatchClient: this.cloudWatchClient,
+            alerting: this.alerting,
+          });
           
           if (whatsappChannel.isAvailable()) {
             const birthdayMessages = this.birthdayService.formatTodaysBirthdayMessages(todaysBirthdays);
@@ -442,7 +482,7 @@ class BirthdayOrchestratorService {
       this.lastRunTracker.updateLastRunDate();
 
       const monthlyDigestSent = !!monthlyBirthdays && whatsappChannel?.isAvailable();
-      await this.monitoring.recordDailyExecution(true, monthlyDigestSent);
+      await this.metrics.recordDailyExecution(true, monthlyDigestSent);
 
       const executionDuration = Date.now() - executionStartTime;
       trackExecutionComplete(this.metrics, executionDuration, true);
@@ -450,7 +490,7 @@ class BirthdayOrchestratorService {
       this.logger.error('Error in birthday check', error);
       
       // Record failed execution in monitoring system
-      await this.monitoring.recordDailyExecution(false, false);
+      await this.metrics.recordDailyExecution(false, false);
       
       // Track failed execution
       const executionDuration = Date.now() - executionStartTime;
@@ -483,14 +523,8 @@ class BirthdayOrchestratorService {
   }
 }
 
-export function runBirthdayCheck(
-  logger: Logger,
-  config: AppConfig,
-  calendarClient: CalendarClient,
-  xrayClient: XRayClient,
-  cloudWatchClient: CloudWatchClient
-): Promise<void> {
-  const orchestrator = new BirthdayOrchestratorService(logger, config, calendarClient, xrayClient, cloudWatchClient);
+export function runBirthdayCheck(options: BirthdayOrchestratorServiceOptions): Promise<void> {
+  const orchestrator = new BirthdayOrchestratorService(options);
   return orchestrator.runBirthdayCheck();
 }
 

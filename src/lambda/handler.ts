@@ -5,7 +5,8 @@ import { logger } from '../utils/logger.util.js';
 import { config } from '../config.js';
 import calendarClient from '../clients/google-calendar.client.js';
 import xrayClient from '../clients/xray.client.js';
-import cloudWatchMetricsClient from '../clients/cloudwatch.client.js';
+import cloudWatchClient from '../clients/cloudwatch.client.js';
+import whatsappClient from '../clients/whatsapp.client.js';
 import snsClient from '../clients/sns.client.js';
 import { setCorrelationId } from '../utils/runtime.util.js';
 import type { EventBridgeEvent, LambdaContext, LambdaResponse } from './types.js';
@@ -14,104 +15,119 @@ export async function handler(
   event: EventBridgeEvent,
   context: LambdaContext
 ): Promise<LambdaResponse | void> {
-
-  const alerting = new AlertingService(logger, config, snsClient);
-  const metrics = new MetricsCollector(logger, config, cloudWatchMetricsClient);
-  
-  const correlationId = context.awsRequestId;
-  if (correlationId) {
-    setCorrelationId(correlationId);
-  }
-
   // Determine invocation source - EventBridge events have 'source' field, manual invokes don't
   const isManualInvoke = !event.source || event.source === '';
   const eventSource = isManualInvoke ? 'manual-invoke' : event.source;
   const eventType = isManualInvoke ? 'ManualInvocation' : (event['detail-type'] || 'Unknown');
-  
-  // Add X-Ray annotations
-  xrayClient.addAnnotation('eventSource', eventSource);
-  xrayClient.addAnnotation('eventType', eventType);
-  xrayClient.addAnnotation('isManualInvoke', String(isManualInvoke));
-  xrayClient.addMetadata('functionName', context.functionName);
-  xrayClient.addMetadata('requestId', context.awsRequestId);
-  xrayClient.addMetadata('remainingTime', context.getRemainingTimeInMillis());
-  
-  logger.info('Lambda function invoked', {
-    functionName: context.functionName,
-    requestId: context.awsRequestId,
-    eventSource,
-    eventType,
-    isManualInvoke,
-    remainingTime: context.getRemainingTimeInMillis(),
-  });
 
-  const timeoutWarning = setTimeout(() => {
-    const remaining = context.getRemainingTimeInMillis();
-    if (remaining < 60000) {
-      logger.warn('Lambda execution approaching timeout', {
-        remainingTime: remaining,
+  // Wrap handler logic in a subsegment to allow X-Ray annotations
+  // The main Lambda segment cannot be annotated directly - this is why we get the warning
+  // By wrapping in a subsegment, we can add metadata and annotations properly
+  return await xrayClient.captureAsyncSegment(
+    'handler',
+    async (_subsegment) => {
+      const alerting = new AlertingService({ logger, config, snsClient });
+      const metrics = new MetricsCollector({ logger, config, cloudWatchClient, alerting });
+      
+      const correlationId = context.awsRequestId;
+      if (correlationId) {
+        setCorrelationId(correlationId);
+      }
+      
+      logger.info('Lambda function invoked', {
+        functionName: context.functionName,
         requestId: context.awsRequestId,
+        eventSource,
+        eventType,
+        isManualInvoke,
+        remainingTime: context.getRemainingTimeInMillis(),
       });
-    }
-  }, (context.getRemainingTimeInMillis() - 60000));
 
-  try {
-    await runBirthdayCheck(logger, config, calendarClient, xrayClient, cloudWatchMetricsClient);
-    
-    clearTimeout(timeoutWarning);
+      const timeoutWarning = setTimeout(() => {
+        const remaining = context.getRemainingTimeInMillis();
+        if (remaining < 60000) {
+          logger.warn('Lambda execution approaching timeout', {
+            remainingTime: remaining,
+            requestId: context.awsRequestId,
+          });
+        }
+      }, (context.getRemainingTimeInMillis() - 60000));
 
-    logger.info('Lambda function completed successfully', {
+      try {
+        await runBirthdayCheck({
+          logger,
+          config,
+          calendarClient,
+          xrayClient,
+          cloudWatchClient,
+          whatsappClient,
+          alerting,
+        });
+        
+        clearTimeout(timeoutWarning);
+
+        logger.info('Lambda function completed successfully', {
+          requestId: context.awsRequestId,
+          remainingTime: context.getRemainingTimeInMillis(),
+        });
+
+        await metrics.flush();
+
+        return {
+          statusCode: 200,
+          body: JSON.stringify({
+            message: 'Birthday check completed successfully',
+            requestId: context.awsRequestId,
+          }),
+        };
+      } catch (error) {
+        clearTimeout(timeoutWarning);
+        
+        logger.error('Lambda function failed', error, {
+          requestId: context.awsRequestId,
+          remainingTime: context.getRemainingTimeInMillis(),
+        });
+
+        // Check if this is a timeout error
+        const remainingTime = context.getRemainingTimeInMillis();
+        if (remainingTime <= 0 || (error instanceof Error && error.message.includes('timeout'))) {
+          alerting.sendLambdaTimeoutAlert({
+            requestId: context.awsRequestId,
+            functionName: context.functionName,
+            remainingTime,
+          });
+        } else {
+          alerting.sendLambdaExecutionFailedAlert(error, {
+            requestId: context.awsRequestId,
+            functionName: context.functionName,
+            remainingTime,
+          });
+        }
+
+        try {
+          await metrics.flush();
+        } catch (flushError) {
+          logger.error('Error flushing metrics', flushError);
+        }
+
+        return {
+          statusCode: 500,
+          body: JSON.stringify({
+            message: 'Birthday check failed',
+            error: error instanceof Error ? error.message : String(error),
+            requestId: context.awsRequestId,
+          }),
+        };
+      }
+    },
+    {
+      eventSource,
+      eventType,
+      isManualInvoke: String(isManualInvoke),
+      functionName: context.functionName,
       requestId: context.awsRequestId,
       remainingTime: context.getRemainingTimeInMillis(),
-    });
-
-    await metrics.flush();
-
-    return {
-      statusCode: 200,
-      body: JSON.stringify({
-        message: 'Birthday check completed successfully',
-        requestId: context.awsRequestId,
-      }),
-    };
-  } catch (error) {
-    clearTimeout(timeoutWarning);
-    
-    logger.error('Lambda function failed', error, {
-      requestId: context.awsRequestId,
-      remainingTime: context.getRemainingTimeInMillis(),
-    });
-
-    // Check if this is a timeout error
-    const remainingTime = context.getRemainingTimeInMillis();
-    if (remainingTime <= 0 || (error instanceof Error && error.message.includes('timeout'))) {
-      alerting.sendLambdaTimeoutAlert({
-        requestId: context.awsRequestId,
-        functionName: context.functionName,
-        remainingTime,
-      });
-    } else {
-      alerting.sendLambdaExecutionFailedAlert(error, {
-        requestId: context.awsRequestId,
-        functionName: context.functionName,
-        remainingTime,
-      });
     }
-
-    try {
-      await metrics.flush();
-    } catch (flushError) {
-      logger.error('Error flushing metrics', flushError);
-    }
-
-    return {
-      statusCode: 500,
-      body: JSON.stringify({
-        message: 'Birthday check failed',
-        error: error instanceof Error ? error.message : String(error),
-        requestId: context.awsRequestId,
-      }),
-    };
-  }
+  );
 }
 

@@ -10,7 +10,7 @@ export async function handler(
   context: LambdaContext
 ): Promise<LambdaResponse> {
 
-  const alerting = new AlertingService(logger, config, snsClient);
+  const alerting = new AlertingService({ logger, config, snsClient });
   
   const correlationId = context.awsRequestId;
   if (correlationId) {
