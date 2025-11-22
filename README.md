@@ -4,6 +4,14 @@
 
 Never miss another birthday. Mnemora automatically checks your Google Calendar or Google Sheets for birthdays and sends WhatsApp notifications to your group chat.
 
+## Current Status
+
+![WhatsApp Messages Sent](https://img.shields.io/badge/WhatsApp%20Messages%20Sent-400%2B-25D366?logo=whatsapp&logoColor=white)
+
+**Deployment**: This app is currently running in personal AWS cloud (developer's AWS account).
+
+> Note: Message count is updated periodically. For real-time metrics, check AWS CloudWatch dashboard.
+
 ## The Problem
 
 Birthdays are easy to forget. You might have them in a calendar or spreadsheet, but you still need to remember to check every day. Mnemora solves this by:
