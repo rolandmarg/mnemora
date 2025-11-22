@@ -194,3 +194,4 @@ You are an expert in TypeScript, Node.js.
 - **Do NOT add JSDoc type comments** - TypeScript provides type information, JSDoc type annotations are redundant
 - **After significant changes**: Run `yarn test && yarn type-check && yarn lint` to ensure everything is working
 - **Keep `package.json` and `.vscode/launch.json` synchronized** - When adding scripts, update both files
+- **⚠️ Baileys Version Warning**: Do NOT upgrade `@whiskeysockets/baileys` beyond 6.7.21. Versions 6.17.16+ introduce audio decoder dependencies (~22MB) that are unnecessary for text-only WhatsApp messaging. This significantly increases Lambda package size. Current version: `^6.7.21`

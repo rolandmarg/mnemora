@@ -85,12 +85,42 @@ yarn uninstall-cron # Remove
 
 ## AWS Lambda Deployment
 
+### Prerequisites
+
+- **Node.js**: >= 24.0.0 (matches Lambda runtime)
+- **Yarn**: >= 1.22.0
+- **AWS SAM CLI**: >= 1.148.0 (required for nodejs24.x support)
+- **AWS CLI**: Latest version
+
+Install/update SAM CLI:
 ```bash
-yarn build:lambda
-sam deploy --guided
+brew install aws-sam-cli  # or brew upgrade aws-sam-cli
 ```
 
-**Cost**: ~$1/month. Creates Lambda, EventBridge, S3, DynamoDB, CloudWatch.
+### ⚠️ Important: Baileys Version
+
+**Do NOT upgrade `@whiskeysockets/baileys` beyond 6.7.21.**
+
+Versions 6.17.16+ introduce audio decoder dependencies (~22MB) that are unnecessary for text-only WhatsApp messaging:
+- `@wasm-audio-decoders` (~9MB)
+- `node-wav` (~8MB)
+- `ogg-opus-decoder` (~5MB)
+
+These dependencies significantly increase Lambda package size. The current version `^6.7.21` is sufficient for text messaging and keeps the package size optimal (~40MB vs ~60MB+ with audio decoders).
+
+**If you need to upgrade Baileys:**
+1. Check if audio features are actually needed
+2. Test package size impact: `yarn package:lambda`
+3. Verify size stays under 100MB
+4. Update cleanup script if needed
+
+### Deploy
+
+```bash
+yarn deploy
+```
+
+**Cost**: ~$1/month. Creates Lambda, EventBridge, S3, XRay, SNS, CloudWatch.
 
 ## Project Structure
 

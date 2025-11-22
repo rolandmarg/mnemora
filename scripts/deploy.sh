@@ -3,6 +3,9 @@
 
 set -e
 
+# Ensure production environment
+export NODE_ENV=production
+
 # Get the script directory and project root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -28,7 +31,18 @@ if ! command -v sam &> /dev/null; then
     echo "❌ SAM CLI not installed. Install with: brew install aws-sam-cli"
     exit 1
 fi
-echo "✅ SAM CLI installed"
+
+# Check SAM CLI version (minimum 1.148.0 required for nodejs24.x support)
+SAM_VERSION=$(sam --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+MIN_SAM_VERSION="1.148.0"
+
+# Compare versions using sort -V (version sort)
+if [ "$(printf '%s\n' "$MIN_SAM_VERSION" "$SAM_VERSION" | sort -V | head -n1)" != "$MIN_SAM_VERSION" ]; then
+    echo "❌ SAM CLI version $SAM_VERSION is too old. Minimum required: $MIN_SAM_VERSION"
+    echo "   Update with: brew upgrade aws-sam-cli"
+    exit 1
+fi
+echo "✅ SAM CLI installed (version $SAM_VERSION, minimum required: $MIN_SAM_VERSION)"
 
 # Check AWS credentials
 if ! aws sts get-caller-identity &>/dev/null; then
@@ -47,7 +61,9 @@ else
 fi
 
 # Package Lambda functions (build + SAM build + cleanup)
+# Note: package-lambda.sh sets NODE_ENV=production and uses --production flags
 echo ""
+echo "Building and packaging Lambda functions (production mode)..."
 ./scripts/package-lambda.sh
 
 # Deploy

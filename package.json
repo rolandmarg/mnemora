@@ -38,11 +38,19 @@
   ],
   "author": "",
   "license": "ISC",
+  "engines": {
+    "node": ">=24.0.0",
+    "yarn": ">=1.22.0"
+  },
+  "_deploymentRequirements": {
+    "aws-sam-cli": ">=1.148.0",
+    "note": "SAM CLI 1.148.0+ required for nodejs24.x runtime support. Checked automatically in deploy.sh"
+  },
   "dependencies": {
     "@aws-sdk/client-cloudwatch": "^3.936.0",
     "@aws-sdk/client-s3": "^3.937.0",
     "@aws-sdk/client-sns": "^3.936.0",
-    "@whiskeysockets/baileys": "^6.17.16",
+    "@whiskeysockets/baileys": "^6.7.21",
     "@aws-lambda-powertools/tracer": "^2.29.0",
     "dayjs": "^1.11.19",
     "dotenv": "^17.2.3",

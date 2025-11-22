@@ -12,26 +12,75 @@ yarn build:lambda
 echo "✅ Build complete"
 
 echo ""
-echo "Building with SAM..."
+echo "Building with SAM (production mode)..."
 export NODEJS_PACKAGE_MANAGER=yarn
-sam build --template-file "$PROJECT_ROOT/infrastructure/template.yaml"
+export NODE_ENV=production
+# Ensure production mode for SAM build
+# SAM will use existing node_modules from dist/ if present, which already has production deps only
+sam build \
+  --template-file "$PROJECT_ROOT/infrastructure/template.yaml" \
+  --use-container=false
 echo "✅ SAM build complete"
 
 echo ""
 echo "Cleaning up unused dependencies..."
+echo "Note: We only remove entire unused packages, never modify library internals"
 for FUNCTION_DIR in .aws-sam/build/*Function; do
   if [ -d "$FUNCTION_DIR/node_modules" ]; then
     echo "   Cleaning $(basename "$FUNCTION_DIR")..."
     
+    # Remove devDependencies (should not be in production Lambda)
+    # These should be excluded by --production, but SAM might re-install, so remove them explicitly
+    echo "      Removing devDependencies..."
+    rm -rf "$FUNCTION_DIR/node_modules/typescript" 2>/dev/null || true
+    rm -rf "$FUNCTION_DIR/node_modules/@typescript-eslint" 2>/dev/null || true
+    rm -rf "$FUNCTION_DIR/node_modules/eslint" 2>/dev/null || true
+    rm -rf "$FUNCTION_DIR/node_modules/@eslint" 2>/dev/null || true
+    rm -rf "$FUNCTION_DIR/node_modules/@eslint-community" 2>/dev/null || true
+    rm -rf "$FUNCTION_DIR/node_modules/@types" 2>/dev/null || true
+    rm -rf "$FUNCTION_DIR/node_modules/vitest" 2>/dev/null || true
+    rm -rf "$FUNCTION_DIR/node_modules/@vitest" 2>/dev/null || true
+    rm -rf "$FUNCTION_DIR/node_modules/tsx" 2>/dev/null || true
+    rm -rf "$FUNCTION_DIR/node_modules/pino-pretty" 2>/dev/null || true
+    rm -rf "$FUNCTION_DIR/node_modules/globals" 2>/dev/null || true
+    # Remove any eslint-related packages (catch-all)
+    find "$FUNCTION_DIR/node_modules" -maxdepth 1 -type d -name "eslint*" -exec rm -rf {} + 2>/dev/null || true
+    # Remove TypeScript-related packages (catch-all)
+    find "$FUNCTION_DIR/node_modules" -maxdepth 1 -type d -name "*typescript*" -exec rm -rf {} + 2>/dev/null || true
+    
+    # Remove audio decoders (only needed for Baileys 6.17.16+, we're using 6.7.21)
+    echo "      Removing audio decoders (not needed with Baileys 6.7.21)..."
+    rm -rf "$FUNCTION_DIR/node_modules/@wasm-audio-decoders" 2>/dev/null || true
+    rm -rf "$FUNCTION_DIR/node_modules/node-wav" 2>/dev/null || true
+    rm -rf "$FUNCTION_DIR/node_modules/ogg-opus-decoder" 2>/dev/null || true
+    rm -rf "$FUNCTION_DIR/node_modules/audio-decode" 2>/dev/null || true
+    rm -rf "$FUNCTION_DIR/node_modules/audio-buffer" 2>/dev/null || true
+    rm -rf "$FUNCTION_DIR/node_modules/audio-type" 2>/dev/null || true
+    
+    # Remove unused AWS SDK credential providers (Lambda only needs env and node providers)
+    echo "      Removing unused AWS SDK credential providers..."
+    rm -rf "$FUNCTION_DIR/node_modules/@aws-sdk/credential-provider-ini" 2>/dev/null || true
+    rm -rf "$FUNCTION_DIR/node_modules/@aws-sdk/credential-provider-sso" 2>/dev/null || true
+    rm -rf "$FUNCTION_DIR/node_modules/@aws-sdk/credential-provider-login" 2>/dev/null || true
+    rm -rf "$FUNCTION_DIR/node_modules/@aws-sdk/credential-provider-process" 2>/dev/null || true
+    rm -rf "$FUNCTION_DIR/node_modules/@aws-sdk/credential-provider-web-identity" 2>/dev/null || true
+    rm -rf "$FUNCTION_DIR/node_modules/@aws-sdk/credential-provider-http" 2>/dev/null || true
+    rm -rf "$FUNCTION_DIR/node_modules/@aws-sdk/client-sso" 2>/dev/null || true
+    # Keep: credential-provider-env, credential-provider-node (needed for Lambda IAM roles)
+    
     # Remove sharp (optional peer dependency, not needed for Lambda)
     rm -rf "$FUNCTION_DIR/node_modules/@img" "$FUNCTION_DIR/node_modules/sharp" 2>/dev/null || true
     
-    # Aggressively clean up googleapis (193MB -> target <50MB)
+    # Clean up googleapis by removing unused API modules (entire modules, not library internals)
+    # googleapis is modular - each API (calendar, sheets, drive, etc.) is a separate module
+    # We only keep the modules we actually use (calendar and sheets)
     if [ -d "$FUNCTION_DIR/node_modules/googleapis" ]; then
-      echo "      Aggressively cleaning googleapis (largest dependency)..."
-      # Remove unused Google APIs (keep only calendar, sheets, and common)
+      echo "      Cleaning googleapis (removing unused API modules)..."
+      # Remove unused Google API modules (keep only calendar and sheets)
+      # Note: googleapis-common is a separate package and is already included
+      # This removes entire API modules, not parts of the library
       if [ -d "$FUNCTION_DIR/node_modules/googleapis/build/src/apis" ]; then
-        find "$FUNCTION_DIR/node_modules/googleapis/build/src/apis" -mindepth 1 -maxdepth 1 -type d ! -name "calendar" ! -name "sheets" ! -name "common" -exec rm -rf {} + 2>/dev/null || true
+        find "$FUNCTION_DIR/node_modules/googleapis/build/src/apis" -mindepth 1 -maxdepth 1 -type d ! -name "calendar" ! -name "sheets" -exec rm -rf {} + 2>/dev/null || true
       fi
       # Remove TypeScript source files (we only need compiled JS)
       find "$FUNCTION_DIR/node_modules/googleapis" -name "*.ts" -delete 2>/dev/null || true
@@ -49,6 +98,10 @@ for FUNCTION_DIR in .aws-sam/build/*Function; do
         find "$FUNCTION_DIR/node_modules/googleapis/node_modules" -mindepth 1 -maxdepth 1 -type d ! -name "gaxios" ! -name "google-auth-library" ! -name "gtoken" -exec rm -rf {} + 2>/dev/null || true
       fi
     fi
+    
+    # Remove TypeScript definition files (not needed at runtime, saves ~29MB)
+    echo "      Removing TypeScript definition files..."
+    find "$FUNCTION_DIR/node_modules" -name "*.d.ts" -delete 2>/dev/null || true
     
     # Remove source maps and other unnecessary files from all node_modules
     find "$FUNCTION_DIR/node_modules" -name "*.map" -delete 2>/dev/null || true

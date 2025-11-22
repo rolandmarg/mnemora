@@ -3,6 +3,9 @@
 
 set -e
 
+# Ensure production environment
+export NODE_ENV=production
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$PROJECT_ROOT"
@@ -14,11 +17,13 @@ echo "Copying files to dist..."
 cp package.json dist/
 cp yarn.lock dist/
 
-# Install dependencies in dist to ensure all packages (including dotenv) are available
-# SAM will use these during build
-echo "Installing dependencies in dist..."
+# Install production dependencies in dist
+# SAM will copy this directory with node_modules, so only production deps will be included
+echo "Installing production dependencies in dist..."
 cd dist
-yarn install --production --frozen-lockfile
+# Use production flags: --production excludes devDependencies, --frozen-lockfile ensures consistency
+# NODE_ENV=production is already exported, but explicit here for clarity
+NODE_ENV=production yarn install --production --frozen-lockfile --ignore-scripts
 cd ..
 
 echo ""

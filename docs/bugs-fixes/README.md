@@ -26,6 +26,12 @@ Each bug fix document follows this structure:
 
 ## Bug Fixes
 
+### 2025-11-22
+- [Lambda Package Size Bloat](./2025-11-22-lambda-package-size-bloat.md)
+  - Fixed Lambda package size increase from 60MB to 131MB after Node.js 24.x upgrade
+  - Removed devDependencies, TypeScript definitions, and audio decoders
+  - Total savings: ~88MB, bringing package back to ~60MB
+
 ### 2025-11-20
 - [Lambda Duplicates and Date Range Bug](./2025-11-20-lambda-duplicates-and-date-range-bug.md)
   - Fixed Lambda concurrent execution causing duplicate events
