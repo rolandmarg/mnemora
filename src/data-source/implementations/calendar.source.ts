@@ -1,7 +1,7 @@
 import { BaseDataSource } from '../data-source.base.js';
 import { extractNameFromEvent, isBirthdayEvent } from '../../utils/event-helpers.util.js';
 import { extractNameParts, getFullName } from '../../utils/name-helpers.util.js';
-import { parseDateFromString, formatDateISO, today, startOfYear, endOfYear } from '../../utils/date-helpers.util.js';
+import { parseDateFromString, formatDateISO, today, startOfYear, endOfYear, getMonthInTimezone, getDateInTimezone } from '../../utils/date-helpers.util.js';
 import { auditDeletionAttempt, SecurityError } from '../../utils/security.util.js';
 import type { BirthdayRecord } from '../../types/birthday.types.js';
 import type { Event } from '../../types/event.types.js';
@@ -116,10 +116,11 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
     const uniqueRecurringEvents = new Set<string>();
     
     // Get unique month/day combinations from birthdays we're syncing
+    // Use timezone-aware extraction to ensure correct date components
     const uniqueDates = new Map<string, Date[]>();
     for (const birthday of birthdays) {
-      const month = birthday.birthday.getMonth() + 1; // 1-12
-      const day = birthday.birthday.getDate();
+      const month = getMonthInTimezone(birthday.birthday); // 1-12
+      const day = getDateInTimezone(birthday.birthday);
       const dateKey = `${month}-${day}`; // Month-Day key (e.g., "1-15" for Jan 15)
       
       if (!uniqueDates.has(dateKey)) {
@@ -139,8 +140,9 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
       const eventName = extractNameFromEvent(event);
 
       if (eventDate && eventName) {
-        const eventMonth = eventDate.getMonth() + 1;
-        const eventDay = eventDate.getDate();
+        // Use timezone-aware extraction to ensure correct date components
+        const eventMonth = getMonthInTimezone(eventDate);
+        const eventDay = getDateInTimezone(eventDate);
         const eventDateKey = `${eventMonth}-${eventDay}`;
         
         // Check if this event matches any of the dates we're syncing

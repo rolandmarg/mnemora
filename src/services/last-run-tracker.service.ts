@@ -9,6 +9,7 @@ const S3_LAST_RUN_KEY = 'last-run.txt';
 
 class LastRunTrackerService {
   private readonly storage = StorageService.getAppStorage();
+  private pendingLastRunDate: string | null = null;
 
   constructor(private readonly ctx: AppContext) {}
 
@@ -54,30 +55,47 @@ class LastRunTrackerService {
     }
   }
 
-  async updateLastRunDate(): Promise<void> {
-    try {
-      const todayDate = today();
-      const dateString = todayDate.toISOString();
+  updateLastRunDate(): void {
+    const todayDate = today();
+    const dateString = todayDate.toISOString();
+    
+    // Store date in memory for later batch write
+    this.pendingLastRunDate = dateString;
+    
+    if (this.ctx.isLambda) {
+      this.ctx.logger.info('Last run date updated (pending S3 write)', { date: dateString });
+    } else {
+      // In local mode, write immediately (not Lambda)
+      this.flushPendingWrites().catch(() => {});
+    }
+  }
 
+  async flushPendingWrites(): Promise<void> {
+    if (!this.pendingLastRunDate) {
+      return;
+    }
+
+    try {
       if (this.ctx.isLambda) {
         try {
-          await this.storage.writeFile(S3_LAST_RUN_KEY, dateString);
-          this.ctx.logger.info('Last run date updated in S3', { date: dateString });
-          return;
+          await this.storage.writeFile(S3_LAST_RUN_KEY, this.pendingLastRunDate);
+          this.ctx.logger.info('Last run date updated in S3', { date: this.pendingLastRunDate });
         } catch (error) {
           this.ctx.logger.warn('Error updating last run date in S3', error);
         }
-      }
+      } else {
+        const logsDir = join(process.cwd(), 'logs');
+        if (!existsSync(logsDir)) {
+          mkdirSync(logsDir, { recursive: true });
+        }
 
-      const logsDir = join(process.cwd(), 'logs');
-      if (!existsSync(logsDir)) {
-        mkdirSync(logsDir, { recursive: true });
+        writeFileSync(LAST_RUN_FILE, this.pendingLastRunDate, 'utf-8');
+        this.ctx.logger.info('Last run date updated', { date: this.pendingLastRunDate });
       }
-
-      writeFileSync(LAST_RUN_FILE, dateString, 'utf-8');
-      this.ctx.logger.info('Last run date updated', { date: dateString });
+      
+      this.pendingLastRunDate = null;
     } catch (error) {
-      this.ctx.logger.error('Error updating last run date', error);
+      this.ctx.logger.error('Error flushing last run date', error);
     }
   }
 

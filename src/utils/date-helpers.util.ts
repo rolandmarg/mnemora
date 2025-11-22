@@ -12,10 +12,12 @@ function getTimezone(): string {
 
 function createDateInTimezone(year: number, month: number, day: number): Date {
   const tz = getTimezone();
-  // Create a date at midnight in the target timezone
-  const localDate = new Date(year, month - 1, day, 0, 0, 0, 0);
-  // fromZonedTime equivalent: interpret localDate as being in timezone tz, return UTC Date
-  return dayjs.tz(localDate, tz).toDate();
+  // Create a date at midnight in the target timezone directly using dayjs
+  // Parse the date string in the target timezone (not system timezone)
+  const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  // dayjs.tz(dateStr, tz) parses the date string as if it's in the target timezone
+  // This is correct: we want Nov 21 at midnight in the configured timezone
+  return dayjs.tz(dateStr, tz).startOf('day').toDate();
 }
 
 export function today(): Date {
@@ -160,4 +162,24 @@ export function formatDateRange(startDate: Date, endDate: Date): string {
 
 export function isFirstDayOfMonth(date: Date): boolean {
   return date.getDate() === 1;
+}
+
+/**
+ * Get the month (1-12) of a date in the configured timezone.
+ * This ensures we extract date components correctly regardless of system timezone.
+ */
+export function getMonthInTimezone(date: Date): number {
+  const tz = getTimezone();
+  const zonedDate = dayjs(date).tz(tz);
+  return zonedDate.month() + 1; // dayjs months are 0-indexed, return 1-12
+}
+
+/**
+ * Get the day of month (1-31) of a date in the configured timezone.
+ * This ensures we extract date components correctly regardless of system timezone.
+ */
+export function getDateInTimezone(date: Date): number {
+  const tz = getTimezone();
+  const zonedDate = dayjs(date).tz(tz);
+  return zonedDate.date(); // dayjs.date() returns 1-31
 }

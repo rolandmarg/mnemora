@@ -73,7 +73,7 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
       }
       
       if (this.ctx.clients.whatsapp.isClientReady()) {
-        await this.authReminder.recordAuthentication().catch(() => {});
+        this.authReminder.recordAuthentication();
       }
     } catch (error) {
       // Re-throw QR authentication required error so it bubbles up to handler
@@ -342,8 +342,15 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
     };
   }
 
+  async flushPendingWrites(): Promise<void> {
+    await this.authReminder.flushPendingWrites();
+  }
+
   async destroy(): Promise<void> {
     try {
+      // Flush pending S3 writes (auth reminder) before session sync
+      await this.flushPendingWrites();
+      
       // Sync session to S3 before destroying (Lambda only)
       // This is the only place we save session to S3 after loading at start
       await this.syncSessionToS3();

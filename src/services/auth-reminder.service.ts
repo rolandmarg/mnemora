@@ -5,24 +5,44 @@ class AuthReminderService {
   private readonly storage = StorageService.getAppStorage();
   private readonly reminderDays: number = 7;
   private readonly authKey: string = 'whatsapp-auth.json';
+  private pendingAuthTimestamp: string | null = null;
 
   constructor(private readonly ctx: AppContext) {}
 
-  async recordAuthentication(): Promise<void> {
+  recordAuthentication(): void {
     const now = new Date();
     const timestamp = now.toISOString();
+    
+    // Store timestamp in memory for later batch write
+    this.pendingAuthTimestamp = timestamp;
+    
+    if (this.ctx.isLambda) {
+      this.ctx.logger.info('WhatsApp authentication recorded (pending S3 write)', { timestamp });
+    } else {
+      // In local mode, write immediately (not Lambda)
+      this.flushPendingWrites().catch(() => {});
+    }
+  }
+
+  async flushPendingWrites(): Promise<void> {
+    if (!this.pendingAuthTimestamp) {
+      return;
+    }
 
     try {
-      const authData = JSON.stringify({ timestamp });
+      const authData = JSON.stringify({ timestamp: this.pendingAuthTimestamp });
       
       if (this.ctx.isLambda) {
         await this.storage.writeFile(this.authKey, authData);
-        this.ctx.logger.info('WhatsApp authentication recorded in S3', { timestamp });
+        this.ctx.logger.info('WhatsApp authentication recorded in S3', { timestamp: this.pendingAuthTimestamp });
       } else {
-        this.ctx.logger.info('WhatsApp authentication recorded (local)', { timestamp });
+        // Local mode already handled in recordAuthentication
+        this.ctx.logger.info('WhatsApp authentication recorded (local)', { timestamp: this.pendingAuthTimestamp });
       }
+      
+      this.pendingAuthTimestamp = null;
     } catch (error) {
-      this.ctx.logger.error('Error recording authentication', error);
+      this.ctx.logger.error('Error flushing authentication record', error);
     }
   }
 

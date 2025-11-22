@@ -44,13 +44,13 @@ class BirthdayService {
         const todayDate = today();
         trackApiCall(this.metrics, 'calendar', true);
         const records = await this.calendarSource.read({ startDate: todayDate, endDate: todayDate });
-        
         trackBirthdayFetch(this.metrics, records.length);
         trackOperationDuration(this.metrics, 'getTodaysBirthdays', Date.now() - startTime);
         
         return records;
       } catch (error) {
-        trackApiCall(this.metrics, 'calendar', false);
+        const apiDuration = Date.now() - startTime;
+        trackApiCall(this.metrics, 'calendar', false, apiDuration);
         trackOperationDuration(this.metrics, 'getTodaysBirthdays', Date.now() - startTime, { success: 'false' });
         this.ctx.logger.error('Error getting today\'s birthdays', error);
         

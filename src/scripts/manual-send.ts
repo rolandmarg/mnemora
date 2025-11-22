@@ -186,11 +186,21 @@ async function manualSend(): Promise<void> {
     
     appContext.logger.info('Manual send completed successfully!');
     
-    await lastRunTracker.updateLastRunDate();
+    lastRunTracker.updateLastRunDate();
   } catch (error) {
     appContext.logger.error('Error in manual send', error);
     process.exit(1);
   } finally {
+    // Flush all pending S3 writes before cleanup
+    try {
+      await lastRunTracker.flushPendingWrites();
+      if (whatsappChannel && 'flushPendingWrites' in whatsappChannel && typeof whatsappChannel.flushPendingWrites === 'function') {
+        await whatsappChannel.flushPendingWrites();
+      }
+    } catch (error) {
+      appContext.logger.error('Error flushing pending writes', error);
+    }
+    
     if (whatsappChannel) {
       await new Promise(resolve => setTimeout(resolve, 2000));
     }

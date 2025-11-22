@@ -124,8 +124,16 @@ export function trackMissedDaysDetected(metrics: MetricsCollector, count: number
   metrics.incrementCounter('missed_days.detected', count);
 }
 
-export function trackApiCall(metrics: MetricsCollector, service: 'calendar' | 'sheets', success: boolean = true): void {
+export function trackApiCall(
+  metrics: MetricsCollector, 
+  service: 'calendar' | 'sheets' | 's3', 
+  success: boolean = true,
+  durationMs?: number
+): void {
   metrics.incrementCounter(`api.${service}.calls`, 1, { Status: success ? 'success' : 'failure' });
+  if (durationMs !== undefined) {
+    metrics.recordDuration(`api.${service}.duration`, durationMs, { Status: success ? 'success' : 'failure' });
+  }
 }
 
 export function trackWhatsAppMessageSent(metrics: MetricsCollector, success: boolean = true): void {

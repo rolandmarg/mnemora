@@ -66,6 +66,22 @@ class BirthdayOrchestratorService {
     await logSentMessage(this.ctx, messageId, messageType, groupId, content, success, duration, error, metadata).catch(() => {});
   }
 
+  private async flushPendingWrites(
+    channel: ReturnType<typeof OutputChannelFactory.createWhatsAppOutputChannel> | null
+  ): Promise<void> {
+    try {
+      // Flush last run date
+      await this.lastRunTracker.flushPendingWrites();
+      
+      // Flush auth reminder if channel is available
+      if (channel && 'flushPendingWrites' in channel && typeof channel.flushPendingWrites === 'function') {
+        await channel.flushPendingWrites();
+      }
+    } catch (error) {
+      this.ctx.logger.error('Error flushing pending writes', error);
+    }
+  }
+
   private async cleanupWhatsAppClient(
     channel: ReturnType<typeof OutputChannelFactory.createWhatsAppOutputChannel> | null
   ): Promise<void> {
@@ -405,7 +421,7 @@ class BirthdayOrchestratorService {
       
       this.ctx.logger.info('Birthday check completed successfully!');
       
-      await this.lastRunTracker.updateLastRunDate();
+      this.lastRunTracker.updateLastRunDate();
 
       const monthlyDigestSent = !!monthlyBirthdays && whatsappChannel?.isAvailable();
       await this.monitoring.recordDailyExecution(true, monthlyDigestSent);
@@ -438,6 +454,9 @@ class BirthdayOrchestratorService {
         this.alerting.sendHighExecutionDurationAlert(executionDuration, { success: true });
       }
 
+      // Flush all pending S3 writes before cleanup
+      await this.flushPendingWrites(whatsappChannel);
+      
       await this.cleanupWhatsAppClient(whatsappChannel);
     }
     }, {
