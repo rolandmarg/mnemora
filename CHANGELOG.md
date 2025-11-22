@@ -13,6 +13,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+---
+## [1.0.6] - 2025-11-22
+
+## What's Changed
+
+### 🔧 Chores
+
+- Update deploy script to use Yarn for packaging Lambda functions (6769d01)
+
+### 📦 Other Changes
+
+- Fix deploy warning (bd9e576)
+- Fix deploy script (0e8e917)
+
+**Full Changelog**: v1.0.5...v1.0.6
+
 ---
 ## [1.0.5] - 2025-11-22
 
