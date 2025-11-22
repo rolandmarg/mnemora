@@ -79,7 +79,7 @@ if (existsSync(distNodeModules)) {
 
 // Install production dependencies in dist
 console.log('Installing production dependencies in dist...');
-exec('NODE_ENV=production yarn install --production --immutable --ignore-scripts', {
+exec('NODE_ENV=production YARN_ENABLE_SCRIPTS=false yarn install --production --immutable', {
   cwd: join(PROJECT_ROOT, 'dist')
 });
 
