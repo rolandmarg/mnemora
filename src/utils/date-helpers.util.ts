@@ -14,9 +14,10 @@ function createDateInTimezone(year: number, month: number, day: number): Date {
   const tz = getTimezone();
   // Create a date at midnight in the target timezone directly using dayjs
   // Parse the date string in the target timezone (not system timezone)
+  // This prevents day shifts when converting between timezones
   const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   // dayjs.tz(dateStr, tz) parses the date string as if it's in the target timezone
-  // This is correct: we want Nov 21 at midnight in the configured timezone
+  // This ensures Nov 21 stays Nov 21 in the configured timezone
   return dayjs.tz(dateStr, tz).startOf('day').toDate();
 }
 

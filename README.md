@@ -2,15 +2,6 @@
 
 A TypeScript bot that manages birthdays across multiple data sources (Google Calendar, Google Sheets) and sends notifications through multiple output channels (Console, SMS, WhatsApp, Email).
 
-## ⚠️ Disclaimer
-
-**This project was primarily developed with the assistance of AI (Claude/Cursor AI).** While the code has been reviewed and tested, please be aware that:
-
-- Most of the codebase was generated or significantly assisted by AI models
-- The architecture and implementation decisions were made in collaboration with AI assistance
-- Code quality and patterns follow AI-generated conventions
-- Manual review and testing have been performed, but the codebase may contain AI-generated patterns or approaches
-
 ## Features
 
 - 🎂 Daily birthday checks
@@ -369,6 +360,10 @@ This project is open to improvements, suggestions, and new ideas. Whether you wa
 - Discuss architecture decisions
 
 We'd love to hear from you! See [docs/CONTRIBUTING.md](./docs/CONTRIBUTING.md) for more details.
+
+## Note
+
+This project was primarily developed with the assistance of AI (Claude/Cursor AI). Most of the codebase was generated or significantly assisted by AI models, and the architecture and implementation decisions were made in collaboration with AI assistance. Manual review and testing have been performed.
 
 ## License
 
