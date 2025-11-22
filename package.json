@@ -24,7 +24,11 @@
     "deploy:lambda": "./scripts/deploy.sh",
     "deploy:force": "rm -rf .aws-sam && ./scripts/deploy.sh --force-upload",
     "invoke:local": "sam local invoke BirthdayBotFunction --event events/event.json",
-    "invoke:lambda": "aws lambda invoke --function-name mnemora-birthday-bot-prod --payload '{}' /dev/stdout | cat"
+    "invoke:lambda": "aws lambda invoke --function-name mnemora-birthday-bot-prod --payload '{}' /dev/stdout | cat",
+    "release:patch": "./scripts/release.sh patch",
+    "release:minor": "./scripts/release.sh minor",
+    "release:major": "./scripts/release.sh major",
+    "release:version": "./scripts/release.sh version"
   },
   "keywords": [
     "calendar",
