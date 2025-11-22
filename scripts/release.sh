@@ -80,18 +80,276 @@ check_git_clean() {
     fi
 }
 
-# Function to get release notes from git commits
-get_release_notes() {
+# Function to get commits since last tag
+get_commits() {
     local previous_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-    local current_tag=$1
     
     if [ -z "$previous_tag" ]; then
         # First release - get all commits
-        git log --pretty=format:"- %s (%h)" --reverse
+        git log --pretty=format:"%h|%s" --reverse
     else
-        # Get commits since last tag
-        git log --pretty=format:"- %s (%h)" "${previous_tag}..HEAD"
+        # Get commits since last tag (exclude version bump commits)
+        git log --pretty=format:"%h|%s" "${previous_tag}..HEAD" | grep -v "chore: bump version"
     fi
+}
+
+# Function to categorize commit message
+categorize_commit() {
+    local commit_message=$1
+    
+    # Check for conventional commit prefixes
+    if [[ "$commit_message" =~ ^feat(\(.+\))?: ]]; then
+        echo "features"
+    elif [[ "$commit_message" =~ ^fix(\(.+\))?: ]]; then
+        echo "fixes"
+    elif [[ "$commit_message" =~ ^refactor(\(.+\))?: ]]; then
+        echo "refactor"
+    elif [[ "$commit_message" =~ ^perf(\(.+\))?: ]]; then
+        echo "performance"
+    elif [[ "$commit_message" =~ ^docs(\(.+\))?: ]]; then
+        echo "documentation"
+    elif [[ "$commit_message" =~ ^test(\(.+\))?: ]]; then
+        echo "tests"
+    elif [[ "$commit_message" =~ ^chore(\(.+\))?: ]]; then
+        echo "chores"
+    elif [[ "$commit_message" =~ ^build(\(.+\))?: ]]; then
+        echo "build"
+    else
+        echo "other"
+    fi
+}
+
+# Function to format commit message (remove prefix, capitalize)
+format_commit_message() {
+    local commit_message=$1
+    
+    # Remove conventional commit prefix (e.g., "feat: " or "feat(something): ")
+    commit_message=$(echo "$commit_message" | sed -E 's/^[a-z]+(\([^)]+\))?: //')
+    
+    # Capitalize first letter
+    echo "$commit_message" | sed 's/^./\U&/'
+}
+
+# Function to generate structured release notes
+generate_release_notes() {
+    local version=$1
+    local date=$2
+    
+    local previous_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+    local commits=$(get_commits)
+    
+    # Categories in order of importance
+    declare -A categories
+    declare -A category_labels
+    
+    category_labels["features"]="✨ Features"
+    category_labels["fixes"]="🐛 Bug Fixes"
+    category_labels["refactor"]="♻️  Refactoring"
+    category_labels["performance"]="⚡ Performance"
+    category_labels["documentation"]="📝 Documentation"
+    category_labels["tests"]="🧪 Tests"
+    category_labels["build"]="🔨 Build"
+    category_labels["chores"]="🔧 Chores"
+    category_labels["other"]="📦 Other Changes"
+    
+    # Parse commits into categories
+    while IFS='|' read -r hash message; do
+        # Skip empty lines
+        [ -z "$hash" ] && continue
+        
+        local category=$(categorize_commit "$message")
+        local formatted=$(format_commit_message "$message")
+        
+        # Append to category array
+        if [ -z "${categories[$category]}" ]; then
+            categories[$category]=""
+        fi
+        categories[$category]+="- $formatted ($hash)"$'\n'
+    done <<< "$commits"
+    
+    # Build release notes
+    local notes="## What's Changed"
+    notes+=$'\n\n'
+    
+    # Check if there are any changes
+    local has_changes=false
+    
+    # Output categories in order
+    for category in features fixes refactor performance documentation tests build chores other; do
+        if [ -n "${categories[$category]}" ]; then
+            has_changes=true
+            notes+="### ${category_labels[$category]}"
+            notes+=$'\n\n'
+            # Remove trailing newline
+            notes+="${categories[$category]%$'\n'}"
+            notes+=$'\n\n'
+        fi
+    done
+    
+    if [ "$has_changes" = false ]; then
+        notes+="No significant changes in this release."
+        notes+=$'\n\n'
+    fi
+    
+    # Add contributors/full changelog reference if applicable
+    if [ -n "$previous_tag" ]; then
+        notes+="**Full Changelog**: ${previous_tag}...v${version}"
+    else
+        notes+="**Full Changelog**: v${version}"
+    fi
+    
+    echo "$notes"
+}
+
+# Function to update CHANGELOG.md
+update_changelog() {
+    local version=$1
+    local release_notes=$2
+    local changelog_file="CHANGELOG.md"
+    
+    local changelog_header="## [${version}] - $(date +%Y-%m-%d)"
+    
+    # Use a temporary file to pass release notes to Node.js (avoids escaping issues)
+    local temp_notes_file=$(mktemp)
+    echo "$release_notes" > "$temp_notes_file"
+    
+    # Use Node.js for more reliable file manipulation
+    node -e "
+        const fs = require('fs');
+        const path = '$changelog_file';
+        const notesPath = '$temp_notes_file';
+        const header = '$changelog_header';
+        
+        const notes = fs.readFileSync(notesPath, 'utf8');
+        const newEntry = header + '\\n\\n' + notes.trim() + '\\n';
+        
+        if (!fs.existsSync(path)) {
+            // Create new CHANGELOG.md
+            const content = \`# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+- Initial changelog
+
+---
+
+\${newEntry}\`;
+            fs.writeFileSync(path, content, 'utf8');
+        } else {
+            // Update existing CHANGELOG.md
+            const existing = fs.readFileSync(path, 'utf8');
+            const lines = existing.split('\\n');
+            const newLines = [];
+            let foundUnreleased = false;
+            let inserted = false;
+            let i = 0;
+            
+            // Find and copy lines until we reach the Unreleased section
+            for (i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                newLines.push(line);
+                
+                if (line.match(/^## \\[Unreleased\\]/)) {
+                    foundUnreleased = true;
+                    break;
+                }
+            }
+            
+            if (foundUnreleased) {
+                // Continue through Unreleased section until we find a version entry
+                i++;
+                while (i < lines.length) {
+                    const line = lines[i];
+                    
+                    // Check if we hit the next version entry (format: ## [X.Y.Z])
+                    if (line.match(/^## \\[[0-9]+\\.[0-9]+\\.[0-9]+\\]/)) {
+                        // Insert new version before this one
+                        newLines.push('');
+                        newLines.push('---');
+                        newLines.push(...newEntry.split('\\n'));
+                        inserted = true;
+                        break;
+                    }
+                    
+                    // Check if we hit a separator (---)
+                    if (line.match(/^---/)) {
+                        // Insert new version before separator
+                        newLines.push('');
+                        newLines.push('---');
+                        newLines.push(...newEntry.split('\\n'));
+                        inserted = true;
+                        break;
+                    }
+                    
+                    newLines.push(line);
+                    i++;
+                }
+                
+                // Copy remaining lines if any
+                if (i < lines.length) {
+                    for (let j = i; j < lines.length; j++) {
+                        newLines.push(lines[j]);
+                    }
+                } else if (!inserted) {
+                    // Reached end without finding a version, append
+                    newLines.push('');
+                    newLines.push('---');
+                    newLines.push(...newEntry.split('\\n'));
+                    inserted = true;
+                }
+            } else {
+                // No Unreleased section found, prepend it
+                const headerLines = [
+                    '# Changelog',
+                    '',
+                    'All notable changes to this project will be documented in this file.',
+                    '',
+                    'The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),',
+                    'and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).',
+                    '',
+                    '## [Unreleased]',
+                    '',
+                    '### Added',
+                    '- Initial changelog',
+                    '',
+                    '---',
+                    '',
+                    ...newEntry.split('\\n'),
+                    ''
+                ];
+                const allLines = headerLines.concat(newLines);
+                fs.writeFileSync(path, allLines.join('\\n'), 'utf8');
+                fs.unlinkSync(notesPath);
+                return;
+            }
+            
+            fs.writeFileSync(path, newLines.join('\\n'), 'utf8');
+        }
+        
+        fs.unlinkSync(notesPath);
+    " || {
+        print_error "Failed to update CHANGELOG.md"
+        rm -f "$temp_notes_file"
+        return 1
+    }
+    
+    rm -f "$temp_notes_file"
+    
+    print_success "Updated $changelog_file"
+    return 0
+}
+
+# Function to get release notes from git commits (backwards compatibility)
+get_release_notes() {
+    local current_tag=$1
+    local version="${current_tag#v}"
+    generate_release_notes "$version" "$(date +%Y-%m-%d)"
 }
 
 # Function to create GitHub release
@@ -202,6 +460,22 @@ release() {
         fi
     fi
     
+    # Generate structured release notes
+    print_info "Generating release notes..."
+    local release_notes=$(generate_release_notes "$target_version" "$(date +%Y-%m-%d)")
+    if [ -z "$release_notes" ]; then
+        print_error "Failed to generate release notes"
+        exit 1
+    fi
+    print_success "Release notes generated"
+    
+    # Update CHANGELOG.md
+    print_info "Updating CHANGELOG.md..."
+    update_changelog "$target_version" "$release_notes" || {
+        print_error "Failed to update CHANGELOG.md"
+        exit 1
+    }
+    
     # Update package.json version
     print_info "Updating package.json version..."
     node -e "
@@ -212,18 +486,17 @@ release() {
     "
     print_success "Version updated in package.json"
     
-    # Commit version bump
-    print_info "Committing version bump..."
-    git add package.json
+    # Commit version bump and changelog
+    print_info "Committing version bump and changelog..."
+    git add package.json CHANGELOG.md 2>/dev/null || git add package.json
     git commit -m "chore: bump version to $target_version" || {
         print_error "Failed to commit version bump"
         exit 1
     }
-    print_success "Version bump committed"
+    print_success "Version bump and changelog committed"
     
     # Create git tag
     print_info "Creating git tag..."
-    local release_notes=$(get_release_notes "$tag")
     git tag -a "$tag" -m "Release $tag
 
 $release_notes" || {
