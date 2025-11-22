@@ -1,4 +1,8 @@
 import { describe, it, expect } from 'vitest';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc.js';
+import timezone from 'dayjs/plugin/timezone.js';
+import { config } from '../config.js';
 import {
   today,
   parseDateFromString,
@@ -14,6 +18,15 @@ import {
   formatDateRange,
   isFirstDayOfMonth,
 } from '../utils/date-helpers.util.js';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+function createDateInTimezone(year: number, month: number, day: number): Date {
+  const tz = config.schedule.timezone;
+  const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  return dayjs.tz(dateStr, tz).startOf('day').toDate();
+}
 
 describe('date utilities', () => {
   describe('today', () => {
@@ -129,13 +142,15 @@ describe('date utilities', () => {
 
   describe('formatDateISO', () => {
     it('should format date as YYYY-MM-DD', () => {
-      const date = new Date(2024, 4, 15);
+      // Create date in configured timezone to avoid timezone shifts
+      const date = createDateInTimezone(2024, 5, 15);
       const result = formatDateISO(date);
       expect(result).toBe('2024-05-15');
     });
 
     it('should pad single digit months and days', () => {
-      const date = new Date(2024, 0, 5);
+      // Create date in configured timezone to avoid timezone shifts
+      const date = createDateInTimezone(2024, 1, 5);
       const result = formatDateISO(date);
       expect(result).toBe('2024-01-05');
     });
