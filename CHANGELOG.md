@@ -14,6 +14,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+---
+## [1.0.7] - 2025-11-22
+
+## What's Changed
+
+### 🔧 Chores
+
+- Update nullish coalescing rule in cursor rules (655cbc3)
+- Enforce Baileys version lock and update documentation (1145aec)
+
+**Full Changelog**: v1.0.6...v1.0.7
+
 ---
 ## [1.0.6] - 2025-11-22
 
