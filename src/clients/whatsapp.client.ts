@@ -6,6 +6,7 @@ import makeWASocket, {
   makeCacheableSignalKeyStore,
   ConnectionState,
 } from '@whiskeysockets/baileys';
+import baileysLogger from '@whiskeysockets/baileys/lib/Utils/logger';
 import { existsSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import qrcode from 'qrcode-terminal';
@@ -105,7 +106,7 @@ class WhatsAppClient {
             version,
             auth: {
               creds: state.creds,
-              keys: makeCacheableSignalKeyStore(state.keys),
+              keys: makeCacheableSignalKeyStore(state.keys, baileysLogger),
             },
             // Minimal configuration - send-only mode
             // These options minimize unnecessary operations like read receipts syncing,

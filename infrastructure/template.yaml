@@ -57,7 +57,7 @@ Globals:
   Function:
     Timeout: 900
     MemorySize: 512
-    Runtime: nodejs20.x
+    Runtime: nodejs24.x
     Environment:
       Variables:
         NODE_ENV: production
@@ -144,7 +144,7 @@ Resources:
       FunctionName: !Sub 'mnemora-birthday-bot-${Environment}'
       CodeUri: ../dist/
       Handler: lambda/handler.handler
-      Runtime: nodejs20.x
+      Runtime: nodejs24.x
       Timeout: 900
       MemorySize: 512
       # Note: ReservedConcurrentExecutions removed - account has minimum unreserved concurrency (10)
@@ -224,7 +224,7 @@ Resources:
       FunctionName: !Sub 'mnemora-daily-summary-${Environment}'
       CodeUri: ../dist/
       Handler: lambda/daily-summary-handler.handler
-      Runtime: nodejs20.x
+      Runtime: nodejs24.x
       Timeout: 60
       MemorySize: 256
       Environment:
