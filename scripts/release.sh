@@ -130,7 +130,32 @@ format_commit_message() {
     echo "$commit_message" | sed 's/^./\U&/'
 }
 
-# Function to generate structured release notes
+# Function to categorize commit message (returns category name)
+get_commit_category() {
+    local message=$1
+    case "$message" in
+        feat:*) echo "features" ;;
+        fix:*) echo "fixes" ;;
+        refactor:*) echo "refactor" ;;
+        perf:*) echo "performance" ;;
+        docs:*) echo "documentation" ;;
+        test:*) echo "tests" ;;
+        build:*) echo "build" ;;
+        chore:*) echo "chores" ;;
+        *) echo "other" ;;
+    esac
+}
+
+# Function to format commit message (remove prefix, capitalize)
+format_commit_for_notes() {
+    local message=$1
+    # Remove conventional commit prefix (e.g., "feat: " or "feat(something): ")
+    message=$(echo "$message" | sed -E 's/^[a-z]+(\([^)]+\))?: //')
+    # Capitalize first letter
+    echo "$message" | sed 's/^./\U&/'
+}
+
+# Function to generate structured release notes (using Node.js for compatibility)
 generate_release_notes() {
     local version=$1
     local date=$2
@@ -138,67 +163,94 @@ generate_release_notes() {
     local previous_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
     local commits=$(get_commits)
     
-    # Categories in order of importance
-    declare -A categories
-    declare -A category_labels
-    
-    category_labels["features"]="✨ Features"
-    category_labels["fixes"]="🐛 Bug Fixes"
-    category_labels["refactor"]="♻️  Refactoring"
-    category_labels["performance"]="⚡ Performance"
-    category_labels["documentation"]="📝 Documentation"
-    category_labels["tests"]="🧪 Tests"
-    category_labels["build"]="🔨 Build"
-    category_labels["chores"]="🔧 Chores"
-    category_labels["other"]="📦 Other Changes"
-    
-    # Parse commits into categories
-    while IFS='|' read -r hash message; do
-        # Skip empty lines
-        [ -z "$hash" ] && continue
+    # Use Node.js to generate structured release notes (better compatibility)
+    echo "$commits" | node -e "
+        const readline = require('readline');
+        const rl = readline.createInterface({
+            input: process.stdin,
+            output: process.stdout,
+            terminal: false
+        });
         
-        local category=$(categorize_commit "$message")
-        local formatted=$(format_commit_message "$message")
+        const categories = {};
+        const categoryLabels = {
+            features: '✨ Features',
+            fixes: '🐛 Bug Fixes',
+            refactor: '♻️  Refactoring',
+            performance: '⚡ Performance',
+            documentation: '📝 Documentation',
+            tests: '🧪 Tests',
+            build: '🔨 Build',
+            chores: '🔧 Chores',
+            other: '📦 Other Changes'
+        };
         
-        # Append to category array
-        if [ -z "${categories[$category]}" ]; then
-            categories[$category]=""
-        fi
-        categories[$category]+="- $formatted ($hash)"$'\n'
-    done <<< "$commits"
-    
-    # Build release notes
-    local notes="## What's Changed"
-    notes+=$'\n\n'
-    
-    # Check if there are any changes
-    local has_changes=false
-    
-    # Output categories in order
-    for category in features fixes refactor performance documentation tests build chores other; do
-        if [ -n "${categories[$category]}" ]; then
-            has_changes=true
-            notes+="### ${category_labels[$category]}"
-            notes+=$'\n\n'
-            # Remove trailing newline
-            notes+="${categories[$category]%$'\n'}"
-            notes+=$'\n\n'
-        fi
-    done
-    
-    if [ "$has_changes" = false ]; then
-        notes+="No significant changes in this release."
-        notes+=$'\n\n'
-    fi
-    
-    # Add contributors/full changelog reference if applicable
-    if [ -n "$previous_tag" ]; then
-        notes+="**Full Changelog**: ${previous_tag}...v${version}"
-    else
-        notes+="**Full Changelog**: v${version}"
-    fi
-    
-    echo "$notes"
+        function categorizeCommit(message) {
+            if (message.match(/^feat(\(.+\))?:/)) return 'features';
+            if (message.match(/^fix(\(.+\))?:/)) return 'fixes';
+            if (message.match(/^refactor(\(.+\))?:/)) return 'refactor';
+            if (message.match(/^perf(\(.+\))?:/)) return 'performance';
+            if (message.match(/^docs(\(.+\))?:/)) return 'documentation';
+            if (message.match(/^test(\(.+\))?:/)) return 'tests';
+            if (message.match(/^build(\(.+\))?:/)) return 'build';
+            if (message.match(/^chore(\(.+\))?:/)) return 'chores';
+            return 'other';
+        }
+        
+        function formatCommitMessage(message) {
+            // Remove conventional commit prefix
+            message = message.replace(/^[a-z]+(\([^)]+\))?: /, '');
+            // Capitalize first letter
+            return message.charAt(0).toUpperCase() + message.slice(1);
+        }
+        
+        rl.on('line', (line) => {
+            if (!line.trim()) return;
+            
+            const parts = line.split('|');
+            if (parts.length !== 2) return;
+            
+            const [hash, message] = parts;
+            if (!hash || !message) return;
+            
+            const category = categorizeCommit(message);
+            const formatted = formatCommitMessage(message);
+            
+            if (!categories[category]) {
+                categories[category] = [];
+            }
+            
+            categories[category].push(\`- \${formatted} (\${hash})\`);
+        });
+        
+        rl.on('close', () => {
+            let notes = '## What\\'s Changed\\n\\n';
+            let hasChanges = false;
+            
+            const categoryOrder = ['features', 'fixes', 'refactor', 'performance', 'documentation', 'tests', 'build', 'chores', 'other'];
+            
+            for (const category of categoryOrder) {
+                if (categories[category] && categories[category].length > 0) {
+                    hasChanges = true;
+                    notes += \`### \${categoryLabels[category]}\\n\\n\`;
+                    notes += categories[category].join('\\n') + '\\n\\n';
+                }
+            }
+            
+            if (!hasChanges) {
+                notes += 'No significant changes in this release.\\n\\n';
+            }
+            
+            const prevTag = '$previous_tag';
+            if (prevTag) {
+                notes += \`**Full Changelog**: \${prevTag}...v$version\`;
+            } else {
+                notes += \`**Full Changelog**: v$version\`;
+            }
+            
+            process.stdout.write(notes);
+        });
+    "
 }
 
 # Function to update CHANGELOG.md
@@ -326,7 +378,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
                 const allLines = headerLines.concat(newLines);
                 fs.writeFileSync(path, allLines.join('\\n'), 'utf8');
                 fs.unlinkSync(notesPath);
-                return;
             }
             
             fs.writeFileSync(path, newLines.join('\\n'), 'utf8');
