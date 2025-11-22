@@ -61,7 +61,7 @@ function processPrivateKey(rawKey: string | undefined): string | undefined {
     try {
       // Decode base64 to get the actual PEM key
       key = Buffer.from(key, 'base64').toString('utf-8');
-    } catch (error) {
+    } catch (_error) {
       // If decoding fails, assume it's already in the correct format
       console.warn('Failed to decode private key as base64, using as-is');
     }
@@ -72,7 +72,7 @@ function processPrivateKey(rawKey: string | undefined): string | undefined {
 
 export const config: AppConfig = {
   google: {
-    calendarId: process.env.GOOGLE_CALENDAR_ID || 'primary',
+    calendarId: process.env.GOOGLE_CALENDAR_ID ?? 'primary',
     spreadsheetId: process.env.GOOGLE_SPREADSHEET_ID,
     clientEmail: process.env.GOOGLE_CLIENT_EMAIL,
     privateKey: processPrivateKey(process.env.GOOGLE_PRIVATE_KEY),
@@ -86,20 +86,20 @@ export const config: AppConfig = {
     timezone: process.env.TIMEZONE ?? process.env.TZ ?? 'America/Los_Angeles',
   },
   aws: {
-    region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-west-1',
+    region: process.env.AWS_REGION ?? process.env.AWS_DEFAULT_REGION ?? 'us-west-1',
     s3Bucket: process.env.AWS_S3_BUCKET,
     snsTopicArn: process.env.SNS_TOPIC_ARN,
     cloudWatchLogGroup: process.env.AWS_CLOUDWATCH_LOG_GROUP,
     enableXRay: process.env.AWS_XRAY_ENABLED !== 'false',
   },
   metrics: {
-    namespace: process.env.METRICS_NAMESPACE || 'Mnemora/BirthdayBot',
+    namespace: process.env.METRICS_NAMESPACE ?? 'Mnemora/BirthdayBot',
     enabled: process.env.ENABLE_CLOUDWATCH_METRICS !== 'false',
   },
   logging: {
     level: process.env.LOG_LEVEL ?? 'info',
     pretty: process.env.NODE_ENV === 'development',
   },
-  environment: process.env.NODE_ENV || 'development',
+  environment: process.env.NODE_ENV ?? 'development',
 };
 

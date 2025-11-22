@@ -12,8 +12,8 @@ const PROJECT_ROOT = process.cwd();
 function exec(command: string, options?: { cwd?: string; stdio?: 'inherit' | 'pipe' }) {
   console.log(`Running: ${command}`);
   execSync(command, { 
-    cwd: options?.cwd || PROJECT_ROOT,
-    stdio: options?.stdio || 'inherit',
+    cwd: options?.cwd ?? PROJECT_ROOT,
+    stdio: options?.stdio ?? 'inherit',
     encoding: 'utf-8'
   });
 }
@@ -60,7 +60,7 @@ function getSize(dir: string): { human: string; mb: number } {
 }
 
 function cleanFunctionDir(functionDir: string) {
-  const functionName = functionDir.split('/').pop() || 'unknown';
+  const functionName = functionDir.split('/').pop() ?? 'unknown';
   console.log(`   Cleaning ${functionName}...`);
   
   const nodeModulesDir = join(functionDir, 'node_modules');

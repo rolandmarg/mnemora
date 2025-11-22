@@ -88,7 +88,7 @@ yarn uninstall-cron # Remove
 ### Prerequisites
 
 - **Node.js**: >= 24.0.0 (matches Lambda runtime)
-- **Yarn**: >= 1.22.0
+- **Yarn**: >= 4.11.0
 - **AWS SAM CLI**: >= 1.148.0 (required for nodejs24.x support)
 - **AWS CLI**: Latest version
 

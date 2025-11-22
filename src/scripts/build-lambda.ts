@@ -6,8 +6,7 @@
 
 import { execSync } from 'node:child_process';
 import { existsSync, rmSync, cpSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 
 // Get project root - scripts are run from project root, so use process.cwd()
 const PROJECT_ROOT = process.cwd();
@@ -17,8 +16,8 @@ process.env.NODE_ENV = 'production';
 function exec(command: string, options?: { cwd?: string; stdio?: 'inherit' | 'pipe' }) {
   console.log(`Running: ${command}`);
   execSync(command, { 
-    cwd: options?.cwd || PROJECT_ROOT,
-    stdio: options?.stdio || 'inherit',
+    cwd: options?.cwd ?? PROJECT_ROOT,
+    stdio: options?.stdio ?? 'inherit',
     encoding: 'utf-8'
   });
 }
@@ -80,7 +79,7 @@ if (existsSync(distNodeModules)) {
 
 // Install production dependencies in dist
 console.log('Installing production dependencies in dist...');
-exec('NODE_ENV=production yarn install --production --frozen-lockfile --ignore-scripts', {
+exec('NODE_ENV=production yarn install --production --immutable --ignore-scripts', {
   cwd: join(PROJECT_ROOT, 'dist')
 });
 

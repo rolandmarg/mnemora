@@ -32,7 +32,7 @@ export class ClientError extends Error {
     }
     
     // If there's a cause, append its stack trace
-    if (options.cause && options.cause.stack) {
+    if (options.cause?.stack) {
       this.stack = `${this.stack}\nCaused by: ${options.cause.stack}`;
     }
   }

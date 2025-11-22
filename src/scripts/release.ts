@@ -37,8 +37,8 @@ function printInfo(message: string): void {
 
 function exec(command: string, options?: { cwd?: string; stdio?: 'inherit' | 'pipe' }): string {
   return execSync(command, {
-    cwd: options?.cwd || PROJECT_ROOT,
-    stdio: options?.stdio || 'pipe',
+    cwd: options?.cwd ?? PROJECT_ROOT,
+    stdio: options?.stdio ?? 'pipe',
     encoding: 'utf-8'
   }).trim();
 }
@@ -141,7 +141,7 @@ function formatCommitMessage(message: string): string {
   return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
 }
 
-function generateReleaseNotes(version: string, date: string): string {
+function generateReleaseNotes(version: string): string {
   const commits = getCommits();
   const categories: Record<string, Array<string>> = {};
   
@@ -177,7 +177,7 @@ function generateReleaseNotes(version: string, date: string): string {
     if (categories[category] && categories[category].length > 0) {
       hasChanges = true;
       notes += `### ${categoryLabels[category]}\n\n`;
-      notes += categories[category].join('\n') + '\n\n';
+      notes += `${categories[category].join('\n')}\n\n`;
     }
   }
   
@@ -204,7 +204,7 @@ function generateReleaseNotes(version: string, date: string): string {
 function updateChangelog(version: string, releaseNotes: string): void {
   const changelogPath = join(PROJECT_ROOT, 'CHANGELOG.md');
   const header = `## [${version}] - ${new Date().toISOString().split('T')[0]}`;
-  const newEntry = header + '\n\n' + releaseNotes.trim() + '\n';
+  const newEntry = `${header}\n\n${releaseNotes.trim()}\n`;
   
   if (!existsSync(changelogPath)) {
     const content = `# Changelog
@@ -460,7 +460,7 @@ async function release(versionType?: VersionType, specificVersion?: string): Pro
   
   // Generate structured release notes
   printInfo('Generating release notes...');
-  const releaseNotes = generateReleaseNotes(targetVersion, new Date().toISOString().split('T')[0]);
+  const releaseNotes = generateReleaseNotes(targetVersion);
   if (!releaseNotes) {
     printError('Failed to generate release notes');
     process.exit(1);
@@ -482,7 +482,7 @@ async function release(versionType?: VersionType, specificVersion?: string): Pro
   try {
     const pkg = JSON.parse(readFileSync(join(PROJECT_ROOT, 'package.json'), 'utf-8')) as PackageJson;
     pkg.version = targetVersion;
-    writeFileSync(join(PROJECT_ROOT, 'package.json'), JSON.stringify(pkg, null, 2) + '\n', 'utf-8');
+    writeFileSync(join(PROJECT_ROOT, 'package.json'), `${JSON.stringify(pkg, null, 2)}\n`, 'utf-8');
     printSuccess('Version updated in package.json');
   } catch (error) {
     printError(`Failed to update package.json: ${error instanceof Error ? error.message : 'Unknown error'}`);

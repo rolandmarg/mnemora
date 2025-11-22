@@ -26,10 +26,10 @@ jobs:
           cache: 'yarn'
       
       - name: Install Yarn
-        run: corepack enable && corepack prepare yarn@1.22.22 --activate
+        run: corepack enable && corepack prepare yarn@4.11.0 --activate
       
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: yarn install --immutable
       
       - name: Setup GitHub CLI
         uses: actions4gh/setup-gh@v1
