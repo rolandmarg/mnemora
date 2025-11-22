@@ -10,6 +10,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial changelog
 
+
+---
+## [1.0.3] - 2025-11-22
+
+## What's Changed
+
+### 🐛 Bug Fixes
+
+- Use actions4gh/setup-gh action for GitHub CLI installation (c1e0634)
+- Use manual GitHub CLI installation in workflow (76956ce)
+
+### 🔧 Chores
+
+- Remove GitHub CLI setup from auto-release workflow (b5a4600)
+- Update auto-release workflow to enable Corepack (80475bb)
+- Update Yarn configuration and dependencies (09821ae)
+- Update Yarn version in auto-release workflow (1a99377)
+- Add GitHub Actions workflow for automated release process (4f6393c)
+- Migrate build and package scripts to TypeScript and update shell scripts to zsh (6c1b3b9)
+
+### 📦 Other Changes
+
+- Fix bug (a3cff1c)
+
+**Full Changelog**: v1.0.2...v1.0.3
+
 ---
 
 ## [1.0.2] - 2025-11-22
