@@ -143,6 +143,54 @@ src/
 
 See [docs/](./docs/) for detailed documentation.
 
+## Technical Capabilities
+
+### Data Sources
+- **Google Calendar**: Read birthday events from Google Calendar
+- **Google Sheets**: Sync birthdays from Google Sheets to Calendar
+- Extensible architecture for adding additional data sources (CSV, databases, etc.)
+
+### Output Channels
+- **WhatsApp**: Send notifications via WhatsApp Web.js (Baileys)
+- **Console**: Development and debugging output
+- Extensible architecture for additional channels (SMS, Email, etc.)
+
+### AWS Cloud Infrastructure
+- **AWS Lambda**: Serverless execution (Node.js 24.x runtime)
+- **EventBridge**: Scheduled daily execution (configurable time)
+- **S3**: WhatsApp session storage with versioning and lifecycle policies
+- **CloudWatch**: Logging, metrics, and monitoring
+- **X-Ray**: Distributed tracing for performance analysis
+- **SNS**: Alert notifications (Email and SMS) for system failures
+- **CloudWatch Alarms**: Automated alerting for errors and failures
+
+### Monitoring & Observability
+- **Structured Logging**: Pino-based logging with CloudWatch integration
+- **Custom Metrics**: CloudWatch metrics for message counts, execution status
+- **Distributed Tracing**: AWS X-Ray for request tracing
+- **Error Alerting**: SNS-based notifications for critical failures
+
+### Versioning & Release Process
+- **Semantic Versioning**: Automated version management (MAJOR.MINOR.PATCH)
+- **Release Workflow**: Automated release script with git tagging
+- **GitHub Releases**: Integration with GitHub CLI for release notes
+- **Release History**: Git tags and GitHub releases for version tracking
+- *Note: Release workflow documentation to be updated with CI/CD integration details*
+
+### Development Tools
+- **TypeScript**: Strict type checking with ESM support
+- **Vitest**: Unit testing framework
+- **ESLint**: Code quality and style enforcement
+- **Type Checking**: Standalone type checking without compilation
+- **Hot Reload**: Development mode with auto-reload
+
+### Architecture Features
+- **Modular Design**: Pluggable data sources and output channels
+- **Factory Pattern**: Dynamic creation of data sources and channels
+- **Error Handling**: Comprehensive error handling with retry logic
+- **Date Handling**: Timezone-aware date utilities
+- **Duplicate Prevention**: Built-in protection against duplicate birthday messages
+
 ## Releases
 
 Mnemora uses [Semantic Versioning](https://semver.org/) (MAJOR.MINOR.PATCH) for version numbers.
