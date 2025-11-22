@@ -1,5 +1,7 @@
 # 🎂 Mnemora
 
+**Why I built this**: I'm part of a beach volleyball community with 50+ members in a WhatsApp group. We try to congratulate everyone on their birthdays, but we'd sometimes forget them since there was no centralized tracking. So we asked members to add their birthdays to a Google Sheet, and I built Mnemora to sync those birthdays to Google Calendar. Now, on someone's birthday, the bot automatically sends a message to our WhatsApp group, and on the 1st of each month, everyone receives a monthly digest of upcoming birthdays.
+
 Never miss another birthday. Mnemora automatically checks your Google Calendar or Google Sheets for birthdays and sends WhatsApp notifications to your group chat.
 
 ## The Problem
