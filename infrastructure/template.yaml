@@ -116,15 +116,13 @@ Resources:
             # Clean up incomplete multipart uploads after 1 day
           - Id: DeleteOldMessageLogs
             Status: Enabled
-            Filter:
-              Prefix: app-data/messages/
+            Prefix: app-data/messages/
             ExpirationInDays: 90
             # Delete message logs older than 90 days
             # CloudWatch Logs provide long-term storage, S3 logs are for short-term debugging
           - Id: DeleteOldExecutionRecords
             Status: Enabled
-            Filter:
-              Prefix: app-data/executions/
+            Prefix: app-data/executions/
             ExpirationInDays: 90
             # Delete execution records older than 90 days
             # CloudWatch metrics provide long-term tracking, S3 records are for verification
