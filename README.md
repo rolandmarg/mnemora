@@ -6,7 +6,7 @@ Never miss another birthday. Mnemora automatically checks your Google Calendar o
 
 ## Current Status
 
-![WhatsApp Messages Sent](https://img.shields.io/badge/WhatsApp%20Messages%20Sent-400%2B-25D366?logo=whatsapp&logoColor=white)
+![WhatsApp Messages Sent](https://img.shields.io/badge/WhatsApp%20Messages%20Sent-384%2B-25D366?logo=whatsapp&logoColor=white)
 
 **Deployment**: This app is currently running in personal AWS cloud (developer's AWS account).
 

@@ -4,13 +4,48 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
 
 jobs:
-  release:
+  ci:
     runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      
+      - name: Enable Corepack
+        run: corepack enable
+      
+      - name: Install dependencies
+        run: yarn install --immutable
+      
+      - name: Run tests
+        run: yarn test:run
+      
+      - name: Type check
+        run: yarn type-check
+      
+      - name: Lint
+        run: yarn lint
+      
+      - name: Build
+        run: yarn build
+
+  release:
+    needs: ci
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
     steps:
       - name: Checkout code
