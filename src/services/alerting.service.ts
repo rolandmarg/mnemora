@@ -1,5 +1,4 @@
-import { getCorrelationId } from '../utils/correlation.util.js';
-import { getLambdaFunctionName, isLambda } from '../utils/runtime.util.js';
+import { getCorrelationId, getLambdaFunctionName, isLambda } from '../utils/runtime.util.js';
 import { AlertSeverity, AlertType } from '../types/alerting.types.js';
 import { StorageService } from './storage.service.js';
 import type { Logger } from '../types/logger.types.js';

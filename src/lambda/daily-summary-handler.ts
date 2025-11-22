@@ -2,7 +2,7 @@ import { AlertingService } from '../services/alerting.service.js';
 import { logger } from '../utils/logger.util.js';
 import { config } from '../config.js';
 import snsClient from '../clients/sns.client.js';
-import { setCorrelationId } from '../utils/correlation.util.js';
+import { setCorrelationId } from '../utils/runtime.util.js';
 import type { EventBridgeEvent, LambdaContext, LambdaResponse } from './types.js';
 
 export async function handler(

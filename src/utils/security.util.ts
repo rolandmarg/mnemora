@@ -1,4 +1,4 @@
-import { getCorrelationId } from './correlation.util.js';
+import { getCorrelationId } from './runtime.util.js';
 import { config } from '../config.js';
 import type { Logger } from '../types/logger.types.js';
 

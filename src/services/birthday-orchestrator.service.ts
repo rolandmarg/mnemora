@@ -26,7 +26,7 @@ import { AlertingService } from './alerting.service.js';
 import { LastRunTrackerService } from './last-run-tracker.service.js';
 import { getFullName } from '../utils/name-helpers.util.js';
 import { isFirstDayOfMonth, startOfMonth, endOfMonth, today, startOfDay } from '../utils/date-helpers.util.js';
-import { initializeCorrelationId } from '../utils/correlation.util.js';
+import { initializeCorrelationId } from '../utils/runtime.util.js';
 import { QRAuthenticationRequiredError } from '../types/qr-auth-error.js';
 import type { Logger } from '../types/logger.types.js';
 import type { AppConfig } from '../config.js';

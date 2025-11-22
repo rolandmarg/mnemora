@@ -8,9 +8,13 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys';
 import { existsSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
+import qrcode from 'qrcode-terminal';
 import { isLambda } from '../utils/runtime.util.js';
-import { displayQRCode } from '../utils/qr-code.util.js';
 import xrayClient from './xray.client.js';
+
+function displayQRCode(qrCode: string): void {
+  qrcode.generate(qrCode, { small: true });
+}
 
 class WhatsAppClient {
   private sock: WASocket | null = null;

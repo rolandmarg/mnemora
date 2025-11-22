@@ -7,7 +7,7 @@ import calendarClient from '../clients/google-calendar.client.js';
 import xrayClient from '../clients/xray.client.js';
 import cloudWatchMetricsClient from '../clients/cloudwatch.client.js';
 import snsClient from '../clients/sns.client.js';
-import { setCorrelationId } from '../utils/correlation.util.js';
+import { setCorrelationId } from '../utils/runtime.util.js';
 import type { EventBridgeEvent, LambdaContext, LambdaResponse } from './types.js';
 
 export async function handler(

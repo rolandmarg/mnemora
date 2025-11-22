@@ -1,6 +1,5 @@
 import type { MetricDatum } from '@aws-sdk/client-cloudwatch';
-import { getCorrelationId } from '../utils/correlation.util.js';
-import { isLambda } from '../utils/runtime.util.js';
+import { getCorrelationId, isLambda } from '../utils/runtime.util.js';
 import type { Logger } from '../types/logger.types.js';
 import type { AppConfig } from '../config.js';
 import type { MetricUnit, MetricDataPoint } from '../types/metrics.types.js';
