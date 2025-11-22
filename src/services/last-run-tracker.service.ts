@@ -2,7 +2,8 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { StorageService } from './storage.service.js';
 import { today, startOfDay } from '../utils/date-helpers.util.js';
-import type { AppContext } from '../app-context.js';
+import { isLambda } from '../utils/runtime.util.js';
+import type { Logger } from '../types/logger.types.js';
 
 const LAST_RUN_FILE = join(process.cwd(), 'logs', 'last-run.txt');
 const S3_LAST_RUN_KEY = 'last-run.txt';
@@ -11,11 +12,11 @@ class LastRunTrackerService {
   private readonly storage = StorageService.getAppStorage();
   private pendingLastRunDate: string | null = null;
 
-  constructor(private readonly ctx: AppContext) {}
+  constructor(private readonly logger: Logger) {}
 
   async getLastRunDate(): Promise<Date | null> {
     try {
-      if (this.ctx.isLambda) {
+      if (isLambda()) {
         try {
           const data = await this.storage.readFile(S3_LAST_RUN_KEY);
           if (data) {
@@ -28,7 +29,7 @@ class LastRunTrackerService {
             }
           }
         } catch (error) {
-          this.ctx.logger.warn('Error reading last run date from S3, will return null', error);
+          this.logger.warn('Error reading last run date from S3, will return null', error);
         }
         return null;
       }
@@ -44,13 +45,13 @@ class LastRunTrackerService {
 
       const date = new Date(content);
       if (isNaN(date.getTime())) {
-        this.ctx.logger.warn('Invalid last run date in file, resetting');
+        this.logger.warn('Invalid last run date in file, resetting');
         return null;
       }
 
       return startOfDay(date);
     } catch (error) {
-      this.ctx.logger.error('Error reading last run date', error);
+      this.logger.error('Error reading last run date', error);
       return null;
     }
   }
@@ -62,8 +63,8 @@ class LastRunTrackerService {
     // Store date in memory for later batch write
     this.pendingLastRunDate = dateString;
     
-    if (this.ctx.isLambda) {
-      this.ctx.logger.info('Last run date updated (pending S3 write)', { date: dateString });
+    if (isLambda()) {
+      this.logger.info('Last run date updated (pending S3 write)', { date: dateString });
     } else {
       // In local mode, write immediately (not Lambda)
       this.flushPendingWrites().catch(() => {});
@@ -76,12 +77,12 @@ class LastRunTrackerService {
     }
 
     try {
-      if (this.ctx.isLambda) {
+      if (isLambda()) {
         try {
           await this.storage.writeFile(S3_LAST_RUN_KEY, this.pendingLastRunDate);
-          this.ctx.logger.info('Last run date updated in S3', { date: this.pendingLastRunDate });
+          this.logger.info('Last run date updated in S3', { date: this.pendingLastRunDate });
         } catch (error) {
-          this.ctx.logger.warn('Error updating last run date in S3', error);
+          this.logger.warn('Error updating last run date in S3', error);
         }
       } else {
         const logsDir = join(process.cwd(), 'logs');
@@ -90,12 +91,12 @@ class LastRunTrackerService {
         }
 
         writeFileSync(LAST_RUN_FILE, this.pendingLastRunDate, 'utf-8');
-        this.ctx.logger.info('Last run date updated', { date: this.pendingLastRunDate });
+        this.logger.info('Last run date updated', { date: this.pendingLastRunDate });
       }
       
       this.pendingLastRunDate = null;
     } catch (error) {
-      this.ctx.logger.error('Error flushing last run date', error);
+      this.logger.error('Error flushing last run date', error);
     }
   }
 

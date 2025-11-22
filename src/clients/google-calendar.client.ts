@@ -1,7 +1,7 @@
 import { google, type calendar_v3 } from 'googleapis';
 import { auditDeletionAttempt, SecurityError } from '../utils/security.util.js';
 import { startOfDay, endOfDay } from '../utils/date-helpers.util.js';
-import { appContext } from '../app-context.js';
+import { logger } from '../utils/logger.util.js';
 import { config } from '../config.js';
 import xrayClient from './xray.client.js';
 import type { Event, DeletionResult } from '../types/event.types.js';
@@ -125,7 +125,7 @@ class GoogleCalendarClient {
         ...(maxResults && { maxResults }),
       }).then(response => {
         const items = response.data.items ?? [];
-        appContext.logger.info(`Google Calendar API returned ${items.length} event(s)`, {
+        logger.info(`Google Calendar API returned ${items.length} event(s)`, {
           timeMin: timeMinUTC.toISOString(),
           timeMax: timeMaxUTC.toISOString(),
           calendarId: this.calendarId,
@@ -167,7 +167,7 @@ class GoogleCalendarClient {
 
   async deleteEvent(eventId: string): Promise<boolean> {
     return xrayClient.captureAsyncSegment('GoogleCalendar.deleteEvent', async () => {
-      auditDeletionAttempt(appContext, 'GoogleCalendarClient.deleteEvent', { eventId });
+      auditDeletionAttempt(logger, 'GoogleCalendarClient.deleteEvent', { eventId });
       throw new SecurityError('Deletion of calendar events is disabled for security reasons');
     }, {
       calendarId: this.calendarId,
@@ -177,7 +177,7 @@ class GoogleCalendarClient {
 
   async deleteAllEvents(events: Event[]): Promise<DeletionResult> {
     return xrayClient.captureAsyncSegment('GoogleCalendar.deleteAllEvents', async () => {
-      auditDeletionAttempt(appContext, 'GoogleCalendarClient.deleteAllEvents', {
+      auditDeletionAttempt(logger, 'GoogleCalendarClient.deleteAllEvents', {
         eventCount: events.length,
         eventIds: events.map(e => e.id).filter(Boolean),
       });

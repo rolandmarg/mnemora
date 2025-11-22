@@ -1,5 +1,8 @@
 import { StorageService } from './storage.service.js';
-import type { AppContext } from '../app-context.js';
+import { isLambda } from '../utils/runtime.util.js';
+import type { Logger } from '../types/logger.types.js';
+import type { AppConfig } from '../config.js';
+import cloudWatchMetricsClient from '../clients/cloudwatch.client.js';
 
 class AuthReminderService {
   private readonly storage = StorageService.getAppStorage();
@@ -7,7 +10,11 @@ class AuthReminderService {
   private readonly authKey: string = 'whatsapp-auth.json';
   private pendingAuthTimestamp: string | null = null;
 
-  constructor(private readonly ctx: AppContext) {}
+  constructor(
+    private readonly logger: Logger,
+    private readonly config: AppConfig,
+    private readonly cloudWatchClient: typeof cloudWatchMetricsClient
+  ) {}
 
   recordAuthentication(): void {
     const now = new Date();
@@ -16,8 +23,8 @@ class AuthReminderService {
     // Store timestamp in memory for later batch write
     this.pendingAuthTimestamp = timestamp;
     
-    if (this.ctx.isLambda) {
-      this.ctx.logger.info('WhatsApp authentication recorded (pending S3 write)', { timestamp });
+    if (isLambda()) {
+      this.logger.info('WhatsApp authentication recorded (pending S3 write)', { timestamp });
     } else {
       // In local mode, write immediately (not Lambda)
       this.flushPendingWrites().catch(() => {});
@@ -32,23 +39,23 @@ class AuthReminderService {
     try {
       const authData = JSON.stringify({ timestamp: this.pendingAuthTimestamp });
       
-      if (this.ctx.isLambda) {
+      if (isLambda()) {
         await this.storage.writeFile(this.authKey, authData);
-        this.ctx.logger.info('WhatsApp authentication recorded in S3', { timestamp: this.pendingAuthTimestamp });
+        this.logger.info('WhatsApp authentication recorded in S3', { timestamp: this.pendingAuthTimestamp });
       } else {
         // Local mode already handled in recordAuthentication
-        this.ctx.logger.info('WhatsApp authentication recorded (local)', { timestamp: this.pendingAuthTimestamp });
+        this.logger.info('WhatsApp authentication recorded (local)', { timestamp: this.pendingAuthTimestamp });
       }
       
       this.pendingAuthTimestamp = null;
     } catch (error) {
-      this.ctx.logger.error('Error flushing authentication record', error);
+      this.logger.error('Error flushing authentication record', error);
     }
   }
 
   async getLastAuthDate(): Promise<Date | null> {
     try {
-      if (this.ctx.isLambda) {
+      if (isLambda()) {
         const data = await this.storage.readFile(this.authKey);
         if (data) {
           const authData = JSON.parse(data.toString('utf-8'));
@@ -62,7 +69,7 @@ class AuthReminderService {
       }
       return null;
     } catch (error) {
-      this.ctx.logger.error('Error getting last auth date', error);
+      this.logger.error('Error getting last auth date', error);
       return null;
     }
   }
@@ -88,13 +95,13 @@ class AuthReminderService {
         ? Math.floor((Date.now() - lastAuth.getTime()) / (1000 * 60 * 60 * 24))
         : null;
 
-      this.ctx.logger.warn('WhatsApp authentication refresh needed', {
+      this.logger.warn('WhatsApp authentication refresh needed', {
         daysSinceAuth,
         reminderDays: this.reminderDays,
       });
 
-      this.ctx.clients.cloudWatch.putMetricData(
-        this.ctx.config.metrics.namespace,
+      this.cloudWatchClient.putMetricData(
+        this.config.metrics.namespace,
         [{
           MetricName: 'whatsapp.auth.refresh_needed',
           Value: 1,
@@ -104,13 +111,13 @@ class AuthReminderService {
         }]
       ).catch(() => {});
 
-      if (this.ctx.isLambda) {
-        this.ctx.logger.warn(
+      if (isLambda()) {
+        this.logger.warn(
           `⚠️  WhatsApp authentication refresh needed! Last auth: ${lastAuth ? daysSinceAuth : 'never'} days ago. ` +
           `Please check CloudWatch Logs for QR code and scan it.`
         );
       } else {
-        this.ctx.logger.warn(
+        this.logger.warn(
           `⚠️  WhatsApp authentication refresh needed! Last auth: ${lastAuth ? daysSinceAuth : 'never'} days ago. ` +
           `Please run the authentication flow.`
         );

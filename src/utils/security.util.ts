@@ -1,5 +1,6 @@
 import { getCorrelationId } from './correlation.util.js';
-import type { AppContext } from '../app-context.js';
+import { config } from '../config.js';
+import type { Logger } from '../types/logger.types.js';
 
 export class SecurityError extends Error {
   constructor(message: string) {
@@ -9,44 +10,44 @@ export class SecurityError extends Error {
   }
 }
 
-export function requireDevelopment(ctx: AppContext): void {
-  if (ctx.isProduction) {
+export function requireDevelopment(logger: Logger): void {
+  if (config.environment === 'production') {
     const error = new SecurityError(
       'This operation is disabled in production environment. Set NODE_ENV=development to enable.'
     );
-    auditLog(ctx, 'security_violation', {
+    auditLog(logger, 'security_violation', {
       action: 'requireDevelopment',
       error: error.message,
-      environment: ctx.environment,
+      environment: config.environment,
     });
     throw error;
   }
 }
 
-function auditLog(ctx: AppContext, action: string, details: Record<string, unknown>): void {
+function auditLog(logger: Logger, action: string, details: Record<string, unknown>): void {
   const correlationId = getCorrelationId();
   const timestamp = new Date().toISOString();
   
-  ctx.logger.warn('Security audit log', {
+  logger.warn('Security audit log', {
     audit: true,
     action,
     timestamp,
-    environment: ctx.environment,
+    environment: config.environment,
     correlationId,
     ...details,
   });
 }
 
-export function auditDeletionAttempt(ctx: AppContext, method: string, params?: Record<string, unknown>): void {
-  auditLog(ctx, 'deletion_attempt', {
+export function auditDeletionAttempt(logger: Logger, method: string, params?: Record<string, unknown>): void {
+  auditLog(logger, 'deletion_attempt', {
     method,
     params,
     blocked: true,
   });
 }
 
-export function auditManualSend(ctx: AppContext, script: string, details: Record<string, unknown>): void {
-  auditLog(ctx, 'manual_send', {
+export function auditManualSend(logger: Logger, script: string, details: Record<string, unknown>): void {
+  auditLog(logger, 'manual_send', {
     script,
     ...details,
   });

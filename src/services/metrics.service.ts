@@ -1,7 +1,12 @@
 import type { MetricDatum } from '@aws-sdk/client-cloudwatch';
 import { getCorrelationId } from '../utils/correlation.util.js';
-import type { AppContext } from '../app-context.js';
+import { isLambda } from '../utils/runtime.util.js';
+import type { Logger } from '../types/logger.types.js';
+import type { AppConfig } from '../config.js';
 import type { MetricUnit, MetricDataPoint } from '../types/metrics.types.js';
+import cloudWatchMetricsClientDefault from '../clients/cloudwatch.client.js';
+
+type CloudWatchClient = typeof cloudWatchMetricsClientDefault;
 
 class MetricsCollector {
   private metrics: MetricDataPoint[] = [];
@@ -9,9 +14,13 @@ class MetricsCollector {
   private readonly enabled: boolean;
   private readonly batchSize: number = 20;
 
-  constructor(private readonly ctx: AppContext) {
-    this.namespace = ctx.config.metrics.namespace;
-    this.enabled = ctx.config.metrics.enabled && ctx.isLambda;
+  constructor(
+    private readonly logger: Logger,
+    config: AppConfig,
+    private readonly cloudWatchClient: CloudWatchClient
+  ) {
+    this.namespace = config.metrics.namespace;
+    this.enabled = config.metrics.enabled && isLambda();
   }
 
   addMetric(
@@ -36,8 +45,8 @@ class MetricsCollector {
 
     this.metrics.push(metric);
 
-    if (!this.ctx.isLambda) {
-      this.ctx.logger.debug('Metric recorded', {
+    if (!isLambda()) {
+      this.logger.debug('Metric recorded', {
         name,
         value,
         unit,
@@ -59,7 +68,7 @@ class MetricsCollector {
   }
 
   async flush(): Promise<void> {
-    if (!this.enabled || !this.ctx.clients.cloudWatch.isAvailable() || this.metrics.length === 0) {
+    if (!this.enabled || !this.cloudWatchClient.isAvailable() || this.metrics.length === 0) {
       return;
     }
 
@@ -80,13 +89,13 @@ class MetricsCollector {
             : undefined,
         }));
 
-        await this.ctx.clients.cloudWatch.putMetricData(this.namespace, metricData);
+        await this.cloudWatchClient.putMetricData(this.namespace, metricData);
       }));
 
-      this.ctx.logger.debug(`Flushed ${this.metrics.length} metrics to CloudWatch`);
+      this.logger.debug(`Flushed ${this.metrics.length} metrics to CloudWatch`);
       this.metrics = [];
     } catch (error) {
-      this.ctx.logger.error('Failed to flush metrics to CloudWatch', error);
+      this.logger.error('Failed to flush metrics to CloudWatch', error);
     }
   }
 

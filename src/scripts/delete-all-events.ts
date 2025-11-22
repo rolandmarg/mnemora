@@ -11,7 +11,7 @@
  *   yarn delete-all-events --confirm    # Actually delete all events
  */
 
-import { appContext } from '../app-context.js';
+import { logger } from '../utils/logger.util.js';
 import { auditDeletionAttempt } from '../utils/security.util.js';
 import { isBirthdayEvent } from '../utils/event-helpers.util.js';
 import { google } from 'googleapis';
@@ -34,7 +34,7 @@ async function getAllEvents(): Promise<Array<{ id: string; summary: string; star
   const yearStart = startOfYear(new Date(startYear, 0, 1));
   const yearEnd = endOfYear(new Date(endYear, 0, 1));
 
-  appContext.logger.info('Fetching all events from calendar', {
+  logger.info('Fetching all events from calendar', {
     startYear,
     endYear,
     startDate: yearStart.toISOString().split('T')[0],
@@ -89,14 +89,14 @@ async function getAllEvents(): Promise<Array<{ id: string; summary: string; star
     allEvents = allEvents.concat(events);
     pageToken = response.data.nextPageToken ?? undefined;
 
-    appContext.logger.info(`Fetched ${events.length} events (total so far: ${allEvents.length})`);
+    logger.info(`Fetched ${events.length} events (total so far: ${allEvents.length})`);
     
     if (!pageToken) {
       break;
     }
   }
 
-  appContext.logger.info(`Total events found: ${allEvents.length}`);
+  logger.info(`Total events found: ${allEvents.length}`);
 
   return allEvents;
 }
@@ -140,7 +140,7 @@ function isRateLimitError(error: unknown): boolean {
  * Delete an event with exponential backoff retry logic
  */
 async function deleteEvent(eventId: string, summary: string, maxRetries = 5): Promise<boolean> {
-  auditDeletionAttempt(appContext, 'delete-all-events.ts', { eventId });
+  auditDeletionAttempt(logger, 'delete-all-events.ts', { eventId });
 
   const clientEmail = config.google.clientEmail;
   const privateKey = config.google.privateKey;
@@ -176,7 +176,7 @@ async function deleteEvent(eventId: string, summary: string, maxRetries = 5): Pr
         attempt++;
         // Exponential backoff: 2^attempt seconds, with a max of 64 seconds
         const waitTime = Math.min(Math.pow(2, attempt) * 1000, 64000);
-        appContext.logger.warn(`Rate limit hit for event ${eventId} (${summary}). Retrying in ${waitTime / 1000}s (attempt ${attempt}/${maxRetries})`);
+        logger.warn(`Rate limit hit for event ${eventId} (${summary}). Retrying in ${waitTime / 1000}s (attempt ${attempt}/${maxRetries})`);
         await sleep(waitTime);
         continue;
       }
@@ -321,7 +321,7 @@ async function main(): Promise<void> {
           try {
             const success = await deleteEvent(event.id, event.summary);
             if (success) {
-              appContext.logger.info('Deleted event', {
+              logger.info('Deleted event', {
                 eventId: event.id,
                 summary: event.summary,
               });
@@ -329,7 +329,7 @@ async function main(): Promise<void> {
             }
             return { success: false, eventId: event.id, event };
           } catch (error) {
-            appContext.logger.error('Failed to delete event', error, {
+            logger.error('Failed to delete event', error, {
               eventId: event.id,
               summary: event.summary,
             });
@@ -378,7 +378,7 @@ async function main(): Promise<void> {
           const success = await deleteEvent(event.id, event.summary, 10); // More retries for failed events
           if (success) {
             deleted++;
-            appContext.logger.info('Successfully deleted event on retry', {
+            logger.info('Successfully deleted event on retry', {
               eventId: event.id,
               summary: event.summary,
             });
@@ -387,7 +387,7 @@ async function main(): Promise<void> {
           }
         } catch (error) {
           retryFailed.push(event);
-          appContext.logger.error('Failed to delete event after retries', error, {
+          logger.error('Failed to delete event after retries', error, {
             eventId: event.id,
             summary: event.summary,
           });
@@ -420,7 +420,7 @@ async function main(): Promise<void> {
 
     process.exit(0);
   } catch (error) {
-    appContext.logger.error('Error during deletion', error);
+    logger.error('Error during deletion', error);
     console.error('\n❌ Error during deletion:', error instanceof Error ? error.message : String(error));
     process.exit(1);
   }

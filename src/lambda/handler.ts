@@ -1,7 +1,12 @@
 import { runBirthdayCheck } from '../services/birthday-orchestrator.service.js';
 import { AlertingService } from '../services/alerting.service.js';
 import { MetricsCollector } from '../services/metrics.service.js';
-import { appContext } from '../app-context.js';
+import { logger } from '../utils/logger.util.js';
+import { config } from '../config.js';
+import calendarClient from '../clients/google-calendar.client.js';
+import xrayClient from '../clients/xray.client.js';
+import cloudWatchMetricsClient from '../clients/cloudwatch.client.js';
+import snsClient from '../clients/sns.client.js';
 import { setCorrelationId } from '../utils/correlation.util.js';
 import type { EventBridgeEvent, LambdaContext, LambdaResponse } from './types.js';
 
@@ -10,8 +15,8 @@ export async function handler(
   context: LambdaContext
 ): Promise<LambdaResponse | void> {
 
-  const alerting = new AlertingService(appContext);
-  const metrics = new MetricsCollector(appContext);
+  const alerting = new AlertingService(logger, config, snsClient);
+  const metrics = new MetricsCollector(logger, config, cloudWatchMetricsClient);
   
   const correlationId = context.awsRequestId;
   if (correlationId) {
@@ -24,14 +29,14 @@ export async function handler(
   const eventType = isManualInvoke ? 'ManualInvocation' : (event['detail-type'] || 'Unknown');
   
   // Add X-Ray annotations
-  appContext.clients.xray.addAnnotation('eventSource', eventSource);
-  appContext.clients.xray.addAnnotation('eventType', eventType);
-  appContext.clients.xray.addAnnotation('isManualInvoke', String(isManualInvoke));
-  appContext.clients.xray.addMetadata('functionName', context.functionName);
-  appContext.clients.xray.addMetadata('requestId', context.awsRequestId);
-  appContext.clients.xray.addMetadata('remainingTime', context.getRemainingTimeInMillis());
+  xrayClient.addAnnotation('eventSource', eventSource);
+  xrayClient.addAnnotation('eventType', eventType);
+  xrayClient.addAnnotation('isManualInvoke', String(isManualInvoke));
+  xrayClient.addMetadata('functionName', context.functionName);
+  xrayClient.addMetadata('requestId', context.awsRequestId);
+  xrayClient.addMetadata('remainingTime', context.getRemainingTimeInMillis());
   
-  appContext.logger.info('Lambda function invoked', {
+  logger.info('Lambda function invoked', {
     functionName: context.functionName,
     requestId: context.awsRequestId,
     eventSource,
@@ -43,7 +48,7 @@ export async function handler(
   const timeoutWarning = setTimeout(() => {
     const remaining = context.getRemainingTimeInMillis();
     if (remaining < 60000) {
-      appContext.logger.warn('Lambda execution approaching timeout', {
+      logger.warn('Lambda execution approaching timeout', {
         remainingTime: remaining,
         requestId: context.awsRequestId,
       });
@@ -51,11 +56,11 @@ export async function handler(
   }, (context.getRemainingTimeInMillis() - 60000));
 
   try {
-    await runBirthdayCheck(appContext);
+    await runBirthdayCheck(logger, config, calendarClient, xrayClient, cloudWatchMetricsClient);
     
     clearTimeout(timeoutWarning);
 
-    appContext.logger.info('Lambda function completed successfully', {
+    logger.info('Lambda function completed successfully', {
       requestId: context.awsRequestId,
       remainingTime: context.getRemainingTimeInMillis(),
     });
@@ -72,7 +77,7 @@ export async function handler(
   } catch (error) {
     clearTimeout(timeoutWarning);
     
-    appContext.logger.error('Lambda function failed', error, {
+    logger.error('Lambda function failed', error, {
       requestId: context.awsRequestId,
       remainingTime: context.getRemainingTimeInMillis(),
     });
@@ -96,7 +101,7 @@ export async function handler(
     try {
       await metrics.flush();
     } catch (flushError) {
-      appContext.logger.error('Error flushing metrics', flushError);
+      logger.error('Error flushing metrics', flushError);
     }
 
     return {

@@ -1,7 +1,13 @@
 import { AlertingService } from './alerting.service.js';
 import { StorageService } from './storage.service.js';
-import type { AppContext } from '../app-context.js';
+import { isLambda } from '../utils/runtime.util.js';
 import { today, isFirstDayOfMonth } from '../utils/date-helpers.util.js';
+import type { Logger } from '../types/logger.types.js';
+import type { AppConfig } from '../config.js';
+import cloudWatchMetricsClientDefault from '../clients/cloudwatch.client.js';
+import snsClientDefault from '../clients/sns.client.js';
+
+type CloudWatchClient = typeof cloudWatchMetricsClientDefault;
 
 interface ExecutionRecord {
   date: string;
@@ -13,7 +19,11 @@ interface ExecutionRecord {
 class MonitoringService {
   private readonly storage = StorageService.getAppStorage();
 
-  constructor(private readonly ctx: AppContext) {}
+  constructor(
+    private readonly logger: Logger,
+    private readonly config: AppConfig,
+    private readonly cloudWatchClient: CloudWatchClient
+  ) {}
 
   async recordDailyExecution(success: boolean, monthlyDigestSent: boolean = false): Promise<void> {
     const todayDate = today();
@@ -30,15 +40,15 @@ class MonitoringService {
       const key = `executions/${dateStr}.json`;
       const recordJson = JSON.stringify(record);
       
-      if (this.ctx.isLambda) {
+      if (isLambda()) {
         await this.storage.writeFile(key, recordJson);
-        this.ctx.logger.debug('Daily execution recorded in S3', { date: dateStr, success });
+        this.logger.debug('Daily execution recorded in S3', { date: dateStr, success });
       } else {
-        this.ctx.logger.info('Daily execution recorded', { date: dateStr, success, monthlyDigestSent });
+        this.logger.info('Daily execution recorded', { date: dateStr, success, monthlyDigestSent });
       }
 
-      this.ctx.clients.cloudWatch.putMetricData(
-        this.ctx.config.metrics.namespace,
+      this.cloudWatchClient.putMetricData(
+        this.config.metrics.namespace,
         [{
           MetricName: 'monitoring.daily_execution',
           Value: success ? 1 : 0,
@@ -49,8 +59,8 @@ class MonitoringService {
       ).catch(() => {});
 
       if (monthlyDigestSent) {
-        this.ctx.clients.cloudWatch.putMetricData(
-          this.ctx.config.metrics.namespace,
+        this.cloudWatchClient.putMetricData(
+          this.config.metrics.namespace,
           [{
             MetricName: 'monitoring.monthly_digest_sent',
             Value: 1,
@@ -60,14 +70,14 @@ class MonitoringService {
           }]
         ).catch(() => {});
       } else if (isFirstDayOfMonth(todayDate)) {
-        const alerting = new AlertingService(this.ctx);
+        const alerting = new AlertingService(this.logger, this.config, snsClientDefault);
         alerting.sendMonthlyDigestFailedAlert(new Error('Monthly digest not sent on first of month'), {
           date: dateStr,
           executed: success,
         });
       }
     } catch (error) {
-      this.ctx.logger.error('Error recording daily execution', error);
+      this.logger.error('Error recording daily execution', error);
     }
   }
 
@@ -76,7 +86,7 @@ class MonitoringService {
     const dateStr = todayDate.toISOString().split('T')[0];
 
     try {
-      if (this.ctx.isLambda) {
+      if (isLambda()) {
         const key = `executions/${dateStr}.json`;
         const data = await this.storage.readFile(key);
         if (data) {
@@ -88,12 +98,12 @@ class MonitoringService {
       const now = new Date();
       const hours = now.getHours();
       if (hours >= 10) {
-        this.ctx.logger.warn('Daily execution not detected today', { date: dateStr, hour: hours });
+        this.logger.warn('Daily execution not detected today', { date: dateStr, hour: hours });
       }
 
       return false;
     } catch (error) {
-      this.ctx.logger.error('Error checking daily execution', error);
+      this.logger.error('Error checking daily execution', error);
       return false;
     }
   }
@@ -107,7 +117,7 @@ class MonitoringService {
     const dateStr = todayDate.toISOString().split('T')[0];
 
     try {
-      if (this.ctx.isLambda) {
+      if (isLambda()) {
         const key = `executions/${dateStr}.json`;
         const data = await this.storage.readFile(key);
         if (data) {
@@ -115,7 +125,7 @@ class MonitoringService {
           const sent = record.monthlyDigestSent ?? false;
           
           if (!sent) {
-            const alerting = new AlertingService(this.ctx);
+            const alerting = new AlertingService(this.logger, this.config, snsClientDefault);
             alerting.sendMonthlyDigestFailedAlert(new Error('Monthly digest not sent on first of month'), {
               date: dateStr,
               checked: true,
@@ -126,15 +136,15 @@ class MonitoringService {
         }
       }
 
-      const alerting = new AlertingService(this.ctx);
+      const alerting = new AlertingService(this.logger, this.config, snsClientDefault);
       alerting.sendMonthlyDigestFailedAlert(new Error('Unable to verify monthly digest status'), {
         date: dateStr,
         checked: true,
       });
       return false;
     } catch (error) {
-      this.ctx.logger.error('Error checking monthly digest', error);
-      const alerting = new AlertingService(this.ctx);
+      this.logger.error('Error checking monthly digest', error);
+      const alerting = new AlertingService(this.logger, this.config, snsClientDefault);
       alerting.sendMonthlyDigestFailedAlert(error instanceof Error ? error : new Error(String(error)), {
         date: dateStr,
         checked: true,

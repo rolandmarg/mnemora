@@ -17,8 +17,16 @@ import { AuthReminderService } from '../../services/auth-reminder.service.js';
 import { WhatsAppSessionManagerService } from '../../services/whatsapp-session-manager.service.js';
 import { logSentMessage } from '../../services/message-logger.service.js';
 import { QRAuthenticationRequiredError } from '../../types/qr-auth-error.js';
+import { isLambda } from '../../utils/runtime.util.js';
 import type { SendOptions, SendResult, OutputChannelMetadata } from '../output-channel.interface.js';
-import type { AppContext } from '../../app-context.js';
+import type { Logger } from '../../types/logger.types.js';
+import type { AppConfig } from '../../config.js';
+import whatsappClientDefault from '../../clients/whatsapp.client.js';
+import cloudWatchMetricsClientDefault from '../../clients/cloudwatch.client.js';
+import snsClientDefault from '../../clients/sns.client.js';
+
+type WhatsAppClient = typeof whatsappClientDefault;
+type CloudWatchClient = typeof cloudWatchMetricsClientDefault;
 
 export class WhatsAppOutputChannel extends BaseOutputChannel {
   private readonly alerting: AlertingService;
@@ -26,19 +34,24 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
   private readonly authReminder: AuthReminderService;
   private readonly sessionManager: WhatsAppSessionManagerService;
 
-  constructor(private readonly ctx: AppContext) {
+  constructor(
+    private readonly logger: Logger,
+    private readonly config: AppConfig,
+    private readonly whatsappClient: WhatsAppClient,
+    cloudWatchClient: CloudWatchClient
+  ) {
     super();
-    this.alerting = new AlertingService(ctx);
-    this.metrics = new MetricsCollector(ctx);
-    this.authReminder = new AuthReminderService(ctx);
-    this.sessionManager = new WhatsAppSessionManagerService(ctx);
+    this.alerting = new AlertingService(logger, config, snsClientDefault);
+    this.metrics = new MetricsCollector(logger, config, cloudWatchClient);
+    this.authReminder = new AuthReminderService(logger, config, cloudWatchClient);
+    this.sessionManager = new WhatsAppSessionManagerService(logger);
   }
 
   /**
    * Get the WhatsApp session path. Helper to avoid repetition.
    */
   private getSessionPath(): string {
-    return this.ctx.clients.whatsapp.getSessionPath();
+    return this.whatsappClient.getSessionPath();
   }
 
   /**
@@ -53,7 +66,7 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
   private async initializeClient(): Promise<void> {
     try {
       // Check if client is already initialized and ready
-      if (this.ctx.clients.whatsapp.isClientReady()) {
+      if (this.whatsappClient.isClientReady()) {
         return;
       }
 
@@ -62,17 +75,17 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
       const sessionPath = this.getSessionPath();
       await this.sessionManager.syncSessionFromS3(sessionPath);
       
-      await this.ctx.clients.whatsapp.initialize();
+      await this.whatsappClient.initialize();
       
-      if (this.ctx.clients.whatsapp.requiresAuth()) {
+      if (this.whatsappClient.requiresAuth()) {
         trackWhatsAppAuthRequired(this.metrics);
         this.alerting.sendWhatsAppAuthRequiredAlert({
           qrCodeAvailable: true,
-          environment: this.ctx.isLambda ? 'lambda' : 'local',
+          environment: isLambda() ? 'lambda' : 'local',
         });
       }
       
-      if (this.ctx.clients.whatsapp.isClientReady()) {
+      if (this.whatsappClient.isClientReady()) {
         this.authReminder.recordAuthentication();
       }
     } catch (error) {
@@ -82,7 +95,7 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
         throw error;
       }
       
-      this.ctx.logger.error('Failed to initialize WhatsApp client', error);
+      this.logger.error('Failed to initialize WhatsApp client', error);
       this.alerting.sendWhatsAppClientInitFailedAlert(error instanceof Error ? error : new Error(String(error)), {
         reason: 'initialization_error',
       });
@@ -108,7 +121,7 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
       const identifier = options?.recipients?.[0];
       resolvedGroupId = await this.resolveGroupId(identifier);
 
-      if (!this.ctx.clients.whatsapp.isClientReady()) {
+      if (!this.whatsappClient.isClientReady()) {
         return {
           success: false,
           error: new Error('WhatsApp client is not ready'),
@@ -129,17 +142,17 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
       
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-          if (!this.ctx.clients.whatsapp.isClientReady()) {
+          if (!this.whatsappClient.isClientReady()) {
             throw new Error('Client is not ready');
           }
 
-          const result = await this.ctx.clients.whatsapp.sendMessage(chatId, message);
+          const result = await this.whatsappClient.sendMessage(chatId, message);
 
           const duration = Date.now() - startTime;
           trackWhatsAppMessageSent(this.metrics, true);
           trackOperationDuration(this.metrics, 'whatsapp.send', duration, { success: 'true', attempt: attempt.toString() });
 
-          this.ctx.logger.info('WhatsApp message sent successfully', {
+          this.logger.info('WhatsApp message sent successfully', {
             groupId: chatId,
             messageId: result.id,
             attempt,
@@ -147,7 +160,7 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
           });
 
           await logSentMessage(
-            this.ctx,
+            this.logger,
             result.id,
             'other',
             chatId,
@@ -181,12 +194,12 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
                                   lastError.message.includes('Target closed');
           
           if (isProtocolError && attempt < maxRetries) {
-            this.ctx.logger.warn(`WhatsApp send attempt ${attempt} failed, retrying...`, {
+            this.logger.warn(`WhatsApp send attempt ${attempt} failed, retrying...`, {
               error: lastError.message,
             });
             
-            if (!this.ctx.clients.whatsapp.isClientReady()) {
-              this.ctx.logger.info('Client invalid after protocol error, reinitializing...');
+            if (!this.whatsappClient.isClientReady()) {
+              this.logger.info('Client invalid after protocol error, reinitializing...');
               await this.initializeClient();
             }
             
@@ -209,21 +222,21 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
       const duration = Date.now() - startTime;
       trackWhatsAppMessageSent(this.metrics, false);
       trackOperationDuration(this.metrics, 'whatsapp.send', duration, { success: 'false' });
-      this.ctx.logger.error('Error sending WhatsApp message', {
+      this.logger.error('Error sending WhatsApp message', {
         error,
         groupId: resolvedGroupId,
       });
       
       this.alerting.sendWhatsAppMessageFailedAlert(error, {
-        groupId: resolvedGroupId ?? options?.recipients?.[0] ?? this.ctx.config.whatsapp.groupId,
+        groupId: resolvedGroupId ?? options?.recipients?.[0] ?? this.config.whatsapp.groupId,
         retries: 3,
       });
 
       await logSentMessage(
-        this.ctx,
+        this.logger,
         undefined,
         'other',
-        resolvedGroupId ?? options?.recipients?.[0] ?? this.ctx.config.whatsapp.groupId ?? 'unknown',
+        resolvedGroupId ?? options?.recipients?.[0] ?? this.config.whatsapp.groupId ?? 'unknown',
         message,
         false,
         duration,
@@ -244,14 +257,14 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
     try {
       await this.initializeClient();
 
-      if (!this.ctx.clients.whatsapp.isClientReady()) {
+      if (!this.whatsappClient.isClientReady()) {
         throw new Error('WhatsApp client is not ready');
       }
 
-      const foundGroup = await this.ctx.clients.whatsapp.findGroupByName(groupName);
+      const foundGroup = await this.whatsappClient.findGroupByName(groupName);
       return foundGroup?.id ?? null;
     } catch (error) {
-      this.ctx.logger.error('Error finding group by name', error);
+      this.logger.error('Error finding group by name', error);
       throw error;
     }
   }
@@ -267,12 +280,12 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
   async resolveGroupId(identifier: string | undefined): Promise<string> {
     await this.initializeClient();
 
-    if (!this.ctx.clients.whatsapp.isClientReady()) {
+    if (!this.whatsappClient.isClientReady()) {
       throw new Error('WhatsApp client is not ready');
     }
 
     // Fall back to config if identifier is undefined
-    const inputIdentifier = identifier ?? this.ctx.config.whatsapp.groupId;
+    const inputIdentifier = identifier ?? this.config.whatsapp.groupId;
 
     if (!inputIdentifier) {
       throw new Error('No WhatsApp group ID specified. Set WHATSAPP_GROUP_ID in .env or provide identifier');
@@ -284,8 +297,8 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
     }
 
     // Otherwise, treat it as a group name and search for it
-    this.ctx.logger.info(`Searching for group by name: ${inputIdentifier}`);
-    const foundGroup = await this.ctx.clients.whatsapp.findGroupByName(inputIdentifier);
+    this.logger.info(`Searching for group by name: ${inputIdentifier}`);
+    const foundGroup = await this.whatsappClient.findGroupByName(inputIdentifier);
 
     if (!foundGroup) {
       const error = new Error(`Group "${inputIdentifier}" not found`);
@@ -295,7 +308,7 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
       throw error;
     }
 
-    this.ctx.logger.info(`Found group ID: ${foundGroup.id}`);
+    this.logger.info(`Found group ID: ${foundGroup.id}`);
     return foundGroup.id;
   }
 
@@ -305,7 +318,7 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
       return true;
     }
 
-    return this.ctx.clients.whatsapp.requiresAuth();
+    return this.whatsappClient.requiresAuth();
   }
 
   async getAuthStatus(): Promise<{
@@ -316,7 +329,7 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
     daysSinceAuth: number | null;
   }> {
     const authStatus = await this.authReminder.getAuthStatus();
-    const clientStatus = this.ctx.clients.whatsapp.getAuthStatus();
+    const clientStatus = this.whatsappClient.getAuthStatus();
     
     return {
       isReady: clientStatus.isReady,
@@ -328,7 +341,7 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
   }
 
   isAvailable(): boolean {
-    return !!this.ctx.config.whatsapp.groupId;
+    return !!this.config.whatsapp.groupId;
   }
 
   getMetadata(): OutputChannelMetadata {
@@ -355,9 +368,9 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
       // This is the only place we save session to S3 after loading at start
       await this.syncSessionToS3();
       
-      await this.ctx.clients.whatsapp.destroy();
+      await this.whatsappClient.destroy();
     } catch (error) {
-      this.ctx.logger.error('Error destroying WhatsApp client', error);
+      this.logger.error('Error destroying WhatsApp client', error);
     }
   }
 }

@@ -1,5 +1,7 @@
 import { AlertingService } from '../services/alerting.service.js';
-import { appContext } from '../app-context.js';
+import { logger } from '../utils/logger.util.js';
+import { config } from '../config.js';
+import snsClient from '../clients/sns.client.js';
 import { setCorrelationId } from '../utils/correlation.util.js';
 import type { EventBridgeEvent, LambdaContext, LambdaResponse } from './types.js';
 
@@ -8,14 +10,14 @@ export async function handler(
   context: LambdaContext
 ): Promise<LambdaResponse> {
 
-  const alerting = new AlertingService(appContext);
+  const alerting = new AlertingService(logger, config, snsClient);
   
   const correlationId = context.awsRequestId;
   if (correlationId) {
     setCorrelationId(correlationId);
   }
 
-  appContext.logger.info('Daily summary handler invoked', {
+  logger.info('Daily summary handler invoked', {
     functionName: context.functionName,
     requestId: context.awsRequestId,
     eventSource: event.source,
@@ -24,7 +26,7 @@ export async function handler(
   try {
     await alerting.sendDailySummary();
 
-    appContext.logger.info('Daily summary handler completed successfully', {
+    logger.info('Daily summary handler completed successfully', {
       requestId: context.awsRequestId,
     });
 
@@ -36,7 +38,7 @@ export async function handler(
       }),
     };
   } catch (error) {
-    appContext.logger.error('Daily summary handler failed', error, {
+    logger.error('Daily summary handler failed', error, {
       requestId: context.awsRequestId,
     });
 

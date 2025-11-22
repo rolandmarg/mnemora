@@ -28,7 +28,17 @@ import { getFullName } from '../utils/name-helpers.util.js';
 import { isFirstDayOfMonth, startOfMonth, endOfMonth, today, startOfDay } from '../utils/date-helpers.util.js';
 import { initializeCorrelationId } from '../utils/correlation.util.js';
 import { QRAuthenticationRequiredError } from '../types/qr-auth-error.js';
-import type { AppContext } from '../app-context.js';
+import type { Logger } from '../types/logger.types.js';
+import type { AppConfig } from '../config.js';
+import calendarClientDefault from '../clients/google-calendar.client.js';
+import xrayClientDefault from '../clients/xray.client.js';
+import cloudWatchMetricsClientDefault from '../clients/cloudwatch.client.js';
+import whatsappClientDefault from '../clients/whatsapp.client.js';
+import snsClientDefault from '../clients/sns.client.js';
+
+type CalendarClient = typeof calendarClientDefault;
+type XRayClient = typeof xrayClientDefault;
+type CloudWatchClient = typeof cloudWatchMetricsClientDefault;
 
 class BirthdayOrchestratorService {
   private readonly birthdayService: BirthdayService;
@@ -37,19 +47,27 @@ class BirthdayOrchestratorService {
   private readonly alerting: AlertingService;
   private readonly lastRunTracker: LastRunTrackerService;
 
-  constructor(private readonly ctx: AppContext) {
-    this.birthdayService = new BirthdayService(ctx);
-    this.monitoring = new MonitoringService(ctx);
-    this.metrics = new MetricsCollector(ctx);
-    this.alerting = new AlertingService(ctx);
-    this.lastRunTracker = new LastRunTrackerService(ctx);
+  constructor(
+    private readonly logger: Logger,
+    private readonly config: AppConfig,
+    _calendarClient: CalendarClient,
+    private readonly xrayClient: XRayClient,
+    private readonly cloudWatchClient: CloudWatchClient
+  ) {
+    this.birthdayService = new BirthdayService(logger, config, _calendarClient, xrayClient);
+    this.monitoring = new MonitoringService(logger, config, cloudWatchClient);
+    this.metrics = new MetricsCollector(logger, config, cloudWatchClient);
+    this.alerting = new AlertingService(logger, config, snsClientDefault);
+    this.lastRunTracker = new LastRunTrackerService(logger);
   }
 
   private getGroupId(channel: ReturnType<typeof OutputChannelFactory.createWhatsAppOutputChannel> | null): string {
     if (!channel?.isAvailable()) {
       return 'unknown';
     }
-    return (channel as { config?: { whatsapp?: { groupId?: string } } }).config?.whatsapp?.groupId ?? 'unknown';
+    // Access config through the channel's isAvailable check or use a type assertion
+    // Since WhatsAppOutputChannel stores config internally, we'll use a workaround
+    return this.config.whatsapp.groupId ?? 'unknown';
   }
 
   private async logMessage(
@@ -63,7 +81,7 @@ class BirthdayOrchestratorService {
     metadata?: Record<string, unknown>
   ): Promise<void> {
     const groupId = this.getGroupId(channel);
-    await logSentMessage(this.ctx, messageId, messageType, groupId, content, success, duration, error, metadata).catch(() => {});
+    await logSentMessage(this.logger, messageId, messageType, groupId, content, success, duration, error, metadata).catch(() => {});
   }
 
   private async flushPendingWrites(
@@ -78,7 +96,7 @@ class BirthdayOrchestratorService {
         await channel.flushPendingWrites();
       }
     } catch (error) {
-      this.ctx.logger.error('Error flushing pending writes', error);
+      this.logger.error('Error flushing pending writes', error);
     }
   }
 
@@ -93,12 +111,12 @@ class BirthdayOrchestratorService {
       // channel.destroy() handles S3 sync and cleanup with its own wait logic
       await channel.destroy();
     } catch (error) {
-      this.ctx.logger.error('Error destroying WhatsApp client', error);
+      this.logger.error('Error destroying WhatsApp client', error);
     }
   }
 
   private async checkAndSendMissedDays(): Promise<void> {
-    return this.ctx.clients.xray.captureAsyncSegment('Orchestrator.checkAndSendMissedDays', async () => {
+    return this.xrayClient.captureAsyncSegment('Orchestrator.checkAndSendMissedDays', async () => {
       const missedDates = await this.lastRunTracker.getMissedDates();
       
       if (missedDates.length === 0) {
@@ -116,7 +134,7 @@ class BirthdayOrchestratorService {
       });
       
       if (missedFirstOfMonths.length === 0) {
-        this.ctx.logger.info(`Found ${missedDates.length} missed day(s), but no missed 1st-of-month dates to recover`);
+        this.logger.info(`Found ${missedDates.length} missed day(s), but no missed 1st-of-month dates to recover`);
         return;
       }
 
@@ -126,7 +144,7 @@ class BirthdayOrchestratorService {
 
       trackMissedDaysDetected(this.metrics, missedFirstOfMonths.length);
 
-      this.ctx.logger.info(`Found ${missedFirstOfMonths.length} missed 1st-of-month date(s), recovering latest: ${dateStr}`, {
+      this.logger.info(`Found ${missedFirstOfMonths.length} missed 1st-of-month date(s), recovering latest: ${dateStr}`, {
         missedFirstOfMonths: missedFirstOfMonths.map(d => d.toISOString().split('T')[0]),
         recovering: dateStr,
       });
@@ -134,9 +152,9 @@ class BirthdayOrchestratorService {
       let whatsappChannel: ReturnType<typeof OutputChannelFactory.createWhatsAppOutputChannel> | null = null;
 
       try {
-        whatsappChannel = OutputChannelFactory.createWhatsAppOutputChannel(this.ctx);
+        whatsappChannel = OutputChannelFactory.createWhatsAppOutputChannel(this.logger, this.config, whatsappClientDefault, this.cloudWatchClient);
         if (!whatsappChannel.isAvailable()) {
-          this.ctx.logger.info('WhatsApp channel not available, skipping missed monthly digest recovery');
+          this.logger.info('WhatsApp channel not available, skipping missed monthly digest recovery');
           return;
         }
 
@@ -146,13 +164,13 @@ class BirthdayOrchestratorService {
           const monthlyBirthdays = await this.birthdayService.getBirthdays(monthStart, monthEnd);
 
           if (monthlyBirthdays.length === 0) {
-            this.ctx.logger.info(`No birthdays found for missed monthly digest: ${dateStr}`);
+            this.logger.info(`No birthdays found for missed monthly digest: ${dateStr}`);
             return;
           }
 
           const monthlyDigest = this.birthdayService.formatMonthlyDigest(monthlyBirthdays);
           
-          this.ctx.logger.info(`Sending monthly digest for missed 1st-of-month: ${dateStr}`, {
+          this.logger.info(`Sending monthly digest for missed 1st-of-month: ${dateStr}`, {
             monthlyBirthdaysCount: monthlyBirthdays.length,
           });
 
@@ -160,7 +178,7 @@ class BirthdayOrchestratorService {
           
           if (result.success) {
             trackMonthlyDigestSent(this.metrics);
-            this.ctx.logger.info('Missed monthly digest sent successfully', { date: dateStr });
+            this.logger.info('Missed monthly digest sent successfully', { date: dateStr });
             
             await this.logMessage(result.messageId, 'monthly-digest', whatsappChannel, monthlyDigest, true);
           } else {
@@ -169,7 +187,7 @@ class BirthdayOrchestratorService {
               throw result.error;
             }
             
-            this.ctx.logger.warn('Failed to send missed monthly digest', {
+            this.logger.warn('Failed to send missed monthly digest', {
               date: dateStr,
               error: result.error?.message,
             });
@@ -184,7 +202,7 @@ class BirthdayOrchestratorService {
             throw error;
           }
           
-          this.ctx.logger.error(`Error recovering monthly digest for ${dateStr}`, error);
+          this.logger.error(`Error recovering monthly digest for ${dateStr}`, error);
           this.alerting.sendMissedDaysRecoveryFailedAlert(error, {
             missedDate: dateStr,
             stage: 'monthly-digest-recovery',
@@ -196,7 +214,7 @@ class BirthdayOrchestratorService {
           throw error;
         }
         
-        this.ctx.logger.error('Error processing missed monthly digest recovery', error);
+        this.logger.error('Error processing missed monthly digest recovery', error);
         this.alerting.sendMissedDaysRecoveryFailedAlert(error, {
           stage: 'initialization',
         });
@@ -209,7 +227,7 @@ class BirthdayOrchestratorService {
   }
 
   async runBirthdayCheck(): Promise<void> {
-    return this.ctx.clients.xray.captureAsyncSegment('Orchestrator.runBirthdayCheck', async () => {
+    return this.xrayClient.captureAsyncSegment('Orchestrator.runBirthdayCheck', async () => {
       const executionStartTime = Date.now();
       
       initializeCorrelationId();
@@ -225,28 +243,28 @@ class BirthdayOrchestratorService {
         try {
           await this.birthdayService.trySyncFromSheets();
         } catch (error) {
-          this.ctx.logger.warn('Unexpected error during Sheets sync', error);
+          this.logger.warn('Unexpected error during Sheets sync', error);
         }
 
-        this.ctx.logger.info('Running birthday check...');
+        this.logger.info('Running birthday check...');
         
         const { todaysBirthdays, monthlyBirthdays } = await this.birthdayService.getTodaysBirthdaysWithOptionalDigest();
       
       // Send monthly digest if it's the first day of the month
       if (monthlyBirthdays) {
         const monthlyDigest = this.birthdayService.formatMonthlyDigest(monthlyBirthdays);
-        this.ctx.logger.info('First day of month detected - generating monthly digest');
-        this.ctx.logger.info('Monthly digest', { monthlyDigest });
+        this.logger.info('First day of month detected - generating monthly digest');
+        this.logger.info('Monthly digest', { monthlyDigest });
         
         try {
-          whatsappChannel = OutputChannelFactory.createWhatsAppOutputChannel(this.ctx);
+          whatsappChannel = OutputChannelFactory.createWhatsAppOutputChannel(this.logger, this.config, whatsappClientDefault, this.cloudWatchClient);
           if (whatsappChannel.isAvailable()) {
-            this.ctx.logger.info('Sending monthly digest to WhatsApp group...');
+            this.logger.info('Sending monthly digest to WhatsApp group...');
             const result = await whatsappChannel.send(monthlyDigest);
             
             if (result.success) {
               trackMonthlyDigestSent(this.metrics);
-              this.ctx.logger.info('Monthly digest sent to WhatsApp successfully', {
+              this.logger.info('Monthly digest sent to WhatsApp successfully', {
                 messageId: result.messageId,
               });
               
@@ -264,7 +282,7 @@ class BirthdayOrchestratorService {
                 ? new Error(`Failed to send monthly digest to WhatsApp: ${result.error.message}`)
                 : new Error('Failed to send monthly digest to WhatsApp');
               
-              this.ctx.logger.error('Failed to send monthly digest to WhatsApp', {
+              this.logger.error('Failed to send monthly digest to WhatsApp', {
                 error: error.message,
               });
               
@@ -284,7 +302,7 @@ class BirthdayOrchestratorService {
           } else {
             // WhatsApp channel unavailable - this is fatal when monthly digest is needed
             const error = new Error('WhatsApp channel is not available (WHATSAPP_GROUP_ID not configured)');
-            this.ctx.logger.error('WhatsApp channel is not available', {
+            this.logger.error('WhatsApp channel is not available', {
               reason: 'channel_unavailable',
             });
             
@@ -304,7 +322,7 @@ class BirthdayOrchestratorService {
           }
           
           // Re-throw all errors - WhatsApp failures are fatal
-          this.ctx.logger.error('Error sending monthly digest to WhatsApp', error);
+          this.logger.error('Error sending monthly digest to WhatsApp', error);
           
           if (isFirstDayOfMonth(new Date())) {
             this.alerting.sendMonthlyDigestFailedAlert(error, {
@@ -321,18 +339,18 @@ class BirthdayOrchestratorService {
       }
       
       if (todaysBirthdays.length === 0) {
-        this.ctx.logger.info('No birthdays today!');
+        this.logger.info('No birthdays today!');
       } else {
-        this.ctx.logger.info(`Found ${todaysBirthdays.length} birthday(s) today`, {
+        this.logger.info(`Found ${todaysBirthdays.length} birthday(s) today`, {
           birthdays: todaysBirthdays.map(record => getFullName(record.firstName, record.lastName)),
         });
         
         try {
-          whatsappChannel ??= OutputChannelFactory.createWhatsAppOutputChannel(this.ctx);
+          whatsappChannel ??= OutputChannelFactory.createWhatsAppOutputChannel(this.logger, this.config, whatsappClientDefault, this.cloudWatchClient);
           
           if (whatsappChannel.isAvailable()) {
             const birthdayMessages = this.birthdayService.formatTodaysBirthdayMessages(todaysBirthdays);
-            this.ctx.logger.info('Sending birthday messages to WhatsApp group...');
+            this.logger.info('Sending birthday messages to WhatsApp group...');
             
             await birthdayMessages.reduce(async (promise, message, index) => {
               await promise;
@@ -345,7 +363,7 @@ class BirthdayOrchestratorService {
               
               if (result.success) {
                 trackBirthdaySent(this.metrics, 1);
-                this.ctx.logger.info('Birthday message sent to WhatsApp successfully', {
+                this.logger.info('Birthday message sent to WhatsApp successfully', {
                   messageId: result.messageId,
                 });
                 
@@ -370,7 +388,7 @@ class BirthdayOrchestratorService {
                   ? new Error(`Failed to send birthday message to WhatsApp: ${result.error.message}`)
                   : new Error('Failed to send birthday message to WhatsApp');
                 
-                this.ctx.logger.error('Failed to send birthday message to WhatsApp', {
+                this.logger.error('Failed to send birthday message to WhatsApp', {
                   error: error.message,
                   messageIndex: index,
                 });
@@ -400,7 +418,7 @@ class BirthdayOrchestratorService {
           } else {
             // WhatsApp channel unavailable - this is fatal when there are birthdays to send
             const error = new Error('WhatsApp channel is not available (WHATSAPP_GROUP_ID not configured)');
-            this.ctx.logger.error('WhatsApp channel is not available', {
+            this.logger.error('WhatsApp channel is not available', {
               reason: 'channel_unavailable',
               birthdaysCount: todaysBirthdays.length,
             });
@@ -414,12 +432,12 @@ class BirthdayOrchestratorService {
           }
           
           // Re-throw all errors - WhatsApp failures are fatal
-          this.ctx.logger.error('Error sending birthday messages to WhatsApp', error);
+          this.logger.error('Error sending birthday messages to WhatsApp', error);
           throw error;
         }
       }
       
-      this.ctx.logger.info('Birthday check completed successfully!');
+      this.logger.info('Birthday check completed successfully!');
       
       this.lastRunTracker.updateLastRunDate();
 
@@ -429,7 +447,7 @@ class BirthdayOrchestratorService {
       const executionDuration = Date.now() - executionStartTime;
       trackExecutionComplete(this.metrics, executionDuration, true);
     } catch (error) {
-      this.ctx.logger.error('Error in birthday check', error);
+      this.logger.error('Error in birthday check', error);
       
       // Record failed execution in monitoring system
       await this.monitoring.recordDailyExecution(false, false);
@@ -444,7 +462,7 @@ class BirthdayOrchestratorService {
       try {
         await this.metrics.flush();
       } catch (error) {
-        this.ctx.logger.error('Error flushing metrics', error);
+        this.logger.error('Error flushing metrics', error);
         this.alerting.sendCloudWatchMetricsFailedAlert(error);
       }
       
@@ -465,8 +483,14 @@ class BirthdayOrchestratorService {
   }
 }
 
-export function runBirthdayCheck(ctx: AppContext): Promise<void> {
-  const orchestrator = new BirthdayOrchestratorService(ctx);
+export function runBirthdayCheck(
+  logger: Logger,
+  config: AppConfig,
+  calendarClient: CalendarClient,
+  xrayClient: XRayClient,
+  cloudWatchClient: CloudWatchClient
+): Promise<void> {
+  const orchestrator = new BirthdayOrchestratorService(logger, config, calendarClient, xrayClient, cloudWatchClient);
   return orchestrator.runBirthdayCheck();
 }
 

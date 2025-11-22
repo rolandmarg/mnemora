@@ -1,21 +1,25 @@
 import { getCorrelationId } from '../utils/correlation.util.js';
-import { getLambdaFunctionName } from '../utils/runtime.util.js';
+import { getLambdaFunctionName, isLambda } from '../utils/runtime.util.js';
 import { AlertSeverity, AlertType } from '../types/alerting.types.js';
 import { StorageService } from './storage.service.js';
-import type { AppContext } from '../app-context.js';
+import type { Logger } from '../types/logger.types.js';
+import type { AppConfig } from '../config.js';
 import type { AlertState, AlertDetails } from '../types/alerting.types.js';
+import snsClientDefault from '../clients/sns.client.js';
+
+type SNSClient = typeof snsClientDefault;
 
 interface ActiveAlerts {
   [alertId: string]: AlertState;
 }
 
-function getCloudWatchLogsUrl(ctx: AppContext): string | undefined {
-  if (!ctx.isLambda) {
+function getCloudWatchLogsUrl(config: AppConfig): string | undefined {
+  if (!isLambda()) {
     return undefined;
   }
 
   const functionName = getLambdaFunctionName();
-  const region = ctx.config.aws.region;
+  const region = config.aws.region;
   const requestId = getCorrelationId();
 
   if (functionName && requestId) {
@@ -31,13 +35,17 @@ export class AlertingService {
   private readonly alertStateKey = 'alerts/active-alerts.json';
   private readonly deduplicationWindowMs = 60 * 60 * 1000;
 
-  constructor(private readonly ctx: AppContext) {
-    this.topicArn = ctx.config.aws.snsTopicArn;
+  constructor(
+    private readonly logger: Logger,
+    private readonly config: AppConfig,
+    private readonly snsClient: SNSClient
+  ) {
+    this.topicArn = config.aws.snsTopicArn;
   }
 
   private async loadActiveAlerts(): Promise<ActiveAlerts> {
     try {
-      if (this.ctx.isLambda) {
+      if (isLambda()) {
         const data = await this.storage.readFile(this.alertStateKey);
         if (data) {
           return JSON.parse(data.toString('utf-8')) as ActiveAlerts;
@@ -45,19 +53,36 @@ export class AlertingService {
       }
       return {};
     } catch (error) {
-      this.ctx.logger.warn('Error loading active alerts, starting fresh', error);
+      this.logger.warn('Error loading active alerts, starting fresh', error);
       return {};
     }
   }
 
   private async saveActiveAlerts(alerts: ActiveAlerts): Promise<void> {
     try {
-      if (this.ctx.isLambda) {
+      if (isLambda()) {
+        // Clean up resolved alerts older than 30 days
+        const now = Date.now();
+        const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
+        
+        for (const [alertId, alert] of Object.entries(alerts)) {
+          if (alert.resolved && alert.resolvedAt) {
+            const resolvedAt = new Date(alert.resolvedAt).getTime();
+            if (resolvedAt < thirtyDaysAgo) {
+              delete alerts[alertId];
+              this.logger.debug('Removed old resolved alert', {
+                alertId,
+                resolvedAt: alert.resolvedAt,
+              });
+            }
+          }
+        }
+
         const data = JSON.stringify(alerts, null, 2);
         await this.storage.writeFile(this.alertStateKey, data);
       }
     } catch (error) {
-      this.ctx.logger.error('Error saving active alerts', error);
+      this.logger.error('Error saving active alerts', error);
     }
   }
 
@@ -123,16 +148,16 @@ export class AlertingService {
         alert.resolved = true;
         alert.resolvedAt = new Date().toISOString();
         await this.saveActiveAlerts(alerts);
-        this.ctx.logger.info('Alert resolved', { alertId, resolvedAt: alert.resolvedAt });
+        this.logger.info('Alert resolved', { alertId, resolvedAt: alert.resolvedAt });
       }
     } catch (error) {
-      this.ctx.logger.error('Error resolving alert', error);
+      this.logger.error('Error resolving alert', error);
     }
   }
 
   private formatAlertMessage(details: AlertDetails, alertState: AlertState): string {
     const correlationId = getCorrelationId();
-    const logsUrl = getCloudWatchLogsUrl(this.ctx);
+    const logsUrl = getCloudWatchLogsUrl(this.config);
     const now = new Date().toISOString();
 
     let message = `[${details.severity}] ${details.title}\n\n`;
@@ -181,8 +206,8 @@ export class AlertingService {
   }
 
   async sendAlert(details: AlertDetails): Promise<void> {
-    if (!this.ctx.clients.sns.isAvailable() || !this.topicArn) {
-      this.ctx.logger.warn('Alert would be sent (SNS not configured)', {
+    if (!this.snsClient.isAvailable() || !this.topicArn) {
+      this.logger.warn('Alert would be sent (SNS not configured)', {
         type: details.type,
         severity: details.severity,
         title: details.title,
@@ -197,7 +222,7 @@ export class AlertingService {
       const alertState = await this.updateAlertState(alerts, alertId, details.severity, now);
 
       if (!this.shouldSendAlert(alertState, now)) {
-        this.ctx.logger.debug('Alert deduplicated (sent recently)', {
+        this.logger.debug('Alert deduplicated (sent recently)', {
           alertId,
           lastSent: alertState.lastSent,
         });
@@ -210,9 +235,9 @@ export class AlertingService {
 
       const sendSMS = details.severity === AlertSeverity.CRITICAL;
 
-      await this.ctx.clients.sns.publishAlert(subject, message, details.severity, details.type, sendSMS);
+      await this.snsClient.publishAlert(subject, message, details.severity, details.type, sendSMS);
 
-      this.ctx.logger.info('Alert sent via SNS', {
+      this.logger.info('Alert sent via SNS', {
         type: details.type,
         severity: details.severity,
         alertId,
@@ -221,7 +246,7 @@ export class AlertingService {
 
       await this.saveActiveAlerts(alerts);
     } catch (error) {
-      this.ctx.logger.error('Error sending alert via SNS', error, {
+      this.logger.error('Error sending alert via SNS', error, {
         type: details.type,
         severity: details.severity,
       });
@@ -233,14 +258,14 @@ export class AlertingService {
       const alerts = await this.loadActiveAlerts();
       return Object.values(alerts).filter(alert => !alert.resolved);
     } catch (error) {
-      this.ctx.logger.error('Error getting active alerts', error);
+      this.logger.error('Error getting active alerts', error);
       return [];
     }
   }
 
   async sendDailySummary(): Promise<void> {
-    if (!this.ctx.clients.sns.isAvailable() || !this.topicArn) {
-      this.ctx.logger.warn('Daily summary would be sent (SNS not configured)');
+    if (!this.snsClient.isAvailable() || !this.topicArn) {
+      this.logger.warn('Daily summary would be sent (SNS not configured)');
       return;
     }
 
@@ -248,7 +273,7 @@ export class AlertingService {
       const activeAlerts = await this.getActiveAlerts();
 
       if (activeAlerts.length === 0) {
-        this.ctx.logger.debug('No active alerts for daily summary');
+        this.logger.debug('No active alerts for daily summary');
         return;
       }
 
@@ -286,11 +311,11 @@ export class AlertingService {
       summary += 'View details in CloudWatch Logs or AWS Console.\n';
 
       const subject = `[INFO] Mnemora Birthday Bot: Daily Alert Summary (${activeAlerts.length} active)`;
-      await this.ctx.clients.sns.publishAlert(subject, summary, AlertSeverity.INFO, 'daily-summary', false);
+      await this.snsClient.publishAlert(subject, summary, AlertSeverity.INFO, 'daily-summary', false);
 
-      this.ctx.logger.info('Daily alert summary sent', { alertCount: activeAlerts.length });
+      this.logger.info('Daily alert summary sent', { alertCount: activeAlerts.length });
     } catch (error) {
-      this.ctx.logger.error('Error sending daily alert summary', error);
+      this.logger.error('Error sending daily alert summary', error);
     }
   }
 

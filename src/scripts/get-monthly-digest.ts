@@ -1,29 +1,32 @@
 import { BirthdayService } from '../services/birthday.service.js';
-import { appContext } from '../app-context.js';
+import { logger } from '../utils/logger.util.js';
+import { config } from '../config.js';
+import calendarClient from '../clients/google-calendar.client.js';
+import xrayClient from '../clients/xray.client.js';
 import { getFullName } from '../utils/name-helpers.util.js';
 
 async function getMonthlyDigest(): Promise<void> {
-  const birthdayService = new BirthdayService(appContext);
+  const birthdayService = new BirthdayService(logger, config, calendarClient, xrayClient);
   
   try {
-    appContext.logger.info('Getting monthly digest...');
+    logger.info('Getting monthly digest...');
     
     const { todaysBirthdays, monthlyBirthdays } = await birthdayService.getTodaysBirthdaysWithMonthlyDigest();
     
     if (todaysBirthdays.length > 0) {
-      appContext.logger.info('Today\'s birthdays', {
+      logger.info('Today\'s birthdays', {
         birthdays: todaysBirthdays.map(record => getFullName(record.firstName, record.lastName)),
       });
     }
     
     if (monthlyBirthdays && monthlyBirthdays.length > 0) {
       const monthlyDigest = birthdayService.formatMonthlyDigest(monthlyBirthdays);
-      appContext.logger.info('Monthly digest', { monthlyDigest });
+      logger.info('Monthly digest', { monthlyDigest });
     }
     
-    appContext.logger.info('Completed successfully!');
+    logger.info('Completed successfully!');
   } catch (error) {
-    appContext.logger.error('Error getting monthly digest', error);
+    logger.error('Error getting monthly digest', error);
     process.exit(1);
   } finally {
     process.exit(0);

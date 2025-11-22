@@ -1,13 +1,14 @@
 import { StorageService } from './storage.service.js';
 import { formatDateISO } from '../utils/date-helpers.util.js';
-import type { AppContext } from '../app-context.js';
+import { isLambda } from '../utils/runtime.util.js';
+import type { Logger } from '../types/logger.types.js';
 import type { MessageType, MessageRecord } from '../types/message.types.js';
 
 class MessageLoggerService {
   private readonly storage = StorageService.getAppStorage();
   private readonly enabled: boolean;
 
-  constructor(private readonly ctx: AppContext) {
+  constructor(private readonly logger: Logger) {
     this.enabled = true;
   }
 
@@ -16,7 +17,7 @@ class MessageLoggerService {
       return;
     }
 
-    this.ctx.logger.info('Message sent', {
+    this.logger.info('Message sent', {
       messageId: record.messageId,
       messageType: record.messageType,
       recipient: record.recipient,
@@ -30,7 +31,7 @@ class MessageLoggerService {
   }
 
   async persistMessage(record: MessageRecord): Promise<void> {
-    if (!this.enabled || !this.ctx.isLambda) {
+    if (!this.enabled || !isLambda()) {
       this.logMessage(record);
       return;
     }
@@ -45,13 +46,13 @@ class MessageLoggerService {
       
       await this.storage.writeFile(key, recordJson);
       
-      this.ctx.logger.debug('Message persisted to S3', {
+      this.logger.debug('Message persisted to S3', {
         key,
         messageType: record.messageType,
         messageId: record.messageId,
       });
     } catch (error) {
-      this.ctx.logger.error('Error persisting message to S3', error, {
+      this.logger.error('Error persisting message to S3', error, {
         messageType: record.messageType,
         messageId: record.messageId,
       });
@@ -65,7 +66,7 @@ class MessageLoggerService {
 }
 
 export async function logSentMessage(
-  ctx: AppContext,
+  logger: Logger,
   messageId: string | undefined,
   messageType: MessageType,
   recipient: string,
@@ -87,7 +88,7 @@ export async function logSentMessage(
     metadata,
   };
 
-  const messageLogger = new MessageLoggerService(ctx);
+  const messageLogger = new MessageLoggerService(logger);
   await messageLogger.logAndPersist(record);
 }
 

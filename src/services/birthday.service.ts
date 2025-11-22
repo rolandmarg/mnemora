@@ -13,10 +13,19 @@ import {
   endOfYear,
 } from '../utils/date-helpers.util.js';
 import { AlertingService } from './alerting.service.js';
-import type { AppContext } from '../app-context.js';
+import type { Logger } from '../types/logger.types.js';
+import type { AppConfig } from '../config.js';
 import type { BirthdayRecord } from '../types/birthday.types.js';
 import type { OutputChannel } from '../output-channel/output-channel.interface.js';
 import type { WriteResult } from '../data-source/data-source.interface.js';
+import calendarClientDefault from '../clients/google-calendar.client.js';
+import xrayClientDefault from '../clients/xray.client.js';
+import snsClientDefault from '../clients/sns.client.js';
+import cloudWatchMetricsClientDefault from '../clients/cloudwatch.client.js';
+import sheetsClientDefault from '../clients/google-sheets.client.js';
+
+type CalendarClient = typeof calendarClientDefault;
+type XRayClient = typeof xrayClientDefault;
 
 const BIRTHDAY_EMOJIS = ['🎂', '🎉', '🎈', '🎁', '🎊', '🥳', '🎀', '🎆', '🎇', '✨', '🌟', '💫', '🎪', '🎭', '🎨', '🎵', '🎶', '🎸', '🎹', '🎺', '🎻', '🥁', '🎤', '🎧', '🎬', '🎮', '🎯', '🎲', '🎰', '🎳'];
 
@@ -31,14 +40,19 @@ class BirthdayService {
   private readonly sheetsSource: ReturnType<typeof DataSourceFactory.createSheetsDataSource>;
   private readonly metrics: MetricsCollector;
 
-  constructor(private readonly ctx: AppContext) {
-    this.calendarSource = DataSourceFactory.createCalendarDataSource(ctx);
-    this.sheetsSource = DataSourceFactory.createSheetsDataSource(ctx);
-    this.metrics = new MetricsCollector(ctx);
+  constructor(
+    private readonly logger: Logger,
+    private readonly config: AppConfig,
+    _calendarClient: CalendarClient,
+    private readonly xrayClient: XRayClient
+  ) {
+    this.calendarSource = DataSourceFactory.createCalendarDataSource(config, _calendarClient, logger);
+    this.sheetsSource = DataSourceFactory.createSheetsDataSource(config, sheetsClientDefault, logger);
+    this.metrics = new MetricsCollector(logger, config, cloudWatchMetricsClientDefault);
   }
 
   async getTodaysBirthdays(): Promise<BirthdayRecord[]> {
-    return this.ctx.clients.xray.captureAsyncSegment('BirthdayService.getTodaysBirthdays', async () => {
+    return this.xrayClient.captureAsyncSegment('BirthdayService.getTodaysBirthdays', async () => {
       const startTime = Date.now();
       try {
         const todayDate = today();
@@ -52,7 +66,7 @@ class BirthdayService {
         const apiDuration = Date.now() - startTime;
         trackApiCall(this.metrics, 'calendar', false, apiDuration);
         trackOperationDuration(this.metrics, 'getTodaysBirthdays', Date.now() - startTime, { success: 'false' });
-        this.ctx.logger.error('Error getting today\'s birthdays', error);
+        this.logger.error('Error getting today\'s birthdays', error);
         
         // Determine error type and send appropriate alert
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -60,7 +74,7 @@ class BirthdayService {
         const isQuotaError = errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate limit');
         const isNetworkError = errorMessage.includes('timeout') || errorMessage.includes('ECONNREFUSED') || errorMessage.includes('network');
         
-        const alerting = new AlertingService(this.ctx);
+        const alerting = new AlertingService(this.logger, this.config, snsClientDefault);
         if (isAuthError) {
           alerting.sendGoogleCalendarApiFailedAlert(error, {
             errorType: 'authentication',
@@ -91,7 +105,7 @@ class BirthdayService {
   }
 
   formatMonthlyDigest(monthlyBirthdays: BirthdayRecord[]): string {
-    return this.ctx.clients.xray.captureSyncSegment('BirthdayService.formatMonthlyDigest', () => {
+    return this.xrayClient.captureSyncSegment('BirthdayService.formatMonthlyDigest', () => {
       if (monthlyBirthdays.length === 0) {
         const todayDate = today();
         const monthName = formatDateMonthYear(todayDate);
@@ -176,7 +190,7 @@ class BirthdayService {
     } catch (error) {
       trackApiCall(this.metrics, 'calendar', false);
       trackOperationDuration(this.metrics, 'getTodaysBirthdaysWithMonthlyDigest', Date.now() - startTime, { success: 'false' });
-      this.ctx.logger.error('Error getting today\'s birthdays and monthly digest', error);
+      this.logger.error('Error getting today\'s birthdays and monthly digest', error);
       
       // Determine error type and send appropriate alert
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -184,7 +198,7 @@ class BirthdayService {
       const isQuotaError = errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate limit');
       const isNetworkError = errorMessage.includes('timeout') || errorMessage.includes('ECONNREFUSED') || errorMessage.includes('network');
       
-      const alerting = new AlertingService(this.ctx);
+      const alerting = new AlertingService(this.logger, this.config, snsClientDefault);
       if (isAuthError) {
         alerting.sendGoogleCalendarApiFailedAlert(error, {
           errorType: 'authentication',
@@ -212,7 +226,7 @@ class BirthdayService {
   }
 
   async getBirthdays(startDate: Date, endDate: Date): Promise<BirthdayRecord[]> {
-    return this.ctx.clients.xray.captureAsyncSegment('BirthdayService.getBirthdays', async () => {
+    return this.xrayClient.captureAsyncSegment('BirthdayService.getBirthdays', async () => {
       const startTime = Date.now();
       try {
         trackApiCall(this.metrics, 'calendar', true);
@@ -223,7 +237,7 @@ class BirthdayService {
       } catch (error) {
         trackApiCall(this.metrics, 'calendar', false);
         trackOperationDuration(this.metrics, 'getBirthdays', Date.now() - startTime, { success: 'false' });
-        this.ctx.logger.error('Error getting birthdays', error);
+        this.logger.error('Error getting birthdays', error);
         
         // Determine error type and send appropriate alert
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -231,7 +245,7 @@ class BirthdayService {
         const isQuotaError = errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate limit');
         const isNetworkError = errorMessage.includes('timeout') || errorMessage.includes('ECONNREFUSED') || errorMessage.includes('network');
         
-        const alerting = new AlertingService(this.ctx);
+        const alerting = new AlertingService(this.logger, this.config, snsClientDefault);
         if (isAuthError) {
           alerting.sendGoogleCalendarApiFailedAlert(error, {
             errorType: 'authentication',
@@ -276,7 +290,7 @@ class BirthdayService {
     } catch (error) {
       trackApiCall(this.metrics, 'sheets', false);
       trackOperationDuration(this.metrics, 'readFromSheets', Date.now() - startTime, { success: 'false' });
-      this.ctx.logger.error('Error reading from sheets', error);
+      this.logger.error('Error reading from sheets', error);
       throw error;
     }
   }
@@ -291,32 +305,32 @@ class BirthdayService {
       }
       return await this.calendarSource.write(birthdays);
     } catch (error) {
-      this.ctx.logger.error('Error syncing to calendar', error);
+      this.logger.error('Error syncing to calendar', error);
       throw error;
     }
   }
 
   async trySyncFromSheets(): Promise<void> {
-    return this.ctx.clients.xray.captureAsyncSegment('BirthdayService.trySyncFromSheets', async () => {
+    return this.xrayClient.captureAsyncSegment('BirthdayService.trySyncFromSheets', async () => {
       try {
         if (!this.sheetsSource.isAvailable()) {
-          this.ctx.logger.info('Sheets not configured, skipping sync');
+          this.logger.info('Sheets not configured, skipping sync');
           return;
         }
 
-        this.ctx.logger.info('Attempting to sync birthdays from Sheets to Calendar...');
+        this.logger.info('Attempting to sync birthdays from Sheets to Calendar...');
 
         const sheetBirthdays = await this.readFromSheets();
         const writeResult = await this.syncToCalendar(sheetBirthdays);
 
-        this.ctx.logger.info('Successfully synced birthdays from Sheets to Calendar', {
+        this.logger.info('Successfully synced birthdays from Sheets to Calendar', {
           added: writeResult.added,
           skipped: writeResult.skipped,
           errors: writeResult.errors,
         });
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        this.ctx.logger.warn('Failed to sync from Sheets to Calendar', {
+        this.logger.warn('Failed to sync from Sheets to Calendar', {
           error: errorMessage,
         });
       }
@@ -334,13 +348,13 @@ class BirthdayService {
       
       return await this.calendarSource.read({ startDate: yearStart, endDate: yearEnd });
     } catch (error) {
-      this.ctx.logger.error('Error getting all birthdays for year', error);
+      this.logger.error('Error getting all birthdays for year', error);
       throw error;
     }
   }
 
   formatTodaysBirthdayMessages(birthdays: BirthdayRecord[]): string[] {
-    return this.ctx.clients.xray.captureSyncSegment('BirthdayService.formatTodaysBirthdayMessages', () => {
+    return this.xrayClient.captureSyncSegment('BirthdayService.formatTodaysBirthdayMessages', () => {
       if (birthdays.length === 0) {
         return [];
       }
@@ -427,7 +441,7 @@ class BirthdayService {
       
       await outputChannel.send('\n✅ Completed successfully!');
     } catch (error) {
-      this.ctx.logger.error('Error formatting and sending birthdays', error);
+      this.logger.error('Error formatting and sending birthdays', error);
       throw error;
     }
   }

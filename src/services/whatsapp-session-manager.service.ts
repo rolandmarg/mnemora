@@ -8,32 +8,29 @@
 
 import { StorageService } from './storage.service.js';
 import { isLambda } from '../utils/runtime.util.js';
-import type { AppContext } from '../app-context.js';
+import type { Logger } from '../types/logger.types.js';
 
 export class WhatsAppSessionManagerService {
   private readonly storage = StorageService.getSessionStorage();
-  private readonly isLambda: boolean;
 
-  constructor(private readonly ctx: AppContext) {
-    this.isLambda = isLambda();
-  }
+  constructor(private readonly logger: Logger) {}
 
   /**
    * Sync session from S3 to local filesystem.
    * Should be called before initializing the WhatsApp client in Lambda.
    */
   async syncSessionFromS3(sessionPath: string): Promise<void> {
-    if (!this.isLambda) {
+    if (!isLambda()) {
       // Not needed in local development
       return;
     }
 
     try {
       await this.storage.syncFromS3(sessionPath);
-      this.ctx.logger.info('WhatsApp session synced from S3');
+      this.logger.info('WhatsApp session synced from S3');
     } catch (error) {
       // Log but don't fail - session might not exist yet (first run)
-      this.ctx.logger.warn('Failed to sync session from S3 (this is normal on first run)', {
+      this.logger.warn('Failed to sync session from S3 (this is normal on first run)', {
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -44,17 +41,17 @@ export class WhatsAppSessionManagerService {
    * Should be called at the end of execution to save session state.
    */
   async syncSessionToS3(sessionPath: string): Promise<void> {
-    if (!this.isLambda) {
+    if (!isLambda()) {
       // Not needed in local development
       return;
     }
 
     try {
       await this.storage.syncToS3(sessionPath);
-      this.ctx.logger.info('WhatsApp session synced to S3');
+      this.logger.info('WhatsApp session synced to S3');
     } catch (error) {
       // Log but don't fail - session is still usable locally
-      this.ctx.logger.warn('Failed to sync session to S3', {
+      this.logger.warn('Failed to sync session to S3', {
         error: error instanceof Error ? error.message : String(error),
       });
     }
