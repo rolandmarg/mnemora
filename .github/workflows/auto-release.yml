@@ -30,17 +30,6 @@ jobs:
       - name: Install dependencies
         run: yarn install --immutable
       
-      - name: Setup GitHub CLI
-        uses: actions4gh/setup-gh@v1
-        with:
-          gh-version: 'latest'
-      
-      - name: Authenticate GitHub CLI
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "$GH_TOKEN" | gh auth login --with-token
-      
       - name: Configure git
         run: |
           git config user.name "github-actions[bot]"
