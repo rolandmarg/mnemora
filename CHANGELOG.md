@@ -16,6 +16,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+---
+## [1.0.9] - 2025-11-25
+
+## What's Changed
+
+### 🔧 Chores
+
+- Update import paths in whatsapp.client.ts to include .js extension (4e78438)
+
+**Full Changelog**: v1.0.8...v1.0.9
+
 ---
 ## [1.0.8] - 2025-11-25
 
