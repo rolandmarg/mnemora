@@ -15,6 +15,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+---
+## [1.0.8] - 2025-11-25
+
+## What's Changed
+
+### ✨ Features
+
+- Enhance alerting service with human-readable timestamps (cf5cfba)
+
+**Full Changelog**: v1.0.7...v1.0.8
+
 ---
 ## [1.0.7] - 2025-11-22
 
