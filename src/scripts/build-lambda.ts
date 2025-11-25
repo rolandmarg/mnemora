@@ -162,33 +162,6 @@ if (existsSync(distNodeModules)) {
     removeIfExists(join(distNodeModules, provider));
   }
   
-  // Clean up googleapis
-  const googleapisDir = join(distNodeModules, 'googleapis');
-  if (existsSync(googleapisDir)) {
-    console.log('   Cleaning googleapis (removing unused API modules, saves ~191MB)...');
-    const apisDir = join(googleapisDir, 'build/src/apis');
-    if (existsSync(apisDir)) {
-      try {
-        execSync(`find "${apisDir}" -mindepth 1 -maxdepth 1 -type d ! -name "calendar" ! -name "sheets" -exec rm -rf {} +`, {
-          stdio: 'pipe'
-        });
-      } catch {
-        // Ignore errors
-      }
-    }
-    removeFiles('*.ts', googleapisDir);
-    removeFiles('*.d.ts', googleapisDir);
-    removeFiles('*.map', googleapisDir);
-    removeDirs('test', googleapisDir);
-    removeDirs('tests', googleapisDir);
-    removeDirs('__tests__', googleapisDir);
-    removeDirs('docs', googleapisDir);
-    removeDirs('examples', googleapisDir);
-    removeFiles('*.md', googleapisDir);
-    removeFiles('CHANGELOG*', googleapisDir);
-    removeFiles('LICENSE*', googleapisDir);
-  }
-  
   // Remove TypeScript definition files
   console.log('   Removing TypeScript definition files...');
   removeFiles('*.d.ts', distNodeModules);

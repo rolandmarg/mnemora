@@ -1,4 +1,6 @@
-import { google, type sheets_v4 } from 'googleapis';
+import { sheets } from '@googleapis/sheets';
+import type { sheets_v4 } from '@googleapis/sheets';
+import { JWT } from 'google-auth-library';
 import { config } from '../config.js';
 import xrayClient from './xray.client.js';
 
@@ -27,12 +29,12 @@ class GoogleSheetsClient {
 
     this._spreadsheetId = spreadsheetId;
 
-    const auth = new google.auth.JWT({
+    const auth = new JWT({
       email: clientEmail,
       key: privateKey,
       scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
     });
-    this._sheets = google.sheets({ version: 'v4', auth });
+    this._sheets = sheets({ version: 'v4' as const, auth: auth as any });
 
     this._initialized = true;
   }
@@ -68,7 +70,7 @@ class GoogleSheetsClient {
         throw new Error('No sheets found in spreadsheet');
       }
 
-      this.cachedSheetName = sheets[0].properties?.title ?? 'Sheet1';
+      this.cachedSheetName = sheets[0]?.properties?.title ?? 'Sheet1';
       return this.cachedSheetName;
     }, {
       spreadsheetId: this.spreadsheetId,

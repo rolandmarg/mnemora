@@ -1,4 +1,6 @@
-import { google, type calendar_v3 } from 'googleapis';
+import { calendar } from '@googleapis/calendar';
+import type { calendar_v3 } from '@googleapis/calendar';
+import { JWT } from 'google-auth-library';
 import { auditDeletionAttempt, SecurityError } from '../utils/security.util.js';
 import { startOfDay, endOfDay } from '../utils/date-helpers.util.js';
 import { logger } from '../utils/logger.util.js';
@@ -64,19 +66,19 @@ class GoogleCalendarClient extends BaseClient {
 
     this._calendarId = calendarId;
 
-    const readOnlyAuth = new google.auth.JWT({
+    const readOnlyAuth = new JWT({
       email: clientEmail,
       key: privateKey,
       scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
     });
-    this._readOnlyCalendar = google.calendar({ version: 'v3', auth: readOnlyAuth });
+    this._readOnlyCalendar = calendar({ version: 'v3' as const, auth: readOnlyAuth as any });
 
-    const readWriteAuth = new google.auth.JWT({
+    const readWriteAuth = new JWT({
       email: clientEmail,
       key: privateKey,
       scopes: ['https://www.googleapis.com/auth/calendar'],
     });
-    this._readWriteCalendar = google.calendar({ version: 'v3', auth: readWriteAuth });
+    this._readWriteCalendar = calendar({ version: 'v3' as const, auth: readWriteAuth as any });
 
     this._initialized = true;
   }
@@ -130,13 +132,13 @@ class GoogleCalendarClient extends BaseClient {
         singleEvents: true,
         orderBy: 'startTime',
         ...(maxResults && { maxResults }),
-      }).then(response => {
+      }).then((response) => {
         const items = response.data.items ?? [];
         logger.info(`Google Calendar API returned ${items.length} event(s)`, {
           timeMin: timeMinUTC.toISOString(),
           timeMax: timeMaxUTC.toISOString(),
           calendarId: this.calendarId,
-          sampleEvents: items.slice(0, 3).map(e => ({
+          sampleEvents: items.slice(0, 3).map((e: CalendarEvent) => ({
             summary: e.summary,
             start: e.start?.date ?? e.start?.dateTime,
             recurrence: e.recurrence,
@@ -151,7 +153,7 @@ class GoogleCalendarClient extends BaseClient {
       const startDateStr = `${startYear}-${String(startMonth + 1).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
       const endDateStr = `${endYear}-${String(endMonth + 1).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
       
-      const filteredEvents = calendarEvents.filter(event => {
+      const filteredEvents = calendarEvents.filter((event: CalendarEvent) => {
         if (event.start?.date) {
           // All-day event: check if the date is within the range (inclusive)
           const eventDate = event.start.date;

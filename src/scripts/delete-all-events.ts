@@ -13,7 +13,8 @@
 
 import { logger } from '../utils/logger.util.js';
 import { auditDeletionAttempt } from '../utils/security.util.js';
-import { google } from 'googleapis';
+import { calendar } from '@googleapis/calendar';
+import { JWT } from 'google-auth-library';
 import { config } from '../config.js';
 
 interface EventWithRecurrence {
@@ -50,13 +51,13 @@ async function getAllEvents(): Promise<EventWithRecurrence[]> {
     singleEvents: false,
   });
 
-  const auth = new google.auth.JWT({
+  const auth = new JWT({
     email: clientEmail,
     key: privateKey,
     scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
   });
 
-  const calendar = google.calendar({ version: 'v3', auth });
+  const calendarClient = calendar({ version: 'v3' as const, auth: auth as any });
 
   // Fetch all events (Google Calendar API limit is 2500 per request)
   // Using singleEvents: false to get master recurring events directly (not expanded instances)
@@ -65,7 +66,7 @@ async function getAllEvents(): Promise<EventWithRecurrence[]> {
 
   while (true) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const response = await calendar.events.list({
+    const response = await calendarClient.events.list({
       calendarId: calendarId || 'primary',
       timeMin: yearStart.toISOString(),
       timeMax: yearEnd.toISOString(),
@@ -186,20 +187,20 @@ async function deleteEvent(eventId: string, summary: string, maxRetries = 5): Pr
     throw new Error('Google Calendar credentials not configured');
   }
 
-  const auth = new google.auth.JWT({
+  const auth = new JWT({
     email: clientEmail,
     key: privateKey,
     scopes: ['https://www.googleapis.com/auth/calendar'],
   });
 
-  const calendar = google.calendar({ version: 'v3', auth });
+  const calendarClient = calendar({ version: 'v3' as const, auth: auth as any });
 
   let attempt = 0;
   let lastError: unknown;
 
   while (attempt < maxRetries) {
     try {
-      await calendar.events.delete({
+      await calendarClient.events.delete({
         calendarId: calendarId || 'primary',
         eventId,
       });
