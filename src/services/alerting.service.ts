@@ -5,6 +5,7 @@ import type { Logger } from '../types/logger.types.js';
 import type { AppConfig } from '../config.js';
 import type { AlertState, AlertDetails } from '../types/alerting.types.js';
 import snsClientDefault from '../clients/sns.client.js';
+import { formatTimestampHumanReadable } from '../utils/date-helpers.util.js';
 
 type SNSClient = typeof snsClientDefault;
 
@@ -166,10 +167,10 @@ export class AlertingService {
   private formatAlertMessage(details: AlertDetails, alertState: AlertState): string {
     const correlationId = getCorrelationId();
     const logsUrl = getCloudWatchLogsUrl(this.config);
-    const now = new Date().toISOString();
+    const now = new Date();
 
     let message = `[${details.severity}] ${details.title}\n\n`;
-    message += `Time: ${now}\n`;
+    message += `Time: ${formatTimestampHumanReadable(now)}\n`;
     
     if (correlationId) {
       message += `Correlation ID: ${correlationId}\n`;
@@ -196,7 +197,7 @@ export class AlertingService {
     }
 
     if (alertState.count > 1) {
-      message += `\nThis alert has occurred ${alertState.count} time(s) since ${alertState.firstOccurred}\n`;
+      message += `\nThis alert has occurred ${alertState.count} time(s) since ${formatTimestampHumanReadable(alertState.firstOccurred)}\n`;
     }
 
     if (details.remediationSteps && details.remediationSteps.length > 0) {
@@ -295,7 +296,7 @@ export class AlertingService {
       if (critical.length > 0) {
         summary += `🚨 CRITICAL (${critical.length}):\n`;
         critical.forEach(alert => {
-          summary += `  - ${alert.alertId}: ${alert.count} occurrence(s) since ${alert.firstOccurred}\n`;
+          summary += `  - ${alert.alertId}: ${alert.count} occurrence(s) since ${formatTimestampHumanReadable(alert.firstOccurred)}\n`;
         });
         summary += '\n';
       }
@@ -303,7 +304,7 @@ export class AlertingService {
       if (warnings.length > 0) {
         summary += `⚠️  WARNING (${warnings.length}):\n`;
         warnings.forEach(alert => {
-          summary += `  - ${alert.alertId}: ${alert.count} occurrence(s) since ${alert.firstOccurred}\n`;
+          summary += `  - ${alert.alertId}: ${alert.count} occurrence(s) since ${formatTimestampHumanReadable(alert.firstOccurred)}\n`;
         });
         summary += '\n';
       }
@@ -311,7 +312,7 @@ export class AlertingService {
       if (info.length > 0) {
         summary += `ℹ️  INFO (${info.length}):\n`;
         info.forEach(alert => {
-          summary += `  - ${alert.alertId}: ${alert.count} occurrence(s) since ${alert.firstOccurred}\n`;
+          summary += `  - ${alert.alertId}: ${alert.count} occurrence(s) since ${formatTimestampHumanReadable(alert.firstOccurred)}\n`;
         });
         summary += '\n';
       }

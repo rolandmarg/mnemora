@@ -184,3 +184,16 @@ export function getDateInTimezone(date: Date): number {
   const zonedDate = dayjs(date).tz(tz);
   return zonedDate.date(); // dayjs.date() returns 1-31
 }
+
+/**
+ * Format a timestamp in a human-readable format in the configured timezone.
+ * Example: "Nov 20, 2025 at 8:18 AM PST" or "Nov 20, 2025 at 9:18 AM PDT"
+ */
+export function formatTimestampHumanReadable(timestamp: string | Date): string {
+  const tz = getTimezone();
+  const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
+  const zonedDate = dayjs(date).tz(tz);
+  
+  // Format: "Nov 20, 2025 at 8:18 AM PST"
+  return zonedDate.format('MMM D, YYYY [at] h:mm A z');
+}
