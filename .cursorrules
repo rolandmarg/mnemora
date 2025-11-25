@@ -66,6 +66,10 @@ You are an expert in TypeScript, Node.js.
 ### Imports
 - Always use `.js` extension in import paths (TypeScript requirement for ESM)
 - Example: `import { config } from '../config.js';`
+- **CRITICAL for Runtime**: Subpath imports from node_modules packages MUST also include `.js` extension
+  - ✅ Correct: `import baileysLogger from '@whiskeysockets/baileys/lib/Utils/logger.js';`
+  - ❌ Wrong: `import baileysLogger from '@whiskeysockets/baileys/lib/Utils/logger';` (will fail at runtime in Lambda)
+  - Main package imports (e.g., `from '@whiskeysockets/baileys'`) don't need extension, but subpath imports do
 - Group imports: external packages, then internal modules
 
 ### Naming Conventions

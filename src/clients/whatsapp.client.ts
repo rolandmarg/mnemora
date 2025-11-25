@@ -6,7 +6,7 @@ import makeWASocket, {
   makeCacheableSignalKeyStore,
   ConnectionState,
 } from '@whiskeysockets/baileys';
-import baileysLogger from '@whiskeysockets/baileys/lib/Utils/logger';
+import baileysLogger from '@whiskeysockets/baileys/lib/Utils/logger.js';
 import { existsSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import qrcode from 'qrcode-terminal';
