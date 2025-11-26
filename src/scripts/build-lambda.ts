@@ -5,7 +5,7 @@
  */
 
 import { execSync } from 'node:child_process';
-import { existsSync, rmSync, cpSync, readFileSync } from 'node:fs';
+import { existsSync, rmSync, cpSync, readFileSync, appendFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 // Get project root - scripts are run from project root, so use process.cwd()
@@ -69,6 +69,21 @@ exec('yarn build');
 console.log('Copying files to dist...');
 cpSync(join(PROJECT_ROOT, 'package.json'), join(PROJECT_ROOT, 'dist/package.json'));
 cpSync(join(PROJECT_ROOT, 'yarn.lock'), join(PROJECT_ROOT, 'dist/yarn.lock'));
+
+// Update .npmrc to disable git-based versioning (prevents SAM npm pack errors)
+// The new @googleapis packages (replacing googleapis) may trigger git checks during pack
+// When SAM copies dist to a temp directory, .git doesn't exist, causing pack to fail
+const npmrcPath = join(PROJECT_ROOT, 'dist/.npmrc');
+const npmrcContent = existsSync(npmrcPath) 
+  ? readFileSync(npmrcPath, 'utf-8') 
+  : '';
+// Only add git settings if not already present
+if (!npmrcContent.includes('git-tag-version=false') && !npmrcContent.includes('pack-git=false')) {
+  const separator = npmrcContent && !npmrcContent.endsWith('\n') ? '\n' : '';
+  appendFileSync(npmrcPath, `${separator}# Disable git-based versioning for SAM builds\n` + 
+    `git-tag-version=false\n` + 
+    `pack-git=false\n`, 'utf-8');
+}
 
 // Remove old node_modules to ensure clean install
 const distNodeModules = join(PROJECT_ROOT, 'dist/node_modules');
