@@ -5,7 +5,7 @@
  */
 
 import { execSync } from 'node:child_process';
-import { existsSync, rmSync, cpSync, readFileSync } from 'node:fs';
+import { existsSync, rmSync, cpSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 // Get project root - scripts are run from project root, so use process.cwd()
@@ -69,6 +69,20 @@ exec('yarn build');
 console.log('Copying files to dist...');
 cpSync(join(PROJECT_ROOT, 'package.json'), join(PROJECT_ROOT, 'dist/package.json'));
 cpSync(join(PROJECT_ROOT, 'yarn.lock'), join(PROJECT_ROOT, 'dist/yarn.lock'));
+
+// Create empty .git directory as workaround for SAM's NodejsNpmBuilder bug
+// npm pack outputs ".git can't be found" message when .git is missing
+// SAM's NodejsNpmBuilder misinterprets this message as a file path and fails
+// Creating empty .git prevents npm pack from outputting the message
+// This is a SAM bug, not an npm bug - upgrading npm won't fix it
+console.log('Creating empty .git directory as workaround for SAM NodejsNpmBuilder...');
+const distGitDir = join(PROJECT_ROOT, 'dist/.git');
+if (!existsSync(distGitDir)) {
+  execSync(`mkdir -p "${distGitDir}"`, { cwd: PROJECT_ROOT, stdio: 'pipe' });
+  // Create a minimal .git/config file so npm pack recognizes it as a git repo
+  writeFileSync(join(distGitDir, 'config'), '[core]\n\trepositoryformatversion = 0\n');
+  console.log('✅ Empty .git directory created');
+}
 
 // Remove old node_modules to ensure clean install
 const distNodeModules = join(PROJECT_ROOT, 'dist/node_modules');

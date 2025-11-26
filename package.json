@@ -44,6 +44,21 @@
     "node": ">=24.0.0",
     "yarn": ">=4.11.0"
   },
+  "files": [
+    "*.js",
+    "clients/",
+    "data-source/",
+    "lambda/",
+    "output-channel/",
+    "services/",
+    "types/",
+    "utils/",
+    "config.js",
+    "index.js",
+    "package.json",
+    "yarn.lock",
+    "node_modules/"
+  ],
   "_deploymentRequirements": {
     "aws-sam-cli": ">=1.148.0",
     "note": "SAM CLI 1.148.0+ required for nodejs24.x runtime support. Checked automatically in deploy.sh"
