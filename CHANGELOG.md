@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial changelog
 
 
+
+---
+## [1.0.12] - 2025-11-26
+
+## What's Changed
+
+### 🔧 Chores
+
+- Update build-lambda script to disable git-based versioning for SAM builds (151c2de)
+
+**Full Changelog**: v1.0.11...v1.0.12
+
 ---
 ## [1.0.11] - 2025-11-26
 
