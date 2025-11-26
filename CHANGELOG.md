@@ -10,6 +10,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial changelog
 
+
+---
+## [1.0.11] - 2025-11-26
+
+## What's Changed
+
+### 🔧 Chores
+
+- Update Google API dependencies and refactor imports (ff466f7)
+
+### 📦 Other Changes
+
+- Add pre-commit hook with auto-fix aligned with CI pipeline (43ac775)
+
+**Full Changelog**: v1.0.10...v1.0.11
+
 ---
 
 ## [1.0.10] - 2025-11-25
