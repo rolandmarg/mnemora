@@ -18,6 +18,7 @@ class GoogleSheetsClient {
     const clientEmail = config.google.clientEmail;
     const privateKey = config.google.privateKey;
     const spreadsheetId = config.google.spreadsheetId;
+    const projectId = config.google.projectId;
     
     if (!clientEmail || !privateKey) {
       throw new Error('Google Sheets credentials not configured. Please set GOOGLE_CLIENT_EMAIL and GOOGLE_PRIVATE_KEY in .env');
@@ -33,6 +34,7 @@ class GoogleSheetsClient {
       email: clientEmail,
       key: privateKey,
       scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+      ...(projectId && { projectId }),
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this._sheets = sheets({ version: 'v4' as const, auth: auth as any });

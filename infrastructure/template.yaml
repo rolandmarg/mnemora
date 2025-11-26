@@ -157,7 +157,6 @@ Resources:
           GOOGLE_PROJECT_ID: !Ref GoogleProjectId
           GOOGLE_SPREADSHEET_ID: !If [HasSpreadsheetId, !Ref GoogleSpreadsheetId, '']
           WHATSAPP_GROUP_ID: !Ref WhatsAppGroupId
-          SCHEDULE_TIME: '09:00'
           TIMEZONE: 'America/Los_Angeles'
           AWS_S3_BUCKET: !Ref SessionStorageBucket
           AWS_CLOUDWATCH_LOG_GROUP: !Sub '/aws/lambda/mnemora-birthday-bot-${Environment}'
@@ -208,9 +207,14 @@ Resources:
         DailySchedule:
           Type: Schedule
           Properties:
-            # 17:00 UTC = 10 AM PDT (most of year) or 9 AM PST (Nov-Mar)
-            # Note: EventBridge Rules don't support timezones, so this is approximate
-            # For exact 10 AM PST year-round, manually adjust to 18:00 UTC during standard time
+            # UTC → Pacific Time Conversion (EventBridge cron runs in UTC):
+            # - 17:00 UTC = 10:00 AM PDT (Pacific Daylight Time, Mar-Nov, UTC-7)
+            # - 17:00 UTC = 09:00 AM PST (Pacific Standard Time, Nov-Mar, UTC-8)
+            # Note: EventBridge Rules don't support timezones, so this is approximate.
+            # The cron runs at 17:00 UTC year-round, which translates to:
+            #   ~10 AM PDT during daylight saving (most of the year)
+            #   ~9 AM PST during standard time (Nov-Mar)
+            # This is the single source of truth for execution schedule.
             Schedule: cron(0 17 * * ? *)
             Description: Daily birthday check at 10 AM Pacific time (17:00 UTC, ~10 AM PDT most of year)
             Enabled: true

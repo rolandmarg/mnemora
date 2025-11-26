@@ -54,7 +54,6 @@ GOOGLE_SPREADSHEET_ID=your-spreadsheet-id
 WHATSAPP_GROUP_ID=your-group-name
 
 # Config
-SCHEDULE_TIME=09:00
 TIMEZONE=America/Los_Angeles
 ```
 

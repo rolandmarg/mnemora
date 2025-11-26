@@ -34,6 +34,7 @@ async function getAllEvents(): Promise<EventWithRecurrence[]> {
   const clientEmail = config.google.clientEmail;
   const privateKey = config.google.privateKey;
   const calendarId = config.google.calendarId;
+  const projectId = config.google.projectId;
 
   if (!clientEmail || !privateKey) {
     throw new Error('Google Calendar credentials not configured');
@@ -55,6 +56,7 @@ async function getAllEvents(): Promise<EventWithRecurrence[]> {
     email: clientEmail,
     key: privateKey,
     scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+    ...(projectId && { projectId }),
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -183,6 +185,7 @@ async function deleteEvent(eventId: string, summary: string, maxRetries = 5): Pr
   const clientEmail = config.google.clientEmail;
   const privateKey = config.google.privateKey;
   const calendarId = config.google.calendarId;
+  const projectId = config.google.projectId;
 
   if (!clientEmail || !privateKey) {
     throw new Error('Google Calendar credentials not configured');
@@ -192,6 +195,7 @@ async function deleteEvent(eventId: string, summary: string, maxRetries = 5): Pr
     email: clientEmail,
     key: privateKey,
     scopes: ['https://www.googleapis.com/auth/calendar'],
+    ...(projectId && { projectId }),
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

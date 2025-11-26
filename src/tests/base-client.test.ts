@@ -48,7 +48,6 @@ const mockConfig: AppConfig = {
     groupId: undefined,
   },
   schedule: {
-    time: '09:00',
     timezone: 'America/Los_Angeles',
   },
   aws: {

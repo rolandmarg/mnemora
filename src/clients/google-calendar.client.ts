@@ -56,6 +56,7 @@ class GoogleCalendarClient extends BaseClient {
     const clientEmail = this.config.google.clientEmail;
     const privateKey = this.config.google.privateKey;
     const calendarId = this.config.google.calendarId;
+    const projectId = this.config.google.projectId;
     
     if (!clientEmail || !privateKey) {
       throw this.createError(
@@ -70,6 +71,7 @@ class GoogleCalendarClient extends BaseClient {
       email: clientEmail,
       key: privateKey,
       scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+      ...(projectId && { projectId }),
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this._readOnlyCalendar = calendar({ version: 'v3' as const, auth: readOnlyAuth as any });
@@ -78,6 +80,7 @@ class GoogleCalendarClient extends BaseClient {
       email: clientEmail,
       key: privateKey,
       scopes: ['https://www.googleapis.com/auth/calendar'],
+      ...(projectId && { projectId }),
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this._readWriteCalendar = calendar({ version: 'v3' as const, auth: readWriteAuth as any });
