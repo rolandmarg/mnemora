@@ -71,6 +71,7 @@ class GoogleCalendarClient extends BaseClient {
       key: privateKey,
       scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
     });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this._readOnlyCalendar = calendar({ version: 'v3' as const, auth: readOnlyAuth as any });
 
     const readWriteAuth = new JWT({
@@ -78,6 +79,7 @@ class GoogleCalendarClient extends BaseClient {
       key: privateKey,
       scopes: ['https://www.googleapis.com/auth/calendar'],
     });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this._readWriteCalendar = calendar({ version: 'v3' as const, auth: readWriteAuth as any });
 
     this._initialized = true;

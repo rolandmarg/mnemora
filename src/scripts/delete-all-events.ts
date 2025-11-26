@@ -57,6 +57,7 @@ async function getAllEvents(): Promise<EventWithRecurrence[]> {
     scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const calendarClient = calendar({ version: 'v3' as const, auth: auth as any });
 
   // Fetch all events (Google Calendar API limit is 2500 per request)
@@ -193,6 +194,7 @@ async function deleteEvent(eventId: string, summary: string, maxRetries = 5): Pr
     scopes: ['https://www.googleapis.com/auth/calendar'],
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const calendarClient = calendar({ version: 'v3' as const, auth: auth as any });
 
   let attempt = 0;

@@ -34,6 +34,7 @@ class GoogleSheetsClient {
       key: privateKey,
       scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
     });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this._sheets = sheets({ version: 'v4' as const, auth: auth as any });
 
     this._initialized = true;
