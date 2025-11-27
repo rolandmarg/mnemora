@@ -5,9 +5,10 @@
  */
 
 import { execSync } from 'node:child_process';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
+import { tmpdir } from 'node:os';
 
 const PROJECT_ROOT = process.cwd();
 
@@ -511,8 +512,21 @@ async function release(versionType?: VersionType, specificVersion?: string): Pro
   // Create git tag
   printInfo('Creating git tag...');
   try {
-    exec(`git tag -a "${tag}" -m "Release ${tag}\n\n${releaseNotes}"`);
-    printSuccess(`Git tag created: ${tag}`);
+    // Use a temporary file for the tag message to handle multi-line release notes
+    const tagMessageFile = join(tmpdir(), `tag-message-${Date.now()}.txt`);
+    const tagMessage = `Release ${tag}\n\n${releaseNotes}`;
+    
+    try {
+      writeFileSync(tagMessageFile, tagMessage, 'utf-8');
+      exec(`git tag -a "${tag}" -F "${tagMessageFile}"`);
+      printSuccess(`Git tag created: ${tag}`);
+    } finally {
+      try {
+        unlinkSync(tagMessageFile);
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
   } catch (error) {
     printError(`Failed to create git tag: ${error instanceof Error ? error.message : 'Unknown error'}`);
     process.exit(1);
