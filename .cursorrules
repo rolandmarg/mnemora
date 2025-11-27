@@ -208,6 +208,7 @@ You are an expert in TypeScript, Node.js.
 - **Do NOT add JSDoc type comments** - TypeScript provides type information, JSDoc type annotations are redundant
 - **After significant changes**: Run `yarn test && yarn type-check && yarn lint` to ensure everything is working
 - **Keep `package.json` and `.vscode/launch.json` synchronized** - When adding scripts, update both files
+- **⚠️ Version Locking**: **ALL dependencies MUST be locked to exact versions** - NEVER use caret (`^`) or tilde (`~`) prefixes. Always use exact version numbers (e.g., `"package": "1.2.3"` not `"package": "^1.2.3"`). This ensures reproducible builds and prevents unexpected breaking changes in Lambda deployments.
 - **⚠️ Baileys Version Lock**: `@whiskeysockets/baileys` MUST be locked to exactly `6.7.21` (no `^` or `~`). Versions 6.17.16+ introduce audio decoder dependencies (~22MB) and lodash+libphonenumber-js (~10MB), increasing Lambda package size from ~37MB to ~60MB+. Always use exact version: `"@whiskeysockets/baileys": "6.7.21"`
 
 ## Deployment & Runtime

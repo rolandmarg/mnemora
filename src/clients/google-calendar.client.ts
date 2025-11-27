@@ -1,6 +1,4 @@
-import { calendar } from '@googleapis/calendar';
-import type { calendar_v3 } from '@googleapis/calendar';
-import { JWT } from 'google-auth-library';
+import { google, type calendar_v3 } from 'googleapis';
 import { auditDeletionAttempt, SecurityError } from '../utils/security.util.js';
 import { startOfDay, endOfDay } from '../utils/date-helpers.util.js';
 import { logger } from '../utils/logger.util.js';
@@ -56,7 +54,6 @@ class GoogleCalendarClient extends BaseClient {
     const clientEmail = this.config.google.clientEmail;
     const privateKey = this.config.google.privateKey;
     const calendarId = this.config.google.calendarId;
-    const projectId = this.config.google.projectId;
     
     if (!clientEmail || !privateKey) {
       throw this.createError(
@@ -67,23 +64,19 @@ class GoogleCalendarClient extends BaseClient {
 
     this._calendarId = calendarId;
 
-    const readOnlyAuth = new JWT({
+    const readOnlyAuth = new google.auth.JWT({
       email: clientEmail,
       key: privateKey,
       scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
-      ...(projectId && { projectId }),
     });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this._readOnlyCalendar = calendar({ version: 'v3' as const, auth: readOnlyAuth as any });
+    this._readOnlyCalendar = google.calendar({ version: 'v3', auth: readOnlyAuth });
 
-    const readWriteAuth = new JWT({
+    const readWriteAuth = new google.auth.JWT({
       email: clientEmail,
       key: privateKey,
       scopes: ['https://www.googleapis.com/auth/calendar'],
-      ...(projectId && { projectId }),
     });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this._readWriteCalendar = calendar({ version: 'v3' as const, auth: readWriteAuth as any });
+    this._readWriteCalendar = google.calendar({ version: 'v3', auth: readWriteAuth });
 
     this._initialized = true;
   }
@@ -104,16 +97,10 @@ class GoogleCalendarClient extends BaseClient {
     return this._readWriteCalendar;
   }
 
-  private get calendarId(): string {
-    this.initialize();
-    if (!this._calendarId) {
-      throw this.createError('GoogleCalendar', 'Calendar ID not initialized');
-    }
-    return this._calendarId;
-  }
-
   async fetchEvents(options: EventListOptions): Promise<Event[]> {
     const { startDate, endDate, maxResults } = options;
+    const calendarId = this._calendarId ?? this.config.google.calendarId;
+    
     return this.captureSegment('GoogleCalendar', 'fetchEvents', async () => {
       const start = startOfDay(startDate);
       const end = endOfDay(endDate);
@@ -130,49 +117,53 @@ class GoogleCalendarClient extends BaseClient {
       const timeMinUTC = new Date(Date.UTC(startYear, startMonth, startDay, 0, 0, 0, 0));
       const timeMaxUTC = new Date(Date.UTC(endYear, endMonth, endDay + 1, 0, 0, 0, 0));
 
-      const calendarEvents = await this.readOnlyCalendar.events.list({
-        calendarId: this.calendarId,
-        timeMin: timeMinUTC.toISOString(),
-        timeMax: timeMaxUTC.toISOString(),
-        singleEvents: true,
-        orderBy: 'startTime',
-        ...(maxResults && { maxResults }),
-      }).then((response) => {
-        const items = response.data.items ?? [];
-        logger.info(`Google Calendar API returned ${items.length} event(s)`, {
+      try {
+        const calendarEvents = await this.readOnlyCalendar.events.list({
+          calendarId,
           timeMin: timeMinUTC.toISOString(),
           timeMax: timeMaxUTC.toISOString(),
-          calendarId: this.calendarId,
-          sampleEvents: items.slice(0, 3).map((e: CalendarEvent) => ({
-            summary: e.summary,
-            start: e.start?.date ?? e.start?.dateTime,
-            recurrence: e.recurrence,
-          })),
+          singleEvents: true,
+          orderBy: 'startTime',
+          ...(maxResults && { maxResults }),
+        }).then((response: { data: { items?: CalendarEvent[] | null } }) => {
+          const items = response.data.items ?? [];
+          logger.info(`Google Calendar API returned ${items.length} event(s)`, {
+            timeMin: timeMinUTC.toISOString(),
+            timeMax: timeMaxUTC.toISOString(),
+            calendarId,
+            sampleEvents: items.slice(0, 3).map((e: CalendarEvent) => ({
+              summary: e.summary,
+              start: e.start?.date ?? e.start?.dateTime,
+              recurrence: e.recurrence,
+            })),
+          });
+          return items;
         });
-        return items;
-      });
 
-      // Filter events to only include those within the date range
-      // For all-day events (date-only), check if the date is within the range
-      // For timed events, they're already filtered by the API query
-      const startDateStr = `${startYear}-${String(startMonth + 1).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
-      const endDateStr = `${endYear}-${String(endMonth + 1).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
-      
-      const filteredEvents = calendarEvents.filter((event: CalendarEvent) => {
-        if (event.start?.date) {
-          // All-day event: check if the date is within the range (inclusive)
-          const eventDate = event.start.date;
-          return eventDate >= startDateStr && eventDate <= endDateStr;
-        }
-        // Timed event: already filtered by API query
-        return true;
-      });
+        // Filter events to only include those within the date range
+        // For all-day events (date-only), check if the date is within the range
+        // For timed events, they're already filtered by the API query
+        const startDateStr = `${startYear}-${String(startMonth + 1).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
+        const endDateStr = `${endYear}-${String(endMonth + 1).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
+        
+        const filteredEvents = calendarEvents.filter((event: CalendarEvent) => {
+          if (event.start?.date) {
+            // All-day event: check if the date is within the range (inclusive)
+            const eventDate = event.start.date;
+            return eventDate >= startDateStr && eventDate <= endDateStr;
+          }
+          // Timed event: already filtered by API query
+          return true;
+        });
 
-      const result = filteredEvents.map(calendarEventToEvent);
-      
-      return result;
+        const result = filteredEvents.map(calendarEventToEvent);
+        
+        return result;
+      } catch (error) {
+        throw error instanceof Error ? error : new Error(String(error));
+      }
     }, {
-      calendarId: this.calendarId,
+      calendarId,
       startDate: startDate.toISOString(),
       endDate: endDate.toISOString(),
       maxResults: maxResults ?? 'unlimited',
@@ -180,16 +171,18 @@ class GoogleCalendarClient extends BaseClient {
   }
 
   async deleteEvent(eventId: string): Promise<boolean> {
+    const calendarId = this._calendarId ?? this.config.google.calendarId;
     return this.captureSegment('GoogleCalendar', 'deleteEvent', async () => {
       auditDeletionAttempt(logger, 'GoogleCalendarClient.deleteEvent', { eventId });
       throw new SecurityError('Deletion of calendar events is disabled for security reasons');
     }, {
-      calendarId: this.calendarId,
+      calendarId,
       eventId,
     });
   }
 
   async deleteAllEvents(events: Event[]): Promise<DeletionResult> {
+    const calendarId = this._calendarId ?? this.config.google.calendarId;
     return this.captureSegment('GoogleCalendar', 'deleteAllEvents', async () => {
       auditDeletionAttempt(logger, 'GoogleCalendarClient.deleteAllEvents', {
         eventCount: events.length,
@@ -197,12 +190,14 @@ class GoogleCalendarClient extends BaseClient {
       });
       throw new SecurityError('Deletion of calendar events is disabled for security reasons');
     }, {
-      calendarId: this.calendarId,
+      calendarId,
       eventCount: events.length,
     });
   }
 
   async insertEvent(event: Event): Promise<{ id: string }> {
+    const calendarId = this._calendarId ?? this.config.google.calendarId;
+    
     return this.captureSegment('GoogleCalendar', 'insertEvent', async () => {
       const calendarEvent = {
         summary: event.summary,
@@ -214,18 +209,22 @@ class GoogleCalendarClient extends BaseClient {
         reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: 1440 }] },
       };
 
-      const response = await this.readWriteCalendar.events.insert({
-        calendarId: this.calendarId,
-        requestBody: calendarEvent,
-      });
+      try {
+        const response = await this.readWriteCalendar.events.insert({
+          calendarId,
+          requestBody: calendarEvent,
+        });
 
-      if (!response.data.id) {
-        throw this.createError('GoogleCalendar', 'Event created but no ID returned');
+        if (!response.data.id) {
+          throw this.createError('GoogleCalendar', 'Event created but no ID returned');
+        }
+
+        return { id: response.data.id };
+      } catch (error) {
+        throw error instanceof Error ? error : new Error(String(error));
       }
-
-      return { id: response.data.id };
     }, {
-      calendarId: this.calendarId,
+      calendarId,
       hasSummary: !!event.summary,
       hasRecurrence: !!event.recurrence,
     });

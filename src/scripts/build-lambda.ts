@@ -69,6 +69,17 @@ exec('yarn build');
 console.log('Copying files to dist...');
 cpSync(join(PROJECT_ROOT, 'package.json'), join(PROJECT_ROOT, 'dist/package.json'));
 cpSync(join(PROJECT_ROOT, 'yarn.lock'), join(PROJECT_ROOT, 'dist/yarn.lock'));
+// Copy Yarn 4 configuration and binary (required for SAM's yarn install)
+if (existsSync(join(PROJECT_ROOT, '.yarnrc.yml'))) {
+  cpSync(join(PROJECT_ROOT, '.yarnrc.yml'), join(PROJECT_ROOT, 'dist/.yarnrc.yml'));
+}
+// Copy only .yarn/releases/ (Yarn binary), not build artifacts like install-state.gz
+const yarnReleasesSrc = join(PROJECT_ROOT, '.yarn/releases');
+const yarnReleasesDest = join(PROJECT_ROOT, 'dist/.yarn/releases');
+if (existsSync(yarnReleasesSrc)) {
+  execSync(`mkdir -p "${join(PROJECT_ROOT, 'dist/.yarn')}"`, { cwd: PROJECT_ROOT, stdio: 'pipe' });
+  cpSync(yarnReleasesSrc, yarnReleasesDest, { recursive: true });
+}
 
 // Create empty .git directory as workaround for SAM's NodejsNpmBuilder bug
 // npm pack outputs ".git can't be found" message when .git is missing
@@ -174,6 +185,146 @@ if (existsSync(distNodeModules)) {
   
   for (const provider of unusedProviders) {
     removeIfExists(join(distNodeModules, provider));
+  }
+  
+  // Remove unused googleapis API modules (tree shaking)
+  // googleapis is modular - each API is a separate module
+  // We only need calendar and sheets, so remove all others
+  // CRITICAL: Must preserve apis/index.js file structure for module resolution
+  console.log('   Removing unused googleapis API modules (tree shaking)...');
+  const googleapisDir = join(distNodeModules, 'googleapis');
+  if (existsSync(googleapisDir)) {
+    const buildDir = join(googleapisDir, 'build');
+    if (existsSync(buildDir)) {
+      try {
+        // The apis directory is at build/src/apis
+        const apisDir = join(buildDir, 'src', 'apis');
+        if (existsSync(apisDir)) {
+          // List all API directories
+          const apiDirs = execSync(`ls -1 "${apisDir}"`, { encoding: 'utf-8' }).trim().split('\n').filter(Boolean);
+          // Keep only calendar and sheets
+          const apisToKeep = ['calendar', 'sheets'];
+          const removedApis: string[] = [];
+          for (const apiDir of apiDirs) {
+            if (!apisToKeep.includes(apiDir)) {
+              const apiPath = join(apisDir, apiDir);
+              if (existsSync(apiPath)) {
+                removeIfExists(apiPath);
+                removedApis.push(apiDir);
+              }
+            }
+          }
+          console.log(`   ✅ Removed ${removedApis.length} unused API modules (kept: ${apisToKeep.join(', ')})`);
+          
+          // Edit apis/index.js to remove require statements and exports for deleted APIs
+          const apisIndexPath = join(apisDir, 'index.js');
+          
+          // Ensure apis/index.js exists - copy from original if missing
+          if (!existsSync(apisIndexPath)) {
+            const originalIndexPath = join(PROJECT_ROOT, 'node_modules/googleapis/build/src/apis/index.js');
+            if (existsSync(originalIndexPath)) {
+              const originalContent = readFileSync(originalIndexPath, 'utf-8');
+              writeFileSync(apisIndexPath, originalContent, 'utf-8');
+              console.log('   ✅ Restored apis/index.js from original package');
+            } else {
+              console.log('   ⚠️  Warning: apis/index.js not found in original package, skipping tree shaking');
+              removedApis.length = 0; // Skip tree shaking if we can't find the original
+            }
+          }
+          
+          if (existsSync(apisIndexPath) && removedApis.length > 0) {
+            console.log('   Editing apis/index.js to remove references to deleted APIs...');
+            let indexContent = readFileSync(apisIndexPath, 'utf-8');
+            const originalContent = indexContent;
+            
+            // Remove require statements for deleted APIs
+            // Format: const apiName_1 = require("./apiName");
+            for (const api of removedApis) {
+              const escapedApi = api.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              // Match entire line with require statement (including any whitespace)
+              const requirePattern = new RegExp(`^\\s*const\\s+${escapedApi}_1\\s*=\\s*require\\(["']\\./${escapedApi}["']\\);\\s*$`, 'gm');
+              indexContent = indexContent.replace(requirePattern, '');
+            }
+            
+            // Remove entries from exports.APIS object
+            // Format: apiName: apiName_1.VERSIONS, (with or without trailing comma)
+            for (const api of removedApis) {
+              const escapedApi = api.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              // Match line with APIS export entry - handle trailing comma carefully
+              const apisExportPattern = new RegExp(`^\\s+${escapedApi}:\\s+${escapedApi}_1\\.VERSIONS,?\\s*$`, 'gm');
+              indexContent = indexContent.replace(apisExportPattern, '');
+            }
+            
+            // Remove properties from GeneratedAPIs class
+            // Format: apiName = apiName_1.apiName; (with or without semicolon)
+            for (const api of removedApis) {
+              const escapedApi = api.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              // Match line with class property
+              const apiPropertyPattern = new RegExp(`^\\s+${escapedApi}\\s*=\\s+${escapedApi}_1\\.${escapedApi};?\\s*$`, 'gm');
+              indexContent = indexContent.replace(apiPropertyPattern, '');
+            }
+            
+            // Validate: Check that the file still has valid structure
+            if (indexContent.length < 1000) {
+              console.log('   ⚠️  Warning: apis/index.js too small after editing, restoring original...');
+              indexContent = originalContent;
+            } else if (!indexContent.includes('exports.APIS = {')) {
+              console.log('   ⚠️  Warning: apis/index.js structure corrupted (missing exports.APIS), restoring original...');
+              indexContent = originalContent;
+            } else if (!indexContent.includes('class GeneratedAPIs')) {
+              console.log('   ⚠️  Warning: apis/index.js structure corrupted (missing GeneratedAPIs class), restoring original...');
+              indexContent = originalContent;
+            } else {
+              // Validate syntax by checking for calendar and sheets (should still be present)
+              if (!indexContent.includes('calendar_1') || !indexContent.includes('sheets_1')) {
+                console.log('   ⚠️  Warning: Required APIs missing from apis/index.js, restoring original...');
+                indexContent = originalContent;
+              } else {
+                writeFileSync(apisIndexPath, indexContent, 'utf-8');
+                console.log(`   ✅ Updated apis/index.js to remove ${removedApis.length} deleted API references`);
+              }
+            }
+          }
+        }
+        
+        // Remove generator directory (not needed at runtime)
+        const generatorDir = join(buildDir, 'src', 'generator');
+        if (existsSync(generatorDir)) {
+          removeIfExists(generatorDir);
+          console.log('   ✅ Removed googleapis generator directory');
+        }
+        
+        // Remove source TypeScript files (only need compiled JS)
+        const srcDir = join(buildDir, 'src');
+        if (existsSync(srcDir)) {
+          removeFiles('*.ts', srcDir);
+          console.log('   ✅ Removed TypeScript source files from googleapis');
+        }
+      } catch (error) {
+        console.log(`   ⚠️  Could not perform googleapis tree shaking: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    
+    // Remove other unnecessary files from googleapis root
+    removeFiles('*.md', googleapisDir);
+    removeFiles('*.ts', googleapisDir);
+    removeDirs('test', googleapisDir);
+    removeDirs('tests', googleapisDir);
+    removeDirs('docs', googleapisDir);
+    removeDirs('examples', googleapisDir);
+    
+    // Clean up nested node_modules in googleapis (keep only what's needed)
+    const googleapisNodeModules = join(googleapisDir, 'node_modules');
+    if (existsSync(googleapisNodeModules)) {
+      // Remove unnecessary files from nested dependencies
+      removeFiles('*.md', googleapisNodeModules);
+      removeFiles('*.ts', googleapisNodeModules);
+      removeFiles('*.d.ts', googleapisNodeModules);
+      removeDirs('test', googleapisNodeModules);
+      removeDirs('tests', googleapisNodeModules);
+      removeDirs('docs', googleapisNodeModules);
+      removeDirs('examples', googleapisNodeModules);
+    }
   }
   
   // Remove TypeScript definition files
