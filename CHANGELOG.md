@@ -13,6 +13,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+---
+## [1.0.14] - 2025-11-27
+
+## What's Changed
+
+### 🔧 Chores
+
+- Enhance git tagging process in release script (af2a9a2)
+- Update build-lambda script to use --immutable flag for yarn install (acd933a)
+- Lock googleapis dependency to exact version (3b7744a)
+- Remove SCHEDULE_TIME from configuration files (b5caed4)
+- Update build-lambda script and package.json for SAM compatibility (bc732fe)
+- Disable automatic version bumping in GitHub Actions (9a3cc55)
+
+### 📦 Other Changes
+
+- Fix build (324b776)
+- Merge pull request #1 from rolandmarg/refactor/build-scripts-and-clients (7504175)
+- Refactor build scripts and improve client implementations (21b45aa)
+- Lock down all dependency versions to exact versions (0537fe0)
+- Revert "chore: update build-lambda script to disable git-based versioning for SAM builds" (3997862)
+
+**Full Changelog**: v1.0.12...v1.0.14
+
 ---
 ## [1.0.13] - 2025-11-27
 
