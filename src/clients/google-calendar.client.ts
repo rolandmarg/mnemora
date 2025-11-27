@@ -39,7 +39,6 @@ export interface EventListOptions {
 class GoogleCalendarClient extends BaseClient {
   private _readOnlyCalendar: CalendarClient | null = null;
   private _readWriteCalendar: CalendarClient | null = null;
-  private _calendarId: string | null = null;
   private _initialized = false;
 
   constructor(config: AppConfig, xrayClient: XRayClientInterface) {
@@ -53,7 +52,6 @@ class GoogleCalendarClient extends BaseClient {
 
     const clientEmail = this.config.google.clientEmail;
     const privateKey = this.config.google.privateKey;
-    const calendarId = this.config.google.calendarId;
     
     if (!clientEmail || !privateKey) {
       throw this.createError(
@@ -61,8 +59,6 @@ class GoogleCalendarClient extends BaseClient {
         'Google Calendar credentials not configured. Please set GOOGLE_CLIENT_EMAIL and GOOGLE_PRIVATE_KEY in .env'
       );
     }
-
-    this._calendarId = calendarId;
 
     const readOnlyAuth = new google.auth.JWT({
       email: clientEmail,
@@ -99,7 +95,7 @@ class GoogleCalendarClient extends BaseClient {
 
   async fetchEvents(options: EventListOptions): Promise<Event[]> {
     const { startDate, endDate, maxResults } = options;
-    const calendarId = this._calendarId ?? this.config.google.calendarId;
+    const calendarId = this.config.google.calendarId;
     
     return this.captureSegment('GoogleCalendar', 'fetchEvents', async () => {
       const start = startOfDay(startDate);
@@ -171,7 +167,7 @@ class GoogleCalendarClient extends BaseClient {
   }
 
   async deleteEvent(eventId: string): Promise<boolean> {
-    const calendarId = this._calendarId ?? this.config.google.calendarId;
+    const calendarId = this.config.google.calendarId;
     return this.captureSegment('GoogleCalendar', 'deleteEvent', async () => {
       auditDeletionAttempt(logger, 'GoogleCalendarClient.deleteEvent', { eventId });
       throw new SecurityError('Deletion of calendar events is disabled for security reasons');
@@ -182,7 +178,7 @@ class GoogleCalendarClient extends BaseClient {
   }
 
   async deleteAllEvents(events: Event[]): Promise<DeletionResult> {
-    const calendarId = this._calendarId ?? this.config.google.calendarId;
+    const calendarId = this.config.google.calendarId;
     return this.captureSegment('GoogleCalendar', 'deleteAllEvents', async () => {
       auditDeletionAttempt(logger, 'GoogleCalendarClient.deleteAllEvents', {
         eventCount: events.length,
@@ -196,7 +192,7 @@ class GoogleCalendarClient extends BaseClient {
   }
 
   async insertEvent(event: Event): Promise<{ id: string }> {
-    const calendarId = this._calendarId ?? this.config.google.calendarId;
+    const calendarId = this.config.google.calendarId;
     
     return this.captureSegment('GoogleCalendar', 'insertEvent', async () => {
       const calendarEvent = {

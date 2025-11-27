@@ -71,14 +71,12 @@ Conditions:
   HasPhoneNumber: !Not [!Equals [!Ref AlertPhone, '']]
 
 Resources:
-  # SNS Topic for Alerts
   AlertTopic:
     Type: AWS::SNS::Topic
     Properties:
       TopicName: !Sub 'mnemora-alerts-${Environment}'
       DisplayName: Mnemora Birthday Bot Alerts
 
-  # SNS Email Subscription
   AlertEmailSubscription:
     Type: AWS::SNS::Subscription
     Properties:
@@ -86,7 +84,6 @@ Resources:
       Protocol: email
       Endpoint: !Ref AlertEmail
 
-  # SNS SMS Subscription (optional)
   AlertSMSSubscription:
     Type: AWS::SNS::Subscription
     Condition: HasPhoneNumber
@@ -95,7 +92,6 @@ Resources:
       Protocol: sms
       Endpoint: !Ref AlertPhone
 
-  # S3 Bucket for WhatsApp session storage
   SessionStorageBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -107,37 +103,25 @@ Resources:
           - Id: DeleteOldVersions
             Status: Enabled
             NoncurrentVersionExpirationInDays: 7
-            # Delete non-current versions after 7 days to prevent accumulation
-            # WhatsApp session files don't need long version history
           - Id: DeleteIncompleteMultipartUploads
             Status: Enabled
             AbortIncompleteMultipartUpload:
               DaysAfterInitiation: 1
-            # Clean up incomplete multipart uploads after 1 day
           - Id: DeleteOldMessageLogs
             Status: Enabled
             Prefix: app-data/messages/
             ExpirationInDays: 90
-            # Delete message logs older than 90 days
-            # CloudWatch Logs provide long-term storage, S3 logs are for short-term debugging
           - Id: DeleteOldExecutionRecords
             Status: Enabled
             Prefix: app-data/executions/
             ExpirationInDays: 90
-            # Delete execution records older than 90 days
-            # CloudWatch metrics provide long-term tracking, S3 records are for verification
 
-  # Note: DynamoDB removed - using S3 instead (cheaper for once-a-day script)
-  # Execution tracking stored in S3 bucket (same bucket as WhatsApp sessions)
-
-  # CloudWatch Log Group
   BirthdayBotLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub '/aws/lambda/mnemora-birthday-bot-${Environment}'
       RetentionInDays: 30
 
-  # Lambda Function
   BirthdayBotFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -147,8 +131,6 @@ Resources:
       Runtime: nodejs24.x
       Timeout: 900
       MemorySize: 512
-      # Note: ReservedConcurrentExecutions removed - account has minimum unreserved concurrency (10)
-      # Duplicate protection is handled via double-check in calendar.source.ts
       Environment:
         Variables:
           GOOGLE_CALENDAR_ID: !Ref GoogleCalendarId
@@ -207,21 +189,13 @@ Resources:
         DailySchedule:
           Type: Schedule
           Properties:
-            # UTC → Pacific Time Conversion (EventBridge cron runs in UTC):
-            # - 17:00 UTC = 10:00 AM PDT (Pacific Daylight Time, Mar-Nov, UTC-7)
-            # - 17:00 UTC = 09:00 AM PST (Pacific Standard Time, Nov-Mar, UTC-8)
-            # Note: EventBridge Rules don't support timezones, so this is approximate.
-            # The cron runs at 17:00 UTC year-round, which translates to:
-            #   ~10 AM PDT during daylight saving (most of the year)
-            #   ~9 AM PST during standard time (Nov-Mar)
-            # This is the single source of truth for execution schedule.
+            # Runs at 17:00 UTC (~10 AM PDT / ~9 AM PST)
             Schedule: cron(0 17 * * ? *)
             Description: Daily birthday check at 10 AM Pacific time (17:00 UTC, ~10 AM PDT most of year)
             Enabled: true
             Input: '{}'
       Tracing: Active
 
-  # Lambda Function for Daily Summary
   DailySummaryFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -281,8 +255,6 @@ Outputs:
     Value: !Ref SessionStorageBucket
     Export:
       Name: !Sub '${AWS::StackName}-SessionBucket'
-
-  # Execution tracking now uses S3 (same bucket as sessions)
 
   LogGroupName:
     Description: CloudWatch Log Group name

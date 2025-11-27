@@ -261,25 +261,30 @@ function cleanFunctionDir(functionDir: string) {
               // Followed by: Object.defineProperty(exports, "abusiveexperiencereport_v1", ...);
               
               // Match require statements - extract variable name and version
+              // Use a more flexible pattern that handles various whitespace and quote styles
               const requirePattern = new RegExp(`var\\s+(\\w+)\\s*=\\s*require\\(["']\\./apis/${escapedApi}/([^"']+)["']\\);`, 'g');
               let requireMatch;
-              const apiExports: Array<{ varName: string; exportName: string }> = [];
+              const apiExports: Array<{ varName: string; exportName: string; fullMatch: string }> = [];
               
+              // Reset regex lastIndex to ensure we find all matches
+              requirePattern.lastIndex = 0;
               while ((requireMatch = requirePattern.exec(mainIndexContent)) !== null) {
                 const varName = requireMatch[1];
                 const version = requireMatch[2];
+                const fullMatch = requireMatch[0];
                 // Export name is typically: apiName_version (e.g., abusiveexperiencereport_v1)
                 const exportName = `${api}_${version}`;
-                apiExports.push({ varName, exportName });
+                apiExports.push({ varName, exportName, fullMatch });
               }
               
               if (apiExports.length > 0) {
                 totalRemoved += apiExports.length;
               }
               
-              // Remove require statements (with newline after)
+              // Remove require statements - use a more comprehensive pattern that matches the entire line
+              // Handle various whitespace patterns and ensure we remove the whole line
               mainIndexContent = mainIndexContent.replace(
-                new RegExp(`var\\s+\\w+\\s*=\\s*require\\(["']\\./apis/${escapedApi}/[^"']+["']\\);\\s*\\n?`, 'g'),
+                new RegExp(`^\\s*var\\s+\\w+\\s*=\\s*require\\(["']\\./apis/${escapedApi}/[^"']+["']\\);\\s*\\r?\\n?`, 'gm'),
                 ''
               );
               
@@ -287,9 +292,10 @@ function cleanFunctionDir(functionDir: string) {
               for (const { varName, exportName } of apiExports) {
                 const escapedExportName = exportName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                 // Match: Object.defineProperty(exports, "abusiveexperiencereport_v1", { enumerable: true, get: function () { return v1_1.abusiveexperiencereport_v1; } });
+                // Use a more flexible pattern that handles various whitespace and formatting
                 const definePropertyPattern = new RegExp(
-                  `Object\\.defineProperty\\(exports,\\s*["']${escapedExportName}["'],\\s*\\{[^}]*get:\\s*function\\s*\\(\\)\\s*\\{\\s*return\\s+${varName}\\.[^}]+\\}\\s*\\}\\);\\s*\\n?`,
-                  'g'
+                  `^\\s*Object\\.defineProperty\\(exports,\\s*["']${escapedExportName}["'],\\s*\\{[^}]*get:\\s*function\\s*\\(\\)\\s*\\{\\s*return\\s+${varName}\\.[^}]+\\}\\s*\\}\\);\\s*\\r?\\n?`,
+                  'gm'
                 );
                 mainIndexContent = mainIndexContent.replace(definePropertyPattern, '');
               }
