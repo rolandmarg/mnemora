@@ -13,8 +13,7 @@
 
 import { logger } from '../utils/logger.util.js';
 import { auditDeletionAttempt } from '../utils/security.util.js';
-import { calendar } from '@googleapis/calendar';
-import { JWT } from 'google-auth-library';
+import { google } from 'googleapis';
 import { config } from '../config.js';
 
 interface EventWithRecurrence {
@@ -34,7 +33,6 @@ async function getAllEvents(): Promise<EventWithRecurrence[]> {
   const clientEmail = config.google.clientEmail;
   const privateKey = config.google.privateKey;
   const calendarId = config.google.calendarId;
-  const projectId = config.google.projectId;
 
   if (!clientEmail || !privateKey) {
     throw new Error('Google Calendar credentials not configured');
@@ -52,15 +50,12 @@ async function getAllEvents(): Promise<EventWithRecurrence[]> {
     singleEvents: false,
   });
 
-  const auth = new JWT({
+  const auth = new google.auth.JWT({
     email: clientEmail,
     key: privateKey,
     scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
-    ...(projectId && { projectId }),
   });
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const calendarClient = calendar({ version: 'v3' as const, auth: auth as any });
+  const calendarClient = google.calendar({ version: 'v3', auth });
 
   // Fetch all events (Google Calendar API limit is 2500 per request)
   // Using singleEvents: false to get master recurring events directly (not expanded instances)
@@ -185,21 +180,17 @@ async function deleteEvent(eventId: string, summary: string, maxRetries = 5): Pr
   const clientEmail = config.google.clientEmail;
   const privateKey = config.google.privateKey;
   const calendarId = config.google.calendarId;
-  const projectId = config.google.projectId;
 
   if (!clientEmail || !privateKey) {
     throw new Error('Google Calendar credentials not configured');
   }
 
-  const auth = new JWT({
+  const auth = new google.auth.JWT({
     email: clientEmail,
     key: privateKey,
     scopes: ['https://www.googleapis.com/auth/calendar'],
-    ...(projectId && { projectId }),
   });
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const calendarClient = calendar({ version: 'v3' as const, auth: auth as any });
+  const calendarClient = google.calendar({ version: 'v3', auth });
 
   let attempt = 0;
   let lastError: unknown;

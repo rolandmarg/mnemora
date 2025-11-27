@@ -172,16 +172,6 @@
       "skipFiles": ["<node_internals>/**"]
     },
     {
-      "name": "Invoke Lambda (Local)",
-      "type": "node",
-      "request": "launch",
-      "runtimeExecutable": "yarn",
-      "runtimeArgs": ["invoke:local"],
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
-      "skipFiles": ["<node_internals>/**"]
-    },
-    {
       "name": "Invoke Lambda (Remote)",
       "type": "node",
       "request": "launch",

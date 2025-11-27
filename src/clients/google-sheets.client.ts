@@ -1,24 +1,16 @@
-import { sheets } from '@googleapis/sheets';
-import type { sheets_v4 } from '@googleapis/sheets';
-import { JWT } from 'google-auth-library';
+import { google, type sheets_v4 } from 'googleapis';
 import { config } from '../config.js';
 import xrayClient from './xray.client.js';
 
 class GoogleSheetsClient {
-  private _sheets: sheets_v4.Sheets | null = null;
-  private _spreadsheetId: string | null = null;
+  private readonly sheets: sheets_v4.Sheets;
+  private readonly spreadsheetId: string;
   private cachedSheetName: string | null = null;
-  private _initialized = false;
 
-  private initialize(): void {
-    if (this._initialized) {
-      return;
-    }
-
+  constructor() {
     const clientEmail = config.google.clientEmail;
     const privateKey = config.google.privateKey;
     const spreadsheetId = config.google.spreadsheetId;
-    const projectId = config.google.projectId;
     
     if (!clientEmail || !privateKey) {
       throw new Error('Google Sheets credentials not configured. Please set GOOGLE_CLIENT_EMAIL and GOOGLE_PRIVATE_KEY in .env');
@@ -28,34 +20,14 @@ class GoogleSheetsClient {
       throw new Error('Google Sheets spreadsheet ID not configured. Please set GOOGLE_SPREADSHEET_ID in .env');
     }
 
-    this._spreadsheetId = spreadsheetId;
+    this.spreadsheetId = spreadsheetId;
 
-    const auth = new JWT({
+    const auth = new google.auth.JWT({
       email: clientEmail,
       key: privateKey,
       scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
-      ...(projectId && { projectId }),
     });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this._sheets = sheets({ version: 'v4' as const, auth: auth as any });
-
-    this._initialized = true;
-  }
-
-  private get sheets(): sheets_v4.Sheets {
-    this.initialize();
-    if (!this._sheets) {
-      throw new Error('Sheets client not initialized');
-    }
-    return this._sheets;
-  }
-
-  private get spreadsheetId(): string {
-    this.initialize();
-    if (!this._spreadsheetId) {
-      throw new Error('Sheets client not initialized');
-    }
-    return this._spreadsheetId;
+    this.sheets = google.sheets({ version: 'v4', auth });
   }
 
   private async getFirstSheetName(): Promise<string> {
@@ -64,17 +36,21 @@ class GoogleSheetsClient {
     }
 
     return xrayClient.captureAsyncSegment('GoogleSheets.getFirstSheetName', async () => {
-      const response = await this.sheets.spreadsheets.get({
-        spreadsheetId: this.spreadsheetId,
-      });
+      try {
+        const response = await this.sheets.spreadsheets.get({
+          spreadsheetId: this.spreadsheetId,
+        });
 
-      const sheets = response.data.sheets;
-      if (!sheets || sheets.length === 0) {
-        throw new Error('No sheets found in spreadsheet');
+        const sheets = response.data.sheets;
+        if (!sheets || sheets.length === 0) {
+          throw new Error('No sheets found in spreadsheet');
+        }
+
+        this.cachedSheetName = sheets[0]?.properties?.title ?? 'Sheet1';
+        return this.cachedSheetName;
+      } catch (error) {
+        throw error instanceof Error ? error : new Error(String(error));
       }
-
-      this.cachedSheetName = sheets[0]?.properties?.title ?? 'Sheet1';
-      return this.cachedSheetName;
     }, {
       spreadsheetId: this.spreadsheetId,
     });
@@ -85,23 +61,27 @@ class GoogleSheetsClient {
     sheetName?: string;
   }): Promise<string[][]> {
     return xrayClient.captureAsyncSegment('GoogleSheets.readRows', async () => {
-      const sheetName = options?.sheetName ?? await this.getFirstSheetName();
-      const skipHeaderRow = options?.skipHeaderRow ?? true;
+      try {
+        const sheetName = options?.sheetName ?? await this.getFirstSheetName();
+        const skipHeaderRow = options?.skipHeaderRow ?? true;
 
-      const response = await this.sheets.spreadsheets.values.get({
-        spreadsheetId: this.spreadsheetId,
-        range: sheetName,
-      });
+        const response = await this.sheets.spreadsheets.values.get({
+          spreadsheetId: this.spreadsheetId,
+          range: sheetName,
+        });
 
-      const rows = response.data.values;
-      if (!rows || rows.length === 0) {
-        return [];
+        const rows = response.data.values;
+        if (!rows || rows.length === 0) {
+          return [];
+        }
+
+        const startIndex = skipHeaderRow ? 1 : 0;
+        const result = rows.slice(startIndex);
+        
+        return result;
+      } catch (error) {
+        throw error instanceof Error ? error : new Error(String(error));
       }
-
-      const startIndex = skipHeaderRow ? 1 : 0;
-      const result = rows.slice(startIndex);
-      
-      return result;
     }, {
       spreadsheetId: this.spreadsheetId,
       sheetName: options?.sheetName ?? 'auto-detect',
