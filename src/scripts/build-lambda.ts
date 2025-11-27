@@ -103,9 +103,8 @@ if (existsSync(distNodeModules)) {
 }
 
 // Install dependencies in dist (will remove devDependencies manually after)
-// Note: Not using --immutable because dist/ is a build artifact and lockfile may need updates
 console.log('Installing dependencies in dist...');
-exec('NODE_ENV=production YARN_ENABLE_SCRIPTS=false yarn install', {
+exec('NODE_ENV=production YARN_ENABLE_SCRIPTS=false yarn install --immutable', {
   cwd: join(PROJECT_ROOT, 'dist')
 });
 
@@ -283,95 +282,6 @@ if (existsSync(distNodeModules)) {
               } else {
                 writeFileSync(apisIndexPath, indexContent, 'utf-8');
                 console.log(`   ✅ Updated apis/index.js to remove ${removedApis.length} deleted API references`);
-              }
-            }
-          }
-          
-          // CRITICAL: Also edit the main index.js file to remove require statements for deleted APIs
-          // The main index.js file has require statements like: var v1_1 = require("./apis/abusiveexperiencereport/v1");
-          const mainIndexPath = join(buildDir, 'src', 'index.js');
-          if (existsSync(mainIndexPath) && removedApis.length > 0) {
-            console.log('   Editing main index.js to remove references to deleted APIs...');
-            let mainIndexContent = readFileSync(mainIndexPath, 'utf-8');
-            const originalMainContent = mainIndexContent;
-            const originalLength = mainIndexContent.length;
-            
-            // For each deleted API, find and remove:
-            // 1. The require statement: var v1_1 = require("./apis/apiName/v1");
-            // 2. The export statement: Object.defineProperty(exports, "apiName_v1", ...);
-            // 3. The export in the top-level exports list
-            
-            let totalRemoved = 0;
-            for (const api of removedApis) {
-              const escapedApi = api.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-              
-              // Find all require statements for this API and their corresponding exports
-              // Pattern: var v1_1 = require("./apis/abusiveexperiencereport/v1");
-              // Followed by: Object.defineProperty(exports, "abusiveexperiencereport_v1", ...);
-              
-              // Match require statements - extract variable name and version
-              const requirePattern = new RegExp(`var\\s+(\\w+)\\s*=\\s*require\\(["']\\./apis/${escapedApi}/([^"']+)["']\\);`, 'g');
-              let requireMatch;
-              const apiExports: Array<{ varName: string; exportName: string }> = [];
-              
-              while ((requireMatch = requirePattern.exec(mainIndexContent)) !== null) {
-                const varName = requireMatch[1];
-                const version = requireMatch[2];
-                // Export name is typically: apiName_version (e.g., abusiveexperiencereport_v1)
-                const exportName = `${api}_${version}`;
-                apiExports.push({ varName, exportName });
-              }
-              
-              if (apiExports.length > 0) {
-                totalRemoved += apiExports.length;
-              }
-              
-              // Remove require statements (with newline after)
-              mainIndexContent = mainIndexContent.replace(
-                new RegExp(`var\\s+\\w+\\s*=\\s*require\\(["']\\./apis/${escapedApi}/[^"']+["']\\);\\s*\\n?`, 'g'),
-                ''
-              );
-              
-              // Remove Object.defineProperty exports for this API
-              for (const { varName, exportName } of apiExports) {
-                const escapedExportName = exportName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                // Match: Object.defineProperty(exports, "abusiveexperiencereport_v1", { enumerable: true, get: function () { return v1_1.abusiveexperiencereport_v1; } });
-                const definePropertyPattern = new RegExp(
-                  `Object\\.defineProperty\\(exports,\\s*["']${escapedExportName}["'],\\s*\\{[^}]*get:\\s*function\\s*\\(\\)\\s*\\{\\s*return\\s+${varName}\\.[^}]+\\}\\s*\\}\\);\\s*\\n?`,
-                  'g'
-                );
-                mainIndexContent = mainIndexContent.replace(definePropertyPattern, '');
-              }
-              
-              // Note: We don't remove from top-level export list because:
-              // 1. The exports are chained (exports.a = exports.b = exports.c = void 0)
-              // 2. Removing parts of the chain is complex and error-prone
-              // 3. The require() and Object.defineProperty removals are sufficient to prevent import errors
-              // 4. The top-level exports are just for convenience, not required for runtime
-            }
-            
-            const newLength = mainIndexContent.length;
-            const reductionPercent = ((originalLength - newLength) / originalLength) * 100;
-            
-            // Validate: Check that the file still has valid structure
-            // After removing 318 APIs, we expect significant reduction but file should still be substantial
-            if (newLength < originalLength * 0.1) {
-              console.log(`   ⚠️  Warning: main index.js too small after editing (${newLength} bytes, ${reductionPercent.toFixed(1)}% reduction), restoring original...`);
-              mainIndexContent = originalMainContent;
-            } else if (!mainIndexContent.includes('exports.google')) {
-              console.log('   ⚠️  Warning: main index.js structure corrupted (missing exports.google), restoring original...');
-              mainIndexContent = originalMainContent;
-            } else if (!mainIndexContent.includes('require("./googleapis")')) {
-              console.log('   ⚠️  Warning: main index.js structure corrupted (missing googleapis require), restoring original...');
-              mainIndexContent = originalMainContent;
-            } else {
-              // Validate that calendar and sheets are still present
-              if (!mainIndexContent.includes('calendar_v3') || !mainIndexContent.includes('sheets_v4')) {
-                console.log('   ⚠️  Warning: Required APIs missing from main index.js, restoring original...');
-                mainIndexContent = originalMainContent;
-              } else {
-                writeFileSync(mainIndexPath, mainIndexContent, 'utf-8');
-                console.log(`   ✅ Updated main index.js: removed ${totalRemoved} API references (${reductionPercent.toFixed(1)}% size reduction)`);
               }
             }
           }
