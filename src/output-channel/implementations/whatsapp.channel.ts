@@ -81,6 +81,16 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
       const sessionPath = this.getSessionPath();
       await this.sessionManager.syncSessionFromS3(sessionPath);
       
+      // Set active group ID to optimize JID filtering and reduce session file bloat
+      const activeGroupId = this.config.whatsapp.groupId;
+      if (activeGroupId) {
+        // Normalize group ID (ensure it has @g.us suffix)
+        const normalizedGroupId = activeGroupId.includes('@g.us') 
+          ? activeGroupId 
+          : `${activeGroupId}@g.us`;
+        this.whatsappClient.setActiveGroupId(normalizedGroupId);
+      }
+      
       await this.whatsappClient.initialize();
       
       if (this.whatsappClient.requiresAuth()) {

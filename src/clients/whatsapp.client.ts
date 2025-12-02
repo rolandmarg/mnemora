@@ -25,6 +25,7 @@ class WhatsAppClient {
   private readonly isLambda: boolean;
   private authRequired: boolean = false;
   private saveCreds: (() => Promise<void>) | null = null;
+  private activeGroupId: string | undefined = undefined;
 
   constructor() {
     this.isLambda = isLambda();
@@ -41,10 +42,50 @@ class WhatsAppClient {
   }
 
   /**
+   * Set the active group ID to optimize JID filtering.
+   * This reduces session file creation by ignoring unused contacts and groups.
+   * 
+   * @param groupId - The WhatsApp group ID we actively send messages to
+   */
+  setActiveGroupId(groupId: string | undefined): void {
+    this.activeGroupId = groupId;
+  }
+
+  /**
    * Get the session path. Useful for external session management (e.g., S3 sync)
    */
   getSessionPath(): string {
     return this.sessionPath;
+  }
+
+  /**
+   * Determine if a JID should be ignored to reduce session file bloat.
+   * Optimized for Lambda: only process our active group and essential protocol messages.
+   * 
+   * This prevents Baileys from creating session files for:
+   * - Individual contacts (we only send to groups)
+   * - Unused groups (we only use one active group)
+   * 
+   * Protocol messages (pre-keys, sender keys) are not JIDs and are always processed.
+   */
+  private shouldIgnoreJid(jid: string): boolean {
+    // Never ignore our active group
+    if (this.activeGroupId && jid.includes(this.activeGroupId)) {
+      return false;
+    }
+
+    // Ignore individual contacts - we only send to groups
+    if (jid.includes('@s.whatsapp.net') || jid.includes('@lid')) {
+      return true;
+    }
+
+    // Ignore other groups we're not actively using
+    if (jid.includes('@g.us')) {
+      return true;
+    }
+
+    // Allow protocol messages (not JIDs) and other necessary messages
+    return false;
   }
 
   async initialize(): Promise<void> {
@@ -108,21 +149,33 @@ class WhatsAppClient {
               creds: state.creds,
               keys: makeCacheableSignalKeyStore(state.keys, baileysLogger),
             },
-            // Minimal configuration - send-only mode
+            // Lambda-optimized configuration - send-only mode
             // These options minimize unnecessary operations like read receipts syncing,
             // message history syncing, presence updates, and other background operations.
             // This reduces S3 session file updates and improves performance.
-            // NOTE: We must NOT ignore all JIDs because Baileys needs to process protocol
-            // messages (sender keys, pre-keys, group metadata) for proper encryption.
-            // We only skip syncing message content/history.
             syncFullHistory: false,              // Don't sync full message history
             markOnlineOnConnect: false,          // Don't mark as online automatically
             fireInitQueries: false,               // Don't fire initialization queries
             shouldSyncHistoryMessage: () => false, // Don't sync history messages
-            // Removed shouldIgnoreJid - we need protocol messages for encryption to work
             getMessage: async () => undefined,    // Don't fetch messages (but allow protocol processing)
-            connectTimeoutMs: 60000,              // Connection timeout
-            defaultQueryTimeoutMs: 60000,         // Query timeout
+            
+            // JID filtering to reduce session file bloat
+            // Only process our active group and essential protocol messages
+            // Protocol messages (pre-keys, sender keys) are not JIDs and are always processed
+            shouldIgnoreJid: (jid: string) => this.shouldIgnoreJid(jid),
+            
+            // Lambda-optimized timeouts (fail fast)
+            connectTimeoutMs: 30000,              // 30s connection timeout (reduced from 60s)
+            defaultQueryTimeoutMs: 30000,         // 30s query timeout (reduced from 60s)
+            
+            // Message retry settings (fail fast for Lambda)
+            maxMsgRetryCount: 1,                  // Only retry once
+            retryRequestDelayMs: 1000,            // 1s delay between retries
+            
+            // Disable unnecessary features
+            emitOwnEvents: false,                 // Don't emit events for our own actions
+            generateHighQualityLinkPreview: false, // We don't send links
+            linkPreviewImageThumbnailWidth: 0,     // No link previews
             // Don't use printQRInTerminal (deprecated) - we handle QR manually for consistency
           });
 
