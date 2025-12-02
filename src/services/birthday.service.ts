@@ -34,14 +34,6 @@ interface BirthdayServiceOptions {
   alerting: AlertingService;
 }
 
-const BIRTHDAY_EMOJIS = ['🎂', '🎉', '🎈', '🎁', '🎊', '🥳', '🎀', '🎆', '🎇', '✨', '🌟', '💫', '🎪', '🎭', '🎨', '🎵', '🎶', '🎸', '🎹', '🎺', '🎻', '🥁', '🎤', '🎧', '🎬', '🎮', '🎯', '🎲', '🎰', '🎳'];
-
-function getRandomEmoji(_index: number): string {
-  const randomIndex = Math.floor(Math.random() * BIRTHDAY_EMOJIS.length);
-  return BIRTHDAY_EMOJIS[randomIndex];
-}
-
-
 class BirthdayService {
   private readonly logger: Logger;
   private readonly xrayClient: XRayClient;
@@ -129,26 +121,25 @@ class BirthdayService {
         a.birthday.getTime() - b.birthday.getTime()
       );
       
-      const birthdaysByDate = sortedRecords.reduce<Record<string, { name: string; randomEmoji: string }[]>>((acc, record, index) => {
+      const birthdaysByDate = sortedRecords.reduce<Record<string, { name: string }[]>>((acc, record) => {
         const dateKey = formatDateShort(record.birthday);
         const fullName = getFullName(record.firstName, record.lastName);
-        const randomEmoji = getRandomEmoji(index);
-        (acc[dateKey] ??= []).push({ name: fullName, randomEmoji });
+        (acc[dateKey] ??= []).push({ name: fullName });
         return acc;
       }, {});
 
       const sortedDates = Object.keys(birthdaysByDate);
-      const maxDateWidth = Math.max(...sortedDates.map(date => `🎂 ${date}: `.length));
+      const maxDateWidth = Math.max(...sortedDates.map(date => `${date}: `.length));
 
       const monthlyDigest = sortedDates.map(date => {
         const people = birthdaysByDate[date];
-        const namesWithEmojis = people.map(p => `${p.name} ${p.randomEmoji}`).join(', ');
-        const datePrefix = `🎂 ${date}: `;
+        const names = people.map(p => p.name).join(', ');
+        const datePrefix = `${date}: `;
         const paddedDatePrefix = datePrefix.padEnd(maxDateWidth);
-        return `${paddedDatePrefix}${namesWithEmojis}`;
+        return `${paddedDatePrefix}${names}`;
       }).join('\n');
 
-      return monthlyDigest;
+      return `Upcoming birthdays 🎂\n\n${monthlyDigest}`;
     }, {
       birthdaysCount: monthlyBirthdays.length,
     });
