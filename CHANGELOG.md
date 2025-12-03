@@ -14,6 +14,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+---
+## [1.0.14] - 2025-12-03
+
+## What's Changed
+
+### ✨ Features
+
+- Optimize WhatsApp client for Lambda by implementing active group ID filtering (276ffb2)
+
+### ♻️  Refactoring
+
+- Simplify birthday service monthly digest logic (71a9de8)
+
+### 🔧 Chores
+
+- Add tar dependency for session storage management (653c2e8)
+- Update version to 1.0.13 (6ee10d0)
+
+**Full Changelog**: v1.0.13...v1.0.14
+
 ---
 ## [1.0.14] - 2025-11-27
 
