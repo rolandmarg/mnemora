@@ -9,6 +9,7 @@ import {
   type GetObjectCommandInput,
 } from '@aws-sdk/client-s3';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync } from 'fs';
+import tar from 'tar';
 import { createHash } from 'crypto';
 import { join } from 'path';
 import { config } from '../config.js';
@@ -182,10 +183,14 @@ export class FileStorage {
   private readonly basePath: string;
   private readonly isLambda: boolean;
   private readonly METADATA_KEY = '.sync-metadata.json';
+  private readonly isSessionStorage: boolean;
+  private readonly ARCHIVE_NAME = 'session.tar.gz';
+  private readonly DOWNLOAD_BATCH_SIZE = 20;
 
   constructor(basePath: string) {
     this.basePath = basePath;
     this.isLambda = isLambda();
+    this.isSessionStorage = basePath === 'auth_info';
   }
 
   /**
@@ -193,6 +198,47 @@ export class FileStorage {
    */
   private getFileHash(content: Buffer): string {
     return createHash('sha256').update(content).digest('hex');
+  }
+
+  /**
+   * Create a gzipped tar archive of the given local directory.
+   * Used for WhatsApp session storage (auth_info).
+   */
+  private async createSessionArchive(localPath: string): Promise<Buffer> {
+    const archivePath = `/tmp/mnemora-${this.basePath}.tar.gz`;
+
+    await tar.create(
+      {
+        gzip: true,
+        file: archivePath,
+        cwd: localPath,
+      },
+      ['.']
+    );
+
+    return readFileSync(archivePath);
+  }
+
+  /**
+   * Extract a gzipped tar archive buffer into the given local directory.
+   * Used for WhatsApp session storage (auth_info).
+   */
+  private async extractSessionArchive(localPath: string, archiveBuffer: Buffer): Promise<void> {
+    const archivePath = `/tmp/mnemora-${this.basePath}.tar.gz`;
+    writeFileSync(archivePath, archiveBuffer);
+
+    try {
+      await tar.extract({
+        file: archivePath,
+        cwd: localPath,
+      });
+    } catch (error) {
+      throw new Error(
+        `Failed to extract WhatsApp session archive from S3: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
   }
 
   /**
@@ -276,60 +322,55 @@ export class FileStorage {
         return;
       }
 
-      // Only sync files modified within the last 30 days to avoid old session data
-      // Exception: creds.json is always synced (essential for authentication)
+      if (this.isSessionStorage) {
+        const archiveBuffer = await this.createSessionArchive(localPath);
+        const archiveKey = `${this.basePath}/${this.ARCHIVE_NAME}`;
+        await s3Client.upload(archiveKey, archiveBuffer, 'application/gzip');
+        return;
+      }
+
+      // Legacy incremental sync for non-session storage
+      // Only sync files modified within the last 30 days to avoid old data
       const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
       const now = Date.now();
-      const CREDS_FILE = 'creds.json';
 
-      // Load previous sync metadata to determine which files changed
       const previousMetadata = await this.loadSyncMetadata();
       const currentFiles: Record<string, { hash: string; mtime: number }> = {};
       const filesToUpload: Array<{ s3Key: string; content: Buffer }> = [];
 
-      // Collect all files and compute hashes
       const collectFiles = (dirPath: string, relativePath: string = ''): void => {
         const files = readdirSync(dirPath);
-        
+
         for (const file of files) {
           const filePath = join(dirPath, file);
           const stat = statSync(filePath);
           const currentRelativePath = relativePath ? `${relativePath}/${file}` : file;
-          
-          // Skip metadata file itself
+
           if (currentRelativePath === this.METADATA_KEY) {
             continue;
           }
-          
+
           if (stat.isDirectory()) {
             collectFiles(filePath, currentRelativePath);
           } else {
-            const fileName = currentRelativePath.split('/').pop() ?? currentRelativePath;
             const fileAge = now - stat.mtimeMs;
-            
-            // Always sync creds.json (essential for authentication)
-            // For other files, only sync if modified within MAX_AGE_MS (to avoid old session data)
-            const isEssential = fileName === CREDS_FILE;
-            const isRecent = fileAge <= MAX_AGE_MS;
-            
-            if (!isEssential && !isRecent) {
-              // Skip old files (except creds.json)
+
+            if (fileAge > MAX_AGE_MS) {
               continue;
             }
-            
+
             const fileContent = readFileSync(filePath);
             const hash = this.getFileHash(fileContent);
             const mtime = stat.mtimeMs;
             const s3Key = `${this.basePath}/${currentRelativePath}`;
-            
+
             currentFiles[currentRelativePath] = { hash, mtime };
-            
-            // Only upload if file is new or changed
+
             const previousFile = previousMetadata?.files[currentRelativePath];
-            const needsUpload = !previousFile || 
-                               previousFile?.hash !== hash || 
-                               previousFile?.mtime !== mtime;
-            
+            const needsUpload = !previousFile ||
+              previousFile?.hash !== hash ||
+              previousFile?.mtime !== mtime;
+
             if (needsUpload) {
               filesToUpload.push({ s3Key, content: fileContent });
             }
@@ -339,7 +380,6 @@ export class FileStorage {
 
       collectFiles(localPath);
 
-      // Upload changed files in parallel batches
       if (filesToUpload.length > 0) {
         const BATCH_SIZE = 10;
         for (let i = 0; i < filesToUpload.length; i += BATCH_SIZE) {
@@ -350,7 +390,6 @@ export class FileStorage {
         }
       }
 
-      // Save updated metadata (only for files we're tracking)
       const newMetadata: SyncMetadata = {
         files: currentFiles,
         lastSyncTime: Date.now(),
@@ -372,33 +411,57 @@ export class FileStorage {
         mkdirSync(localPath, { recursive: true });
       }
 
-      // List all objects in S3 with the basePath prefix
+      if (this.isSessionStorage) {
+        const archiveKey = `${this.basePath}/${this.ARCHIVE_NAME}`;
+        const existsInS3 = await s3Client.exists(archiveKey);
+
+        if (!existsInS3) {
+          throw new Error('WhatsApp session archive not found in S3');
+        }
+
+        const archiveBuffer = await s3Client.download(archiveKey);
+        if (!archiveBuffer) {
+          throw new Error('WhatsApp session archive is empty or unreadable in S3');
+        }
+
+        await this.extractSessionArchive(localPath, archiveBuffer);
+        return;
+      }
+
+      // Legacy behavior for non-session storage: list and download all objects under basePath
       const s3Keys = await s3Client.listObjects(this.basePath);
-      
+
+      const downloadTasks: Array<{ s3Key: string; localFilePath: string; localFileDir: string }> = [];
+
       for (const s3Key of s3Keys) {
-        // Extract relative path from S3 key (remove basePath prefix)
-        const relativePath = s3Key.startsWith(`${this.basePath}/`) 
+        const relativePath = s3Key.startsWith(`${this.basePath}/`)
           ? s3Key.slice(this.basePath.length + 1)
           : s3Key;
-        
-        // Skip if it's just the base path itself
+
         if (!relativePath || relativePath === this.basePath) {
           continue;
         }
-        
+
         const localFilePath = join(localPath, relativePath);
         const localFileDir = join(localFilePath, '..');
-        
-        // Create directory structure if needed
-        if (!existsSync(localFileDir)) {
-          mkdirSync(localFileDir, { recursive: true });
-        }
-        
-        // Download file from S3
-        const fileContent = await s3Client.download(s3Key);
-        if (fileContent) {
-          writeFileSync(localFilePath, fileContent);
-        }
+
+        downloadTasks.push({ s3Key, localFilePath, localFileDir });
+      }
+
+      for (let i = 0; i < downloadTasks.length; i += this.DOWNLOAD_BATCH_SIZE) {
+        const batch = downloadTasks.slice(i, i + this.DOWNLOAD_BATCH_SIZE);
+        await Promise.all(
+          batch.map(async ({ s3Key, localFilePath, localFileDir }) => {
+            if (!existsSync(localFileDir)) {
+              mkdirSync(localFileDir, { recursive: true });
+            }
+
+            const fileContent = await s3Client.download(s3Key);
+            if (fileContent) {
+              writeFileSync(localFilePath, fileContent);
+            }
+          })
+        );
       }
     }, {
       basePath: this.basePath,
