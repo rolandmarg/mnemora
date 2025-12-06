@@ -132,9 +132,6 @@ function categorizeCommit(message: string): string {
   if (/^docs(\(.+\))?:/.test(message)) {
     return 'documentation';
   }
-  if (/^test(\(.+\))?:/.test(message)) {
-    return 'tests';
-  }
   if (/^build(\(.+\))?:/.test(message)) {
     return 'build';
   }
@@ -161,7 +158,6 @@ function generateReleaseNotes(version: string): string {
     refactor: '♻️  Refactoring',
     performance: '⚡ Performance',
     documentation: '📝 Documentation',
-    tests: '🧪 Tests',
     build: '🔨 Build',
     chores: '🔧 Chores',
     other: '📦 Other Changes'
@@ -181,7 +177,7 @@ function generateReleaseNotes(version: string): string {
   let notes = '## What\'s Changed\n\n';
   let hasChanges = false;
   
-  const categoryOrder = ['features', 'fixes', 'refactor', 'performance', 'documentation', 'tests', 'build', 'chores', 'other'];
+  const categoryOrder = ['features', 'fixes', 'refactor', 'performance', 'documentation', 'build', 'chores', 'other'];
   
   for (const category of categoryOrder) {
     if (categories[category] && categories[category].length > 0) {

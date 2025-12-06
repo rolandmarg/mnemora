@@ -77,8 +77,6 @@ function cleanFunctionDir(functionDir: string) {
     '@eslint',
     '@eslint-community',
     '@types',
-    'vitest',
-    '@vitest',
     'tsx',
     'pino-pretty',
     'globals'

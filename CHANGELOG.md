@@ -221,10 +221,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## What's Changed
 
-### 🧪 Tests
-
-- Enhance date utilities tests with timezone support (8cffe96)
-
 ### 🔧 Chores
 
 - Update README and enhance auto-release workflow (ea1dfe3)

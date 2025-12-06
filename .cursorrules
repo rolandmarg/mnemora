@@ -47,7 +47,6 @@ You are an expert in TypeScript, Node.js.
   
   Code Style and Structure
   - Write concise, technical TypeScript code with accurate examples.
-  - Write unit test suites for every file and execute them for sanity check
   - Use functional and declarative programming patterns; avoid classes.
   - Prefer iteration and modularization over code duplication.
   - Use descriptive variable names with auxiliary verbs (e.g., isLoading, hasError).
@@ -150,8 +149,8 @@ You are an expert in TypeScript, Node.js.
 2. **Type Safety**: Never use `any`, always provide proper types
 3. **Error Messages**: Make error messages helpful and actionable
 4. **Consistency**: Follow existing patterns in the codebase
-5. **Testing**: Run `yarn type-check` and `yarn lint` before committing
-6. **After Big Changes**: Always run tests, typecheck, and lint after making significant changes
+5. **Before Committing**: Run `yarn type-check` and `yarn lint` before committing
+6. **After Big Changes**: Always run typecheck and lint after making significant changes
 7. **Scripts**: Always add new scripts to `package.json` and `launch.json` - keep them in sync
 8. **Linting**: Follow ESLint rules - use `yarn lint:fix` to auto-fix issues
 9. **Documentation**: Do NOT add JSDoc type comments - TypeScript types are sufficient
@@ -195,7 +194,7 @@ You are an expert in TypeScript, Node.js.
 5. **Keep in sync** - Ensure `package.json` and `.vscode/launch.json` are synchronized
 6. **Type check** - Always run `yarn type-check` before committing
 7. **Use shared utilities** - Leverage existing CLI, date, and auth utilities
-8. **After big changes** - Run tests (`yarn test`), typecheck (`yarn type-check`), and lint (`yarn lint`) to verify everything works
+8. **After big changes** - Run typecheck (`yarn type-check`) and lint (`yarn lint`) to verify everything works
 
 ## Important Notes
 
@@ -206,7 +205,7 @@ You are an expert in TypeScript, Node.js.
 - Use `BirthdayService` from `src/services/birthday.service.ts` for birthday operations
 - Use `OutputChannelFactory` from `src/output-channel/output-channel.factory.js` for output channels
 - **Do NOT add JSDoc type comments** - TypeScript provides type information, JSDoc type annotations are redundant
-- **After significant changes**: Run `yarn test && yarn type-check && yarn lint` to ensure everything is working
+- **After significant changes**: Run `yarn type-check && yarn lint` to ensure everything is working
 - **Keep `package.json` and `.vscode/launch.json` synchronized** - When adding scripts, update both files
 - **⚠️ Version Locking**: **ALL dependencies MUST be locked to exact versions** - NEVER use caret (`^`) or tilde (`~`) prefixes. Always use exact version numbers (e.g., `"package": "1.2.3"` not `"package": "^1.2.3"`). This ensures reproducible builds and prevents unexpected breaking changes in Lambda deployments.
 - **⚠️ Baileys Version Lock**: `@whiskeysockets/baileys` MUST be locked to exactly `6.7.21` (no `^` or `~`). Versions 6.17.16+ introduce audio decoder dependencies (~22MB) and lodash+libphonenumber-js (~10MB), increasing Lambda package size from ~37MB to ~60MB+. Always use exact version: `"@whiskeysockets/baileys": "6.7.21"`

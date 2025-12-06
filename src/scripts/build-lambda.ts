@@ -126,9 +126,8 @@ removeDirs('@typescript-eslint*', distNodeModules);
 removeDirs('@eslint*', distNodeModules);
 removeDirs('@esbuild*', distNodeModules);
 removeDirs('*typescript*', distNodeModules);
-removeDirs('*vitest*', distNodeModules);
 removeDirs('*eslint*', distNodeModules);
-// Remove transitive dev dependencies (from vitest, etc.)
+// Remove transitive dev dependencies
 removeDirs('*rollup*', distNodeModules);
 removeDirs('*vite*', distNodeModules);
 removeDirs('*node-gyp*', distNodeModules);

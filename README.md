@@ -83,7 +83,6 @@ yarn dev                # Development mode (auto-reload)
 yarn build              # Compile TypeScript
 yarn type-check         # Type check
 yarn lint               # Lint code
-yarn test               # Run tests
 yarn delete-all-events  # Bulk delete utility
 ```
 
@@ -160,7 +159,6 @@ src/
 
 - **TypeScript** with ESM (use `.js` extension in imports)
 - **Yarn** package manager
-- **Vitest** for testing
 - **ESLint** for linting
 
 See [docs/](./docs/) for detailed documentation.
@@ -201,7 +199,6 @@ See [docs/](./docs/) for detailed documentation.
 
 ### Development Tools
 - **TypeScript**: Strict type checking with ESM support
-- **Vitest**: Unit testing framework
 - **ESLint**: Code quality and style enforcement
 - **Type Checking**: Standalone type checking without compilation
 - **Hot Reload**: Development mode with auto-reload

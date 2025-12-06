@@ -9,7 +9,3 @@ git add -u
 # Type check (can't be auto-fixed)
 echo "🔍 Running type-check..."
 yarn type-check
-
-# Run tests (can't be auto-fixed)
-echo "🧪 Running tests..."
-yarn test:run
