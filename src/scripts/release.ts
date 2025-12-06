@@ -73,9 +73,18 @@ function validateVersion(version: string): void {
 
 function checkGitClean(): void {
   try {
-    exec('git diff-index --quiet HEAD --');
-  } catch {
-    throw new Error('Working directory is not clean. Please commit or stash changes first.');
+    // Use git status --porcelain which is the standard way to check for a clean working directory
+    // It returns empty string if clean, or non-empty if there are changes
+    const status = exec('git status --porcelain', { stdio: 'pipe' });
+    if (status.trim()) {
+      throw new Error('Working directory is not clean. Please commit or stash changes first.');
+    }
+  } catch (error) {
+    // If exec throws (e.g., not a git repo), re-throw with a clearer message
+    if (error instanceof Error && !error.message.includes('Working directory')) {
+      throw new Error('Working directory is not clean. Please commit or stash changes first.');
+    }
+    throw error;
   }
 }
 
