@@ -444,7 +444,7 @@ export class AlertingService {
   sendWhatsAppAuthRequiredAlert(context?: Record<string, unknown>): void {
     this.sendAlert({
     type: AlertType.WHATSAPP_AUTH_REQUIRED,
-    severity: AlertSeverity.WARNING,
+    severity: AlertSeverity.CRITICAL,
     title: 'WhatsApp Authentication Required',
     message: 'WhatsApp session expired or missing. QR code authentication is required. Check CloudWatch Logs for QR code.',
     metadata: {

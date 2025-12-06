@@ -9,6 +9,7 @@ import cloudWatchClient from '../clients/cloudwatch.client.js';
 import whatsappClient from '../clients/whatsapp.client.js';
 import snsClient from '../clients/sns.client.js';
 import { setCorrelationId } from '../utils/runtime.util.js';
+import { QRAuthenticationRequiredError } from '../types/qr-auth-error.js';
 import type { EventBridgeEvent, LambdaContext, LambdaResponse } from './types.js';
 
 export async function handler(
@@ -90,15 +91,29 @@ export async function handler(
           remainingTime: context.getRemainingTimeInMillis(),
         });
 
-        // Check if this is a timeout error
         const remainingTime = context.getRemainingTimeInMillis();
-        if (remainingTime <= 0 || (error instanceof Error && error.message.includes('timeout'))) {
+        
+        // Check for specific error types first
+        if (error instanceof QRAuthenticationRequiredError) {
+          // QR authentication required - send specific alert
+          // Note: WhatsApp channel already sends this alert, but we send it again here
+          // to ensure it's sent even if the error bubbles up before the channel can send it
+          alerting.sendWhatsAppAuthRequiredAlert({
+            requestId: context.awsRequestId,
+            functionName: context.functionName,
+            qrCodeAvailable: true,
+            environment: 'lambda',
+            errorMessage: error.message,
+          });
+        } else if (remainingTime <= 0 || (error instanceof Error && error.message.includes('timeout'))) {
+          // Timeout error
           alerting.sendLambdaTimeoutAlert({
             requestId: context.awsRequestId,
             functionName: context.functionName,
             remainingTime,
           });
         } else {
+          // Generic execution failure
           alerting.sendLambdaExecutionFailedAlert(error, {
             requestId: context.awsRequestId,
             functionName: context.functionName,
