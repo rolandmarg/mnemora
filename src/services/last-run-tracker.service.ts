@@ -100,28 +100,6 @@ class LastRunTrackerService {
     }
   }
 
-  async getMissedDates(): Promise<Date[]> {
-    const lastRun = await this.getLastRunDate();
-    const todayDate = startOfDay(today());
-    const missedDates: Date[] = [];
-
-    if (!lastRun) {
-      return [];
-    }
-
-    const lastRunTime = lastRun.getTime();
-    const todayTime = todayDate.getTime();
-    const oneDay = 24 * 60 * 60 * 1000;
-
-    let currentDate = new Date(lastRunTime + oneDay);
-
-    while (currentDate.getTime() < todayTime) {
-      missedDates.push(new Date(currentDate));
-      currentDate = new Date(currentDate.getTime() + oneDay);
-    }
-
-    return missedDates;
-  }
 }
 
 export { LastRunTrackerService };

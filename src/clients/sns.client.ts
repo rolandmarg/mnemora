@@ -1,15 +1,12 @@
 import { SNSClient, PublishCommand, type PublishCommandInput } from '@aws-sdk/client-sns';
 import { config } from '../config.js';
-import { isLambda } from '../utils/runtime.util.js';
 import xrayClient from './xray.client.js';
 
 class SNSClientWrapper {
   private snsClient: SNSClient | null = null;
   private readonly topicArn: string | undefined;
-  private readonly isLambda: boolean;
 
   constructor() {
-    this.isLambda = isLambda();
     this.topicArn = config.aws.snsTopicArn;
 
     const region = config.aws.region;

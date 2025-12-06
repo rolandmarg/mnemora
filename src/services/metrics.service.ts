@@ -205,9 +205,6 @@ export function trackMonthlyDigestSent(metrics: MetricsCollector): void {
   metrics.incrementCounter('monthly_digest.sent');
 }
 
-export function trackMissedDaysDetected(metrics: MetricsCollector, count: number): void {
-  metrics.incrementCounter('missed_days.detected', count);
-}
 
 export function trackApiCall(
   metrics: MetricsCollector, 

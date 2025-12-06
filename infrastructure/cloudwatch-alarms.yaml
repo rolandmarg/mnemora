@@ -44,29 +44,6 @@ Resources:
   #     Protocol: email
   #     Endpoint: your-email@example.com
 
-  # Alarm: Daily execution missed
-  DailyExecutionMissedAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub '${FunctionName}-DailyExecutionMissed'
-      AlarmDescription: Alert when daily execution is missed (no execution in 25 hours)
-      MetricName: monitoring.daily_execution
-      Namespace: Mnemora/BirthdayBot
-      Statistic: Sum
-      Period: 3600
-      EvaluationPeriods: 1
-      Threshold: 0
-      ComparisonOperator: LessThanThreshold
-      TreatMissingData: breaching
-      Dimensions:
-        - Name: FunctionName
-          Value: !Ref FunctionName
-      AlarmActions:
-        - !If
-          - UseProvidedSnsTopic
-          - !Ref SnsTopicArn
-          - !Ref AlertTopic
-
   # Alarm: Monthly digest not sent
   MonthlyDigestNotSentAlarm:
     Type: AWS::CloudWatch::Alarm
@@ -218,10 +195,6 @@ Outputs:
       - !Ref AlertTopic
     Export:
       Name: !Sub '${AWS::StackName}-AlertTopicArn'
-
-  DailyExecutionAlarm:
-    Description: Alarm for daily execution monitoring
-    Value: !Ref DailyExecutionMissedAlarm
 
   MonthlyDigestAlarm:
     Description: Alarm for monthly digest monitoring

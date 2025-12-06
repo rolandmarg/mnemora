@@ -2,7 +2,6 @@
  * Birthday Orchestrator Service
  * 
  * Orchestrates the daily birthday check process, including:
- * - Checking for missed 1st-of-month dates and recovering monthly digests
  * - Sending monthly digest on the first of the month
  * - Sending today's birthday messages
  * - Managing execution lifecycle (metrics, monitoring, cleanup)
@@ -17,14 +16,13 @@ import {
   MetricsCollector,
   trackExecutionStart,
   trackExecutionComplete,
-  trackMissedDaysDetected,
   trackMonthlyDigestSent,
   trackBirthdaySent,
 } from './metrics.service.js';
 import { AlertingService } from './alerting.service.js';
 import { LastRunTrackerService } from './last-run-tracker.service.js';
 import { getFullName } from '../utils/name-helpers.util.js';
-import { isFirstDayOfMonth, startOfMonth, endOfMonth, today, startOfDay } from '../utils/date-helpers.util.js';
+import { isFirstDayOfMonth } from '../utils/date-helpers.util.js';
 import { initializeCorrelationId } from '../utils/runtime.util.js';
 import { QRAuthenticationRequiredError } from '../types/qr-auth-error.js';
 import type { Logger } from '../types/logger.types.js';
@@ -137,122 +135,6 @@ class BirthdayOrchestratorService {
     }
   }
 
-  private async checkAndSendMissedDays(): Promise<void> {
-    return this.xrayClient.captureAsyncSegment('Orchestrator.checkAndSendMissedDays', async () => {
-      const missedDates = await this.lastRunTracker.getMissedDates();
-      
-      if (missedDates.length === 0) {
-        return;
-      }
-
-      const todayDate = today();
-      const todayStart = startOfDay(todayDate);
-
-      const missedFirstOfMonths = missedDates.filter(date => {
-        const dateStart = startOfDay(date);
-        // Only process missed 1st-of-month dates that are NOT today
-        // (today's monthly digest is handled by the regular flow)
-        return isFirstDayOfMonth(date) && dateStart.getTime() < todayStart.getTime();
-      });
-      
-      if (missedFirstOfMonths.length === 0) {
-        this.logger.info(`Found ${missedDates.length} missed day(s), but no missed 1st-of-month dates to recover`);
-        return;
-      }
-
-      // Only recover the latest (most recent) missed 1st-of-month to avoid spamming
-      const latestMissedFirst = missedFirstOfMonths.sort((a, b) => b.getTime() - a.getTime())[0];
-      const dateStr = latestMissedFirst.toISOString().split('T')[0];
-
-      trackMissedDaysDetected(this.metrics, missedFirstOfMonths.length);
-
-      this.logger.info(`Found ${missedFirstOfMonths.length} missed 1st-of-month date(s), recovering latest: ${dateStr}`, {
-        missedFirstOfMonths: missedFirstOfMonths.map(d => d.toISOString().split('T')[0]),
-        recovering: dateStr,
-      });
-
-      let whatsappChannel: ReturnType<typeof OutputChannelFactory.createWhatsAppOutputChannel> | null = null;
-
-      try {
-        whatsappChannel = OutputChannelFactory.createWhatsAppOutputChannel({
-          logger: this.logger,
-          config: this.config,
-          whatsappClient: this.whatsappClient,
-          cloudWatchClient: this.cloudWatchClient,
-          alerting: this.alerting,
-        });
-        if (!whatsappChannel.isAvailable()) {
-          this.logger.info('WhatsApp channel not available, skipping missed monthly digest recovery');
-          return;
-        }
-
-        try {
-          const monthStart = startOfMonth(latestMissedFirst);
-          const monthEnd = endOfMonth(latestMissedFirst);
-          const monthlyBirthdays = await this.birthdayService.getBirthdays(monthStart, monthEnd);
-
-          if (monthlyBirthdays.length === 0) {
-            this.logger.info(`No birthdays found for missed monthly digest: ${dateStr}`);
-            return;
-          }
-
-          const monthlyDigest = this.birthdayService.formatMonthlyDigest(monthlyBirthdays);
-          
-          this.logger.info(`Sending monthly digest for missed 1st-of-month: ${dateStr}`, {
-            monthlyBirthdaysCount: monthlyBirthdays.length,
-          });
-
-          const result = await whatsappChannel.send(monthlyDigest);
-          
-          if (result.success) {
-            trackMonthlyDigestSent(this.metrics);
-            this.logger.info('Missed monthly digest sent successfully', { date: dateStr });
-            
-            await this.logMessage(result.messageId, 'monthly-digest', whatsappChannel, monthlyDigest, true);
-          } else {
-            // Re-throw QR authentication required error - this is fatal
-            if (result.error instanceof QRAuthenticationRequiredError) {
-              throw result.error;
-            }
-            
-            this.logger.warn('Failed to send missed monthly digest', {
-              date: dateStr,
-              error: result.error?.message,
-            });
-            this.alerting.sendMonthlyDigestFailedAlert(result.error, {
-              date: dateStr,
-              isRecovery: true,
-            });
-          }
-        } catch (error) {
-          // Re-throw QR authentication required error - this is fatal
-          if (error instanceof QRAuthenticationRequiredError) {
-            throw error;
-          }
-          
-          this.logger.error(`Error recovering monthly digest for ${dateStr}`, error);
-          this.alerting.sendMissedDaysRecoveryFailedAlert(error, {
-            missedDate: dateStr,
-            stage: 'monthly-digest-recovery',
-          });
-        }
-      } catch (error) {
-        // Re-throw QR authentication required error - this is fatal
-        if (error instanceof QRAuthenticationRequiredError) {
-          throw error;
-        }
-        
-        this.logger.error('Error processing missed monthly digest recovery', error);
-        this.alerting.sendMissedDaysRecoveryFailedAlert(error, {
-          stage: 'initialization',
-        });
-      } finally {
-        await this.cleanupWhatsAppClient(whatsappChannel);
-      }
-    }, {
-      operation: 'checkAndSendMissedDays',
-    });
-  }
 
   async runBirthdayCheck(): Promise<void> {
     return this.xrayClient.captureAsyncSegment('Orchestrator.runBirthdayCheck', async () => {
@@ -264,9 +146,6 @@ class BirthdayOrchestratorService {
       let whatsappChannel: ReturnType<typeof OutputChannelFactory.createWhatsAppOutputChannel> | null = null;
 
       try {
-        // First, check for and send missed days
-        await this.checkAndSendMissedDays();
-
         // Sync from Sheets to Calendar (optional - continues even if sync fails)
         try {
           await this.birthdayService.trySyncFromSheets();

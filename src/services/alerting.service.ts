@@ -5,6 +5,7 @@ import type { Logger } from '../types/logger.types.js';
 import type { AppConfig } from '../config.js';
 import type { AlertState, AlertDetails } from '../types/alerting.types.js';
 import snsClientDefault from '../clients/sns.client.js';
+import { createTwilioClient, type TwilioClientWrapper } from '../clients/twilio.client.js';
 import { formatTimestampHumanReadable } from '../utils/date-helpers.util.js';
 
 type SNSClient = typeof snsClientDefault;
@@ -17,6 +18,7 @@ interface AlertingServiceOptions {
   logger: Logger;
   config: AppConfig;
   snsClient: SNSClient;
+  twilioClient?: TwilioClientWrapper;
 }
 
 function getCloudWatchLogsUrl(config: AppConfig): string | undefined {
@@ -39,16 +41,32 @@ export class AlertingService {
   private readonly logger: Logger;
   private readonly config: AppConfig;
   private readonly snsClient: SNSClient;
+  private readonly twilioClient: TwilioClientWrapper | undefined;
   private readonly topicArn: string | undefined;
   private readonly storage = StorageService.getAppStorage();
   private readonly alertStateKey = 'alerts/active-alerts.json';
   private readonly deduplicationWindowMs = 60 * 60 * 1000;
 
   constructor(options: AlertingServiceOptions) {
-    const { logger, config, snsClient } = options;
+    const { logger, config, snsClient, twilioClient } = options;
     this.logger = logger;
     this.config = config;
     this.snsClient = snsClient;
+    // Initialize Twilio client only if credentials are provided
+    // Wrap in try-catch to ensure initialization failures don't break the alerting service
+    if (twilioClient) {
+      this.twilioClient = twilioClient;
+    } else if (config.twilio.accountSid) {
+      try {
+        this.twilioClient = createTwilioClient(logger);
+      } catch (error) {
+        // Log but don't throw - Twilio is optional
+        logger.warn('Failed to initialize Twilio client for alerting', error);
+        this.twilioClient = undefined;
+      }
+    } else {
+      this.twilioClient = undefined;
+    }
     this.topicArn = config.aws.snsTopicArn;
   }
 
@@ -164,6 +182,37 @@ export class AlertingService {
     }
   }
 
+  private formatSMSMessage(details: AlertDetails, alertState: AlertState): string {
+    const now = new Date();
+    const timeStr = formatTimestampHumanReadable(now);
+    
+    // Extract key info for SMS - keep it under 160 chars if possible
+    let sms = `🚨 ${details.title}\n`;
+    sms += `${details.message}`;
+    
+    // Add error if present (truncate if too long)
+    if (details.error) {
+      const errorMessage = details.error instanceof Error 
+        ? details.error.message 
+        : String(details.error);
+      // Truncate error to 50 chars max for SMS
+      const shortError = errorMessage.length > 50 
+        ? `${errorMessage.substring(0, 47)}...`
+        : errorMessage;
+      sms += `\nError: ${shortError}`;
+    }
+    
+    // Add count if multiple occurrences
+    if (alertState.count > 1) {
+      sms += `\n(Occurred ${alertState.count}x)`;
+    }
+    
+    // Add time at the end
+    sms += `\n${timeStr}`;
+    
+    return sms;
+  }
+
   private formatAlertMessage(details: AlertDetails, alertState: AlertState): string {
     const correlationId = getCorrelationId();
     const logsUrl = getCloudWatchLogsUrl(this.config);
@@ -243,14 +292,55 @@ export class AlertingService {
       const subject = `[${details.severity}] Mnemora Birthday Bot: ${details.title}`;
 
       const sendSMS = details.severity === AlertSeverity.CRITICAL;
+      console.log(`[DEBUG] sendSMS=${sendSMS}, twilioClient available=${this.twilioClient?.isAvailable() ?? false}`);
 
+      // Send via SNS (for email and potentially SMS if configured)
       await this.snsClient.publishAlert(subject, message, details.severity, details.type, sendSMS);
+
+      // Send SMS via Twilio if configured and SMS is requested
+      console.log(`[DEBUG] About to check SMS: sendSMS=${sendSMS}, twilioAvailable=${this.twilioClient?.isAvailable() ?? false}`);
+      if (sendSMS && this.twilioClient?.isAvailable()) {
+        console.log(`[DEBUG] Entering SMS sending block`);
+        try {
+          const smsMessage = this.formatSMSMessage(details, alertState);
+          this.logger.info('Attempting to send SMS via Twilio', {
+            type: details.type,
+            severity: details.severity,
+            alertId,
+          });
+          const smsSid = await this.twilioClient.sendSMS(smsMessage);
+          this.logger.info('SMS sent via Twilio', {
+            type: details.type,
+            severity: details.severity,
+            alertId,
+            smsSid,
+          });
+          console.log(`✅ SMS sent via Twilio! Message SID: ${smsSid}`);
+        } catch (error) {
+          this.logger.error('Error sending SMS via Twilio', error, {
+            type: details.type,
+            severity: details.severity,
+            alertId,
+          });
+          console.error('❌ Error sending SMS via Twilio:', error);
+          // Don't fail the entire alert if SMS fails
+        }
+      } else if (sendSMS) {
+        this.logger.warn('SMS requested but Twilio not available', {
+          type: details.type,
+          severity: details.severity,
+          alertId,
+          twilioAvailable: this.twilioClient?.isAvailable() ?? false,
+        });
+        console.warn('⚠️  SMS requested but Twilio client not available');
+      }
 
       this.logger.info('Alert sent via SNS', {
         type: details.type,
         severity: details.severity,
         alertId,
         count: alertState.count,
+        smsSent: sendSMS && this.twilioClient?.isAvailable(),
       });
 
       await this.saveActiveAlerts(alerts);
@@ -363,25 +453,6 @@ export class AlertingService {
   });
 }
 
-  sendDailyExecutionMissedAlert(date: string, context?: Record<string, unknown>): void {
-    this.sendAlert({
-    type: AlertType.DAILY_EXECUTION_MISSED,
-    severity: AlertSeverity.CRITICAL,
-    title: 'Daily Execution Missed',
-    message: `The daily birthday check did not execute on ${date}. This is a critical failure.`,
-    metadata: {
-      date,
-      ...context,
-    },
-    remediationSteps: [
-      'Check EventBridge rule is enabled and configured correctly',
-      'Verify Lambda function is deployed and accessible',
-      'Check CloudWatch Logs for execution errors',
-      'Verify IAM permissions for EventBridge to invoke Lambda',
-      'Manually trigger Lambda to test',
-    ],
-  });
-}
 
   sendMonthlyDigestFailedAlert(error: Error | unknown, context?: Record<string, unknown>): void {
     this.sendAlert({
@@ -442,7 +513,8 @@ export class AlertingService {
 }
 
   sendWhatsAppAuthRequiredAlert(context?: Record<string, unknown>): void {
-    this.sendAlert({
+    // Fire and forget - sendAlert is async but we don't need to wait
+    void this.sendAlert({
     type: AlertType.WHATSAPP_AUTH_REQUIRED,
     severity: AlertSeverity.CRITICAL,
     title: 'WhatsApp Authentication Required',
@@ -499,21 +571,6 @@ export class AlertingService {
   });
 }
 
-  sendMissedDaysRecoveryFailedAlert(error: Error | unknown, context?: Record<string, unknown>): void {
-    this.sendAlert({
-    type: AlertType.MISSED_DAYS_RECOVERY_FAILED,
-    severity: AlertSeverity.WARNING,
-    title: 'Missed Days Recovery Failed',
-    message: 'Failed to recover and send messages for missed days.',
-    error,
-    metadata: context,
-    remediationSteps: [
-      'Check CloudWatch Logs for specific error',
-      'Manually trigger recovery if needed',
-      'Fix underlying issue (API, WhatsApp, etc.)',
-    ],
-  });
-}
 
   sendCloudWatchMetricsFailedAlert(error: Error | unknown, context?: Record<string, unknown>): void {
     this.sendAlert({

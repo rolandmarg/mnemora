@@ -7,7 +7,6 @@ export enum AlertSeverity {
 export enum AlertType {
   LAMBDA_EXECUTION_FAILED = 'lambda-execution-failed',
   LAMBDA_TIMEOUT = 'lambda-timeout',
-  DAILY_EXECUTION_MISSED = 'daily-execution-missed',
   MONTHLY_DIGEST_FAILED = 'monthly-digest-failed',
   GOOGLE_CALENDAR_API_FAILED = 'google-calendar-api-failed',
   
@@ -15,7 +14,6 @@ export enum AlertType {
   WHATSAPP_AUTH_REQUIRED = 'whatsapp-auth-required',
   WHATSAPP_GROUP_NOT_FOUND = 'whatsapp-group-not-found',
   WHATSAPP_CLIENT_INIT_FAILED = 'whatsapp-client-init-failed',
-  MISSED_DAYS_RECOVERY_FAILED = 'missed-days-recovery-failed',
   S3_STORAGE_FAILED = 's3-storage-failed',
   CLOUDWATCH_METRICS_FAILED = 'cloudwatch-metrics-failed',
   

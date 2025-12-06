@@ -22,7 +22,6 @@ Never miss another birthday. Mnemora automatically checks your Google Calendar o
 Birthdays are easy to forget. You might have them in a calendar or spreadsheet, but you still need to remember to check every day. Mnemora solves this by:
 - **Automatically checking** your data sources (Google Calendar, Sheets, CSV) every morning
 - **Sending notifications** to your WhatsApp group, family chat, or any messaging platform
-- **Handling missed days** intelligently if the system was down
 - **Monthly digests** on the 1st of each month showing all upcoming birthdays
 
 No more awkward "I didn't know it was your birthday!" moments.
