@@ -1,10 +1,16 @@
 import { google, type calendar_v3 } from 'googleapis';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc.js';
+import timezone from 'dayjs/plugin/timezone.js';
 import { auditDeletionAttempt, SecurityError } from '../utils/security.util.js';
-import { startOfDay, endOfDay } from '../utils/date-helpers.util.js';
+import { startOfDay, endOfDay, getYearInTimezone, getMonthInTimezone, getDateInTimezone, convertMidnightToUTC } from '../utils/date-helpers.util.js';
 import { logger } from '../utils/logger.util.js';
 import type { Event, DeletionResult } from '../types/event.types.js';
 import { BaseClient, type XRayClientInterface } from './base.client.js';
 import type { AppConfig } from '../config.js';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 type CalendarClient = calendar_v3.Calendar;
 type CalendarEvent = calendar_v3.Schema$Event;
@@ -101,17 +107,24 @@ class GoogleCalendarClient extends BaseClient {
       const start = startOfDay(startDate);
       const end = endOfDay(endDate);
       
-      // Extract local date components and create UTC date range
-      // Query from start of target day to start of next day to catch all all-day events
-      const startYear = start.getFullYear();
-      const startMonth = start.getMonth();
-      const startDay = start.getDate();
-      const endYear = end.getFullYear();
-      const endMonth = end.getMonth();
-      const endDay = end.getDate();
+      // Convert start and end of day in configured timezone to UTC
+      // This ensures we query for the correct UTC time range that corresponds to the day
+      // in the configured timezone (e.g., Dec 4 00:00:00 PST -> Dec 4 08:00:00 UTC)
+      const timeMinUTC = convertMidnightToUTC(start);
+      // For end date, we want the start of the next day in the configured timezone
+      // Use dayjs to add one day in the configured timezone to avoid timezone issues
+      const tz = this.config.schedule.timezone;
+      const endInTz = dayjs(end).tz(tz);
+      const nextDayInTz = endInTz.add(1, 'day').startOf('day');
+      const timeMaxUTC = nextDayInTz.utc().toDate();
       
-      const timeMinUTC = new Date(Date.UTC(startYear, startMonth, startDay, 0, 0, 0, 0));
-      const timeMaxUTC = new Date(Date.UTC(endYear, endMonth, endDay + 1, 0, 0, 0, 0));
+      // Extract date components for filtering all-day events (date-only comparison)
+      const startYear = getYearInTimezone(start);
+      const startMonth = getMonthInTimezone(start) - 1; // Convert to 0-indexed for string formatting
+      const startDay = getDateInTimezone(start);
+      const endYear = getYearInTimezone(end);
+      const endMonth = getMonthInTimezone(end) - 1; // Convert to 0-indexed for string formatting
+      const endDay = getDateInTimezone(end);
 
       try {
         const calendarEvents = await this.readOnlyCalendar.events.list({
@@ -139,6 +152,7 @@ class GoogleCalendarClient extends BaseClient {
         // Filter events to only include those within the date range
         // For all-day events (date-only), check if the date is within the range
         // For timed events, they're already filtered by the API query
+        // Note: startMonth and endMonth are already 0-indexed from Date.UTC, so add 1 for display
         const startDateStr = `${startYear}-${String(startMonth + 1).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
         const endDateStr = `${endYear}-${String(endMonth + 1).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
         

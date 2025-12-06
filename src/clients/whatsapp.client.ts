@@ -12,6 +12,7 @@ import { join } from 'path';
 import qrcode from 'qrcode-terminal';
 import { isLambda } from '../utils/runtime.util.js';
 import xrayClient from './xray.client.js';
+import { QRAuthenticationRequiredError } from '../types/qr-auth-error.js';
 
 function displayQRCode(qrCode: string): void {
   qrcode.generate(qrCode, { small: true });
@@ -232,10 +233,24 @@ class WhatsAppClient {
 
       // Handle QR code
       if (qr) {
-        // Don't clear timeout - we want to wait for QR code scanning
-        // The timeout will be cleared when connection opens or on error
         this.authRequired = true;
         
+        // In Lambda, QR code authentication is impossible - fail fast
+        if (this.isLambda) {
+          clearInitTimeout();
+          this.isInitializing = false;
+          if (this.sock) {
+            this.sock.end(undefined);
+            this.sock = null;
+          }
+          const errorMessage = 'WhatsApp authentication required but QR code scanning is not possible in Lambda. ' +
+            'Please authenticate locally first, then sync the session to S3. ' +
+            'The session archive must exist in S3 before the Lambda function can use WhatsApp.';
+          reject(new QRAuthenticationRequiredError(qr, errorMessage));
+          return;
+        }
+        
+        // In local development, display QR code and wait for scanning
         // Common instructions
         const instructions = [
           '1. Open WhatsApp on your phone',

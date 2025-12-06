@@ -61,12 +61,14 @@ TIMEZONE=America/Los_Angeles
 ```bash
 yarn start
 ```
-Scan QR code with WhatsApp (Settings → Linked Devices → Link a Device). Session saves automatically.
+Scan QR code with WhatsApp (Settings → Linked Devices → Link a Device). Session saves automatically to S3 if configured.
+
+**Note:** `yarn start` runs the same functionality as Lambda (including metrics, alerting, etc.). The only difference is it runs locally instead of in AWS Lambda.
 
 ## Commands
 
 ```bash
-yarn start              # Run birthday check
+yarn start              # Run birthday check (same functionality as Lambda)
 yarn dev                # Development mode (auto-reload)
 yarn build              # Compile TypeScript
 yarn type-check         # Type check

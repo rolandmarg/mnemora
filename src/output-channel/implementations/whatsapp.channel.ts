@@ -76,7 +76,7 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
         return;
       }
 
-      // Sync session from S3 before initialization (Lambda only)
+      // Sync session from S3 before initialization (if available)
       // Only sync once at startup - if client is already ready, skip sync
       const sessionPath = this.getSessionPath();
       await this.sessionManager.syncSessionFromS3(sessionPath);
@@ -380,8 +380,8 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
       // Flush pending S3 writes (auth reminder) before session sync
       await this.flushPendingWrites();
       
-      // Sync session to S3 before destroying (Lambda only)
-      // This is the only place we save session to S3 after loading at start
+      // Sync session to S3 before destroying (if S3 is configured)
+      // This saves session to S3 after any changes during execution
       await this.syncSessionToS3();
       
       await this.whatsappClient.destroy();

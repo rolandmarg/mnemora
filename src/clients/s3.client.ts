@@ -313,7 +313,8 @@ export class FileStorage {
   }
 
   async syncToS3(localPath: string): Promise<void> {
-    if (!this.isLambda || !s3Client.isAvailable()) {
+    // Allow sync from both Lambda and local if S3 is configured
+    if (!s3Client.isAvailable()) {
       return;
     }
 

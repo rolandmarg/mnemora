@@ -166,6 +166,31 @@ export function isFirstDayOfMonth(date: Date): boolean {
 }
 
 /**
+ * Get the year of a date in the configured timezone.
+ * This ensures we extract date components correctly regardless of system timezone.
+ */
+export function getYearInTimezone(date: Date): number {
+  const tz = getTimezone();
+  const zonedDate = dayjs(date).tz(tz);
+  return zonedDate.year();
+}
+
+/**
+ * Convert a date at midnight in the configured timezone to UTC.
+ * This is used for querying APIs that expect UTC timestamps.
+ * Example: Dec 4 00:00:00 PST -> Dec 4 08:00:00 UTC
+ */
+export function convertMidnightToUTC(date: Date): Date {
+  const tz = getTimezone();
+  // Get the date components in the configured timezone
+  const zonedDate = dayjs(date).tz(tz);
+  // Create a date string at midnight in the configured timezone
+  const midnightInTz = zonedDate.startOf('day');
+  // Convert to UTC
+  return midnightInTz.utc().toDate();
+}
+
+/**
  * Get the month (1-12) of a date in the configured timezone.
  * This ensures we extract date components correctly regardless of system timezone.
  */
