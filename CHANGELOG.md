@@ -16,6 +16,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+---
+## [1.0.16] - 2025-12-06
+
+## What's Changed
+
+### 📦 Other Changes
+
+- Git status --porcelain (09d92ab)
+- Timezone fix (6d30e54)
+- Update readme (a5981ac)
+
+**Full Changelog**: v1.0.15...v1.0.16
+
 ---
 ## [1.0.15] - 2025-12-06
 
