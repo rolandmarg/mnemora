@@ -1,11 +1,6 @@
-# Auto-fix lint issues
-echo "🔧 Running lint:fix..."
-yarn lint:fix
+# Run lint-staged (only checks changed files) - FAST
+echo "🔧 Running lint-staged on changed files..."
+yarn lint-staged
 
-# Stage any files that were auto-fixed
-echo "📝 Staging auto-fixed files..."
-git add -u
-
-# Type check (can't be auto-fixed)
-echo "🔍 Running type-check..."
-yarn type-check
+# Type-check is skipped locally for speed
+# Type-check runs in CI/CD to catch errors before merge
