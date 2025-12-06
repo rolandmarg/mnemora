@@ -15,6 +15,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+---
+## [1.0.15] - 2025-12-06
+
+## What's Changed
+
+### 📝 Documentation
+
+- Update README and improve local execution details (f38f517)
+
+**Full Changelog**: v1.0.14...v1.0.15
+
 ---
 ## [1.0.14] - 2025-12-03
 

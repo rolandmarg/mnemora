@@ -1,6 +1,6 @@
 {
   "name": "mnemora",
-  "version": "1.0.14",
+  "version": "1.0.15",
   "description": "Bot that fetches Google Calendar birthdays and sends WhatsApp notifications",
   "main": "src/index.ts",
   "type": "module",
