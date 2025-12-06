@@ -13,7 +13,9 @@ class SNSClientWrapper {
     this.topicArn = config.aws.snsTopicArn;
 
     const region = config.aws.region;
-    if (this.isLambda && this.topicArn && region) {
+    // Initialize SNS client if we have topic ARN and region
+    // Allow local testing when SNS_TOPIC_ARN is explicitly set
+    if (this.topicArn && region) {
       this.snsClient = new SNSClient({
         region,
       });

@@ -91,6 +91,9 @@ Resources:
       TopicArn: !Ref AlertTopic
       Protocol: sms
       Endpoint: !Ref AlertPhone
+      FilterPolicy:
+        SendSMS:
+          - 'true'
 
   SessionStorageBucket:
     Type: AWS::S3::Bucket
