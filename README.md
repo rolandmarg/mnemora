@@ -2,11 +2,6 @@
 
 <div align="center">
 
-![CI/CD](https://github.com/rolandmarg/mnemora/workflows/Auto%20Release/badge.svg)
-![Version](https://img.shields.io/github/package-json/v/rolandmarg/mnemora)
-![AWS Lambda](https://img.shields.io/badge/AWS-Lambda-FF9900?logo=aws-lambda&logoColor=white)
-![Deployment](https://img.shields.io/badge/Deployment-Production-25D366?logo=amazon-aws&logoColor=white)
-
 ![Node.js](https://img.shields.io/badge/Node.js-24.x-339933?logo=node.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)
 ![Yarn](https://img.shields.io/badge/Yarn-4.11-2C8EBB?logo=yarn&logoColor=white)
