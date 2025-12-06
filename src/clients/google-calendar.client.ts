@@ -3,7 +3,7 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc.js';
 import timezone from 'dayjs/plugin/timezone.js';
 import { auditDeletionAttempt, SecurityError } from '../utils/security.util.js';
-import { startOfDay, endOfDay, getYearInTimezone, getMonthInTimezone, getDateInTimezone, convertMidnightToUTC } from '../utils/date-helpers.util.js';
+import { getYearInTimezone, getMonthInTimezone, getDateInTimezone, convertMidnightToUTC } from '../utils/date-helpers.util.js';
 import { logger } from '../utils/logger.util.js';
 import type { Event, DeletionResult } from '../types/event.types.js';
 import { BaseClient, type XRayClientInterface } from './base.client.js';
@@ -104,27 +104,27 @@ class GoogleCalendarClient extends BaseClient {
     const calendarId = this.config.google.calendarId;
     
     return this.captureSegment('GoogleCalendar', 'fetchEvents', async () => {
-      const start = startOfDay(startDate);
-      const end = endOfDay(endDate);
-      
       // Convert start and end of day in configured timezone to UTC
       // This ensures we query for the correct UTC time range that corresponds to the day
       // in the configured timezone (e.g., Dec 4 00:00:00 PST -> Dec 4 08:00:00 UTC)
-      const timeMinUTC = convertMidnightToUTC(start);
+      // Note: convertMidnightToUTC already handles creating midnight in the timezone,
+      // so we don't need to call startOfDay() first (which would normalize in UTC and cause date shifts)
+      const timeMinUTC = convertMidnightToUTC(startDate);
       // For end date, we want the start of the next day in the configured timezone
       // Use dayjs to add one day in the configured timezone to avoid timezone issues
       const tz = this.config.schedule.timezone;
-      const endInTz = dayjs(end).tz(tz);
+      const endInTz = dayjs(endDate).tz(tz);
       const nextDayInTz = endInTz.add(1, 'day').startOf('day');
       const timeMaxUTC = nextDayInTz.utc().toDate();
       
       // Extract date components for filtering all-day events (date-only comparison)
-      const startYear = getYearInTimezone(start);
-      const startMonth = getMonthInTimezone(start) - 1; // Convert to 0-indexed for string formatting
-      const startDay = getDateInTimezone(start);
-      const endYear = getYearInTimezone(end);
-      const endMonth = getMonthInTimezone(end) - 1; // Convert to 0-indexed for string formatting
-      const endDay = getDateInTimezone(end);
+      // Use the original dates (interpreted in configured timezone) for component extraction
+      const startYear = getYearInTimezone(startDate);
+      const startMonth = getMonthInTimezone(startDate) - 1; // Convert to 0-indexed for string formatting
+      const startDay = getDateInTimezone(startDate);
+      const endYear = getYearInTimezone(endDate);
+      const endMonth = getMonthInTimezone(endDate) - 1; // Convert to 0-indexed for string formatting
+      const endDay = getDateInTimezone(endDate);
 
       try {
         const calendarEvents = await this.readOnlyCalendar.events.list({

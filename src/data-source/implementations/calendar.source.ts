@@ -209,7 +209,6 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
 
     // Check if birthday already exists
     if (existingBirthdayMap.has(duplicateKey)) {
-      this.logger.info(`Skipping duplicate birthday for ${fullName}`);
       return { added: 0, skipped: 1, errors: 0 };
     }
 
@@ -253,7 +252,6 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
       const duplicateKey = this.createDuplicateKey(birthday.birthday, fullName);
 
       if (existingBirthdayMap.has(duplicateKey)) {
-        this.logger.info(`Skipping duplicate birthday for ${fullName}`);
         skippedCount++;
       } else {
         birthdaysToAdd.push(birthday);
@@ -264,6 +262,11 @@ export class CalendarDataSource extends BaseDataSource<BirthdayRecord> {
     if (birthdaysToAdd.length === 0) {
       this.logger.info(`All ${data.length} birthday(s) already exist in calendar - skipping sync`);
       return { added: 0, skipped: skippedCount, errors: 0 };
+    }
+
+    // Log summary if any duplicates were skipped (but not all)
+    if (skippedCount > 0) {
+      this.logger.info(`Skipped ${skippedCount} duplicate birthday(s), processing ${birthdaysToAdd.length} new birthday(s)`);
     }
 
     // Process only non-duplicate birthdays

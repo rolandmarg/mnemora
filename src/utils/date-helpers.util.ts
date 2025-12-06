@@ -24,9 +24,11 @@ function createDateInTimezone(year: number, month: number, day: number): Date {
 export function today(): Date {
   const tz = getTimezone();
   const now = new Date();
-  // toZonedTime equivalent: convert UTC now to timezone tz, get date components
+  // Get the current date in the configured timezone
   const zonedDate = dayjs(now).tz(tz);
-  return new Date(zonedDate.year(), zonedDate.month(), zonedDate.date());
+  // Create a date at midnight in the configured timezone
+  // This ensures the date represents the correct calendar day in the target timezone
+  return zonedDate.startOf('day').toDate();
 }
 
 function createDate(month: number, day: number, year?: number): Date {
