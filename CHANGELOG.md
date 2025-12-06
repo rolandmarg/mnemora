@@ -18,6 +18,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+---
+## [1.0.18] - 2025-12-06
+
+## What's Changed
+
+### 📦 Other Changes
+
+- Drop tests from ci/cd (3d15183)
+- Skip type check in precommit for fast dev cycle, keep typecheck in CI/CD (c0af7df)
+- Make sharp optional dependency (c8a5e25)
+- Who needs tests when u have claude composer (05a1b0c)
+
+**Full Changelog**: v1.0.17...v1.0.18
+
 ---
 ## [1.0.17] - 2025-12-06
 
