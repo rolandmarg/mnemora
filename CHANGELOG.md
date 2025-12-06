@@ -19,6 +19,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+---
+## [1.0.19] - 2025-12-06
+
+## What's Changed
+
+### 🔧 Chores
+
+- Integrate Twilio for SMS notifications and remove missed days recovery logic (a1699ae)
+- Add FilterPolicy to SNS subscription for SMS notifications (4ca6355)
+
+### 📦 Other Changes
+
+- Remove extra badges (34a3940)
+- Add badges to readme (e8a554d)
+- Update readme (9662f6d)
+
+**Full Changelog**: v1.0.18...v1.0.19
+
 ---
 ## [1.0.18] - 2025-12-06
 
