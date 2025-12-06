@@ -53,6 +53,12 @@ GOOGLE_SPREADSHEET_ID=your-spreadsheet-id
 # WhatsApp
 WHATSAPP_GROUP_ID=your-group-name
 
+# AWS Configuration (for S3 session storage, CloudWatch, and SNS alerts)
+AWS_REGION=us-west-1
+AWS_S3_BUCKET=your-s3-bucket-name
+AWS_CLOUDWATCH_LOG_GROUP=/aws/lambda/your-function-name
+SNS_TOPIC_ARN=arn:aws:sns:region:account-id:your-topic-name
+
 # Config
 TIMEZONE=America/Los_Angeles
 ```
@@ -64,6 +70,10 @@ yarn start
 Scan QR code with WhatsApp (Settings → Linked Devices → Link a Device). Session saves automatically to S3 if configured.
 
 **Note:** `yarn start` runs the same functionality as Lambda (including metrics, alerting, etc.). The only difference is it runs locally instead of in AWS Lambda.
+
+**🔄 Automatic Session Sync:** When you run `yarn start` locally, the WhatsApp session automatically syncs to S3 at the end of execution. This means Lambda will use your latest authenticated session on its next run - no manual sync needed! Every local run refreshes the Lambda session automatically.
+
+**🔄 Automatic Session Sync:** When you run `yarn start` locally, the WhatsApp session automatically syncs to S3 at the end of execution. This means Lambda will use your latest authenticated session on its next run - no manual sync needed! Every local run refreshes the Lambda session automatically.
 
 ## Commands
 
