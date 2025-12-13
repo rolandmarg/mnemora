@@ -21,6 +21,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+---
+## [1.0.21] - 2025-12-13
+
+## What's Changed
+
+### 🔧 Chores
+
+- Remove daily summary handler and related configurations (d8f636b)
+
+**Full Changelog**: v1.0.20...v1.0.21
+
 ---
 ## [1.0.20] - 2025-12-09
 
