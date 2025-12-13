@@ -26,11 +26,19 @@ export interface AWSConfig {
   enableXRay: boolean;
 }
 
+export interface TwilioConfig {
+  accountSid: string | undefined;
+  authToken: string | undefined;
+  fromNumber: string | undefined;
+  toNumber: string | undefined;
+}
+
 export interface AppConfig {
   google: GoogleConfig;
   whatsapp: WhatsAppConfig;
   schedule: ScheduleConfig;
   aws: AWSConfig;
+  twilio: TwilioConfig;
   metrics: {
     namespace: string;
     enabled: boolean;
@@ -88,6 +96,12 @@ export const config: AppConfig = {
     snsTopicArn: process.env.SNS_TOPIC_ARN,
     cloudWatchLogGroup: process.env.AWS_CLOUDWATCH_LOG_GROUP,
     enableXRay: process.env.AWS_XRAY_ENABLED !== 'false',
+  },
+  twilio: {
+    accountSid: process.env.TWILIO_ACCOUNT_SID,
+    authToken: process.env.TWILIO_AUTH_TOKEN,
+    fromNumber: process.env.TWILIO_FROM_NUMBER,
+    toNumber: process.env.TWILIO_TO_NUMBER,
   },
   metrics: {
     namespace: process.env.METRICS_NAMESPACE ?? 'Mnemora/BirthdayBot',
