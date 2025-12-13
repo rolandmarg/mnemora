@@ -273,61 +273,6 @@ export class AlertingService {
     }
   }
 
-  async sendDailySummary(): Promise<void> {
-    if (!this.snsClient.isAvailable() || !this.topicArn) {
-      this.logger.warn('Daily summary would be sent (SNS not configured)');
-      return;
-    }
-
-    try {
-      const activeAlerts = await this.getActiveAlerts();
-
-      if (activeAlerts.length === 0) {
-        this.logger.debug('No active alerts for daily summary');
-        return;
-      }
-
-      const critical = activeAlerts.filter(a => a.severity === AlertSeverity.CRITICAL);
-      const warnings = activeAlerts.filter(a => a.severity === AlertSeverity.WARNING);
-      const info = activeAlerts.filter(a => a.severity === AlertSeverity.INFO);
-
-      let summary = '📊 Daily Alert Summary\n\n';
-      summary += `Total Active Alerts: ${activeAlerts.length}\n\n`;
-
-      if (critical.length > 0) {
-        summary += `🚨 CRITICAL (${critical.length}):\n`;
-        critical.forEach(alert => {
-          summary += `  - ${alert.alertId}: ${alert.count} occurrence(s) since ${formatTimestampHumanReadable(alert.firstOccurred)}\n`;
-        });
-        summary += '\n';
-      }
-
-      if (warnings.length > 0) {
-        summary += `⚠️  WARNING (${warnings.length}):\n`;
-        warnings.forEach(alert => {
-          summary += `  - ${alert.alertId}: ${alert.count} occurrence(s) since ${formatTimestampHumanReadable(alert.firstOccurred)}\n`;
-        });
-        summary += '\n';
-      }
-
-      if (info.length > 0) {
-        summary += `ℹ️  INFO (${info.length}):\n`;
-        info.forEach(alert => {
-          summary += `  - ${alert.alertId}: ${alert.count} occurrence(s) since ${formatTimestampHumanReadable(alert.firstOccurred)}\n`;
-        });
-        summary += '\n';
-      }
-
-      summary += 'View details in CloudWatch Logs or AWS Console.\n';
-
-      const subject = `[INFO] Mnemora Birthday Bot: Daily Alert Summary (${activeAlerts.length} active)`;
-      await this.snsClient.publishAlert(subject, summary, AlertSeverity.INFO, 'daily-summary', false);
-
-      this.logger.info('Daily alert summary sent', { alertCount: activeAlerts.length });
-    } catch (error) {
-      this.logger.error('Error sending daily alert summary', error);
-    }
-  }
 
   sendLambdaExecutionFailedAlert(error: Error | unknown, context?: Record<string, unknown>): void {
     this.sendAlert({
@@ -423,9 +368,9 @@ export class AlertingService {
   });
 }
 
-  sendWhatsAppAuthRequiredAlert(context?: Record<string, unknown>): void {
-    // Fire and forget - sendAlert is async but we don't need to wait
-    void this.sendAlert({
+  async sendWhatsAppAuthRequiredAlert(context?: Record<string, unknown>): Promise<void> {
+    // Await to ensure alert is sent before Lambda exits
+    await this.sendAlert({
     type: AlertType.WHATSAPP_AUTH_REQUIRED,
     severity: AlertSeverity.CRITICAL,
     title: 'WhatsApp Authentication Required',

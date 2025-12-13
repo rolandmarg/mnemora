@@ -216,7 +216,6 @@ You are an expert in TypeScript, Node.js.
 - **Execution Schedule**: Runs once per day (scheduled execution)
 - **Lambda Handlers**: Located in `src/lambda/`
   - `handler.ts` - Main Lambda entry point
-  - `daily-summary-handler.ts` - Daily summary handler
 - **Package Size**: Keep Lambda package size minimal (see Baileys version warning below)
 - **Build Scripts**: Use `yarn build:lambda` and `yarn package:lambda` (TypeScript scripts in `src/scripts/`)
 - **No Backward Compatibility**: This is a single-purpose application running once per day in Lambda. We don't maintain backward compatibility - feel free to refactor, modernize, and improve code without worrying about breaking changes for external consumers.

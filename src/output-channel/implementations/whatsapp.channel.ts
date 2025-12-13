@@ -95,7 +95,7 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
       
       if (this.whatsappClient.requiresAuth()) {
         trackWhatsAppAuthRequired(this.metrics);
-        this.alerting.sendWhatsAppAuthRequiredAlert({
+        await this.alerting.sendWhatsAppAuthRequiredAlert({
           qrCodeAvailable: true,
           environment: isLambda() ? 'lambda' : 'local',
         });
@@ -106,8 +106,16 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
       }
     } catch (error) {
       // Re-throw QR authentication required error so it bubbles up to handler
-      // Don't treat it as a generic initialization failure
+      // But send alert first to ensure it's sent even if Lambda exits quickly
       if (error instanceof QRAuthenticationRequiredError) {
+        // Send alert immediately when QR auth is required
+        // This ensures the alert is sent even if Lambda exits before handler catches it
+        trackWhatsAppAuthRequired(this.metrics);
+        await this.alerting.sendWhatsAppAuthRequiredAlert({
+          qrCodeAvailable: true,
+          environment: isLambda() ? 'lambda' : 'local',
+          errorMessage: error.message,
+        });
         throw error;
       }
       

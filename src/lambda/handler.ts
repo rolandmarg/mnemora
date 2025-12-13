@@ -98,7 +98,8 @@ export async function handler(
           // QR authentication required - send specific alert
           // Note: WhatsApp channel already sends this alert, but we send it again here
           // to ensure it's sent even if the error bubbles up before the channel can send it
-          alerting.sendWhatsAppAuthRequiredAlert({
+          // Await to ensure alert is sent before Lambda exits
+          await alerting.sendWhatsAppAuthRequiredAlert({
             requestId: context.awsRequestId,
             functionName: context.functionName,
             qrCodeAvailable: true,

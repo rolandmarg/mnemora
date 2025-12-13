@@ -243,9 +243,12 @@ class WhatsAppClient {
             this.sock.end(undefined);
             this.sock = null;
           }
+          // Log QR code to CloudWatch Logs so it can be retrieved for authentication
+          console.log('QR_CODE_FOR_SCANNING:', JSON.stringify({ qrCode: qr }));
           const errorMessage = 'WhatsApp authentication required but QR code scanning is not possible in Lambda. ' +
             'Please authenticate locally first, then sync the session to S3. ' +
-            'The session archive must exist in S3 before the Lambda function can use WhatsApp.';
+            'The session archive must exist in S3 before the Lambda function can use WhatsApp. ' +
+            'QR code is available in CloudWatch Logs - search for "QR_CODE_FOR_SCANNING".';
           reject(new QRAuthenticationRequiredError(qr, errorMessage));
           return;
         }

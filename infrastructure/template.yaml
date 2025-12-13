@@ -199,53 +199,6 @@ Resources:
             Input: '{}'
       Tracing: Active
 
-  DailySummaryFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub 'mnemora-daily-summary-${Environment}'
-      CodeUri: ../dist/
-      Handler: lambda/daily-summary-handler.handler
-      Runtime: nodejs24.x
-      Timeout: 60
-      MemorySize: 256
-      Environment:
-        Variables:
-          NODE_ENV: production
-          LOG_LEVEL: info
-          AWS_S3_BUCKET: !Ref SessionStorageBucket
-          SNS_TOPIC_ARN: !Ref AlertTopic
-      Policies:
-        - Version: '2012-10-17'
-          Statement:
-            - Effect: Allow
-              Action:
-                - s3:GetObject
-                - s3:ListBucket
-              Resource:
-                - !Sub 'arn:aws:s3:::${SessionStorageBucket}/*'
-                - !Sub 'arn:aws:s3:::${SessionStorageBucket}'
-        - Statement:
-            - Effect: Allow
-              Action:
-                - logs:CreateLogGroup
-                - logs:CreateLogStream
-                - logs:PutLogEvents
-              Resource: '*'
-        - Version: '2012-10-17'
-          Statement:
-            - Effect: Allow
-              Action:
-                - sns:Publish
-              Resource: !Ref AlertTopic
-      Events:
-        DailySummarySchedule:
-          Type: Schedule
-          Properties:
-            Schedule: cron(0 22 * * ? *)
-            Description: Daily alert summary at 10 PM
-            Enabled: true
-            Input: '{}'
-
 Outputs:
   BirthdayBotFunctionArn:
     Description: ARN of the Lambda function

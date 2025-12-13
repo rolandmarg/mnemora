@@ -91,6 +91,6 @@ class GoogleSheetsClient {
 }
 
 // Lazy initialization: create instance but don't initialize until first use
-// This allows handlers that don't need sheets (like daily-summary) to load without errors
+// This allows handlers that don't need sheets to load without errors
 export default new GoogleSheetsClient();
 

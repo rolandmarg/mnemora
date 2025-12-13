@@ -1,13 +1,13 @@
 /**
  * WhatsApp Session Manager Service
  * 
- * Handles S3 sync for WhatsApp session persistence in Lambda.
- * This service is responsible for syncing session data to/from S3
- * while keeping the WhatsApp client infrastructure-agnostic.
+ * Handles S3 sync for WhatsApp session persistence.
+ * Unified behavior for both Lambda and local environments:
+ * - Always syncs from S3 before initialization (if S3 is configured)
+ * - Always syncs to S3 after execution (if S3 is configured)
  */
 
 import { StorageService } from './storage.service.js';
-import { isLambda } from '../utils/runtime.util.js';
 import type { Logger } from '../types/logger.types.js';
 
 export class WhatsAppSessionManagerService {
@@ -32,58 +32,29 @@ export class WhatsAppSessionManagerService {
   /**
    * Sync session from S3 to local filesystem.
    * Should be called before initializing the WhatsApp client.
-   * In local development, this is optional - will use local session if S3 sync fails.
-   * 
-   * @throws Error if session doesn't exist in S3 (Lambda only - local dev will fall back to local session)
+   * Unified behavior: always tries to sync from S3 if configured.
+   * If session doesn't exist in S3, the WhatsApp client will handle authentication.
    */
   async syncSessionFromS3(sessionPath: string): Promise<void> {
-    // In local dev, try to sync from S3 if available, but don't fail if it doesn't exist
-    const isLocal = !isLambda();
-    
-    if (isLocal) {
-      // In local dev, try to sync but don't fail if session doesn't exist
-      try {
-        await this.storage.syncFromS3(sessionPath);
-        this.logger.info('WhatsApp session synced from S3');
-        return;
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        if (errorMessage.includes('not found') || 
-            errorMessage.includes('not exist') ||
-            errorMessage.includes('archive not found')) {
-          // Session doesn't exist in S3 - this is fine for local dev
-          this.logger.debug('Session not found in S3, using local session', {
-            sessionPath,
-          });
-          return;
-        }
-        // Other errors - log but don't fail in local dev
-        this.logger.warn('Failed to sync session from S3 (using local session)', {
-          error: errorMessage,
-        });
-        return;
-      }
-    }
-
     try {
       await this.storage.syncFromS3(sessionPath);
       this.logger.info('WhatsApp session synced from S3');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       
-      // If session doesn't exist, provide helpful error message
-      if (errorMessage.includes('not found') || 
+      // Check if error is due to session not existing in S3
+      const isNotFoundError = errorMessage.includes('not found') || 
           errorMessage.includes('not exist') ||
-          errorMessage.includes('archive not found')) {
-        const helpfulError = new Error(
-          'WhatsApp session not found in S3. ' +
-          'Please authenticate locally first, then sync the session to S3. ' +
-          'The Lambda function cannot authenticate via QR code - it requires a pre-authenticated session.'
-        );
-        this.logger.error('WhatsApp session not found in S3', {
-          error: helpfulError.message,
+          errorMessage.includes('archive not found');
+      
+      if (isNotFoundError) {
+        // Session not in S3 - this is fine, WhatsApp client will handle authentication
+        // In Lambda, this will cause QR auth error (expected)
+        // In local, this will trigger QR code display (expected)
+        this.logger.debug('Session not found in S3, WhatsApp client will handle authentication', {
+          sessionPath,
         });
-        throw helpfulError;
+        return;
       }
       
       // For other errors, log and rethrow
@@ -97,7 +68,7 @@ export class WhatsAppSessionManagerService {
   /**
    * Sync session from local filesystem to S3.
    * Should be called at the end of execution to save session state.
-   * Works in both Lambda and local environments if S3 is configured.
+   * Unified behavior: always tries to sync to S3 if configured (both Lambda and local).
    */
   async syncSessionToS3(sessionPath: string): Promise<void> {
     try {
@@ -105,13 +76,11 @@ export class WhatsAppSessionManagerService {
       this.logger.info('WhatsApp session synced to S3');
     } catch (error) {
       // Log but don't fail - session is still usable locally
-      // In local dev, S3 might not be configured, which is fine
+      // S3 might not be configured, which is fine
       const errorMessage = error instanceof Error ? error.message : String(error);
       if (errorMessage.includes('not initialized') || errorMessage.includes('not configured')) {
-        // S3 not configured - this is fine for local dev
-        this.logger.debug('S3 not configured, skipping session sync', {
-          environment: isLambda() ? 'lambda' : 'local',
-        });
+        // S3 not configured - this is fine
+        this.logger.debug('S3 not configured, skipping session sync');
       } else {
         this.logger.warn('Failed to sync session to S3', {
           error: errorMessage,

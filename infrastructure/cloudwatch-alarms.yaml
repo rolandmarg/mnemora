@@ -7,11 +7,6 @@ Parameters:
     Description: Name of the Lambda function
     Default: MnemoraBirthdayBot
   
-  DailySummaryFunctionName:
-    Type: String
-    Description: Name of the daily summary Lambda function
-    Default: mnemora-daily-summary-prod
-  
   Environment:
     Type: String
     Description: Environment name (dev/prod)
@@ -159,29 +154,6 @@ Resources:
           - !Ref SnsTopicArn
           - !Ref AlertTopic
 
-  # Alarm: Lambda initialization errors (Runtime.Unknown) - Daily Summary Function
-  DailySummaryInitErrorAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub '${DailySummaryFunctionName}-InitError'
-      AlarmDescription: Alert when daily summary Lambda fails during initialization (Runtime.Unknown) - catches module load errors, missing env vars, etc.
-      MetricName: Errors
-      Namespace: AWS/Lambda
-      Statistic: Sum
-      Period: 300
-      EvaluationPeriods: 1
-      Threshold: 1
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      TreatMissingData: notBreaching
-      Dimensions:
-        - Name: FunctionName
-          Value: !Ref DailySummaryFunctionName
-      AlarmActions:
-        - !If
-          - UseProvidedSnsTopic
-          - !Ref SnsTopicArn
-          - !Ref AlertTopic
-
 Conditions:
   CreateSnsTopic: !Equals [!Ref SnsTopicArn, '']
   UseProvidedSnsTopic: !Not [!Equals [!Ref SnsTopicArn, '']]
@@ -203,8 +175,4 @@ Outputs:
   LambdaInitErrorAlarm:
     Description: Alarm for Lambda initialization errors (main function)
     Value: !Ref LambdaInitErrorAlarm
-
-  DailySummaryInitErrorAlarm:
-    Description: Alarm for Lambda initialization errors (daily summary function)
-    Value: !Ref DailySummaryInitErrorAlarm
 

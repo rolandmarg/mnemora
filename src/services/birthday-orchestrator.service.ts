@@ -20,7 +20,6 @@ import {
   trackBirthdaySent,
 } from './metrics.service.js';
 import { AlertingService } from './alerting.service.js';
-import { LastRunTrackerService } from './last-run-tracker.service.js';
 import { getFullName } from '../utils/name-helpers.util.js';
 import { isFirstDayOfMonth } from '../utils/date-helpers.util.js';
 import { initializeCorrelationId } from '../utils/runtime.util.js';
@@ -48,7 +47,6 @@ interface BirthdayOrchestratorServiceOptions {
 class BirthdayOrchestratorService {
   private readonly birthdayService: BirthdayService;
   private readonly metrics: MetricsCollector;
-  private readonly lastRunTracker: LastRunTrackerService;
 
   constructor(options: BirthdayOrchestratorServiceOptions) {
     const { logger, config, xrayClient, cloudWatchClient, whatsappClient, alerting, calendarClient } = options;
@@ -71,7 +69,6 @@ class BirthdayOrchestratorService {
       cloudWatchClient,
       alerting,
     });
-    this.lastRunTracker = new LastRunTrackerService(logger);
   }
 
   private readonly logger: Logger;
@@ -108,9 +105,6 @@ class BirthdayOrchestratorService {
     channel: ReturnType<typeof OutputChannelFactory.createWhatsAppOutputChannel> | null
   ): Promise<void> {
     try {
-      // Flush last run date
-      await this.lastRunTracker.flushPendingWrites();
-      
       // Flush auth reminder if channel is available
       if (channel && 'flushPendingWrites' in channel && typeof channel.flushPendingWrites === 'function') {
         await channel.flushPendingWrites();
@@ -357,8 +351,6 @@ class BirthdayOrchestratorService {
       }
       
       this.logger.info('Birthday check completed successfully!');
-      
-      this.lastRunTracker.updateLastRunDate();
 
       const monthlyDigestSent = !!monthlyBirthdays && whatsappChannel?.isAvailable();
       await this.metrics.recordDailyExecution(true, monthlyDigestSent);

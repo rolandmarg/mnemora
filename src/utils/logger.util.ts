@@ -1,6 +1,6 @@
 import pino from 'pino';
 import { config } from '../config.js';
-import { getCorrelationId, isLambda, getLambdaFunctionName, getLambdaFunctionVersion, getLambdaRequestId, getXRayTraceId } from './runtime.util.js';
+import { getCorrelationId, getLambdaFunctionName, getLambdaFunctionVersion, getLambdaRequestId, getXRayTraceId } from './runtime.util.js';
 import type { Logger } from '../types/logger.types.js';
 
 enum LogLevel {
@@ -115,11 +115,9 @@ class PinoLogger implements Logger {
 
 function createLogger(options?: {
   level?: LogLevel | string;
-  pretty?: boolean;
   context?: Record<string, unknown>;
 }): Logger {
   const level = options?.level ?? config.logging.level;
-  const pretty = options?.pretty ?? config.logging.pretty;
   
   let levelString: string;
   if (typeof level === 'string') {
@@ -135,22 +133,17 @@ function createLogger(options?: {
     };
     levelString = levelMap[level] ?? 'info';
   }
-  
-  const isLambdaEnv = isLambda();
-  const shouldUsePretty = pretty && !isLambdaEnv;
 
   const pinoOptions: pino.LoggerOptions = {
     level: levelString,
-    ...(shouldUsePretty && {
-      transport: {
-        target: 'pino-pretty',
-        options: {
-          colorize: true,
-          translateTime: 'HH:MM:ss.l',
-          ignore: 'pid,hostname',
-        },
+    transport: {
+      target: 'pino-pretty',
+      options: {
+        colorize: true,
+        translateTime: 'HH:MM:ss.l',
+        ignore: 'pid,hostname',
       },
-    }),
+    },
     base: {
       ...getRequestContext(),
       ...(options?.context ?? {}),

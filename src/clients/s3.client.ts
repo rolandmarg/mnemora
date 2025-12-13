@@ -13,20 +13,19 @@ import tar from 'tar';
 import { createHash } from 'crypto';
 import { join } from 'path';
 import { config } from '../config.js';
-import { isLambda } from '../utils/runtime.util.js';
 import xrayClient from './xray.client.js';
 
 class S3ClientWrapper {
   private s3Client: S3Client | null = null;
   private readonly bucketName: string | undefined;
-  private readonly isLambda: boolean;
 
   constructor() {
-    this.isLambda = isLambda();
     this.bucketName = config.aws.s3Bucket;
 
     const region = config.aws.region;
-    if (this.isLambda && this.bucketName && region) {
+    // Initialize S3 client if we have bucket and region
+    // Allow local testing when S3_BUCKET is explicitly set (like SNS client pattern)
+    if (this.bucketName && region) {
       this.s3Client = new S3Client({
         region,
       });
@@ -181,7 +180,6 @@ interface SyncMetadata {
 
 export class FileStorage {
   private readonly basePath: string;
-  private readonly isLambda: boolean;
   private readonly METADATA_KEY = '.sync-metadata.json';
   private readonly isSessionStorage: boolean;
   private readonly ARCHIVE_NAME = 'session.tar.gz';
@@ -189,7 +187,6 @@ export class FileStorage {
 
   constructor(basePath: string) {
     this.basePath = basePath;
-    this.isLambda = isLambda();
     this.isSessionStorage = basePath === 'auth_info';
   }
 
@@ -245,7 +242,7 @@ export class FileStorage {
    * Load sync metadata from S3
    */
   private async loadSyncMetadata(): Promise<SyncMetadata | null> {
-    if (!this.isLambda || !s3Client.isAvailable()) {
+    if (!s3Client.isAvailable()) {
       return null;
     }
 
@@ -265,7 +262,7 @@ export class FileStorage {
    * Save sync metadata to S3
    */
   private async saveSyncMetadata(metadata: SyncMetadata): Promise<void> {
-    if (!this.isLambda || !s3Client.isAvailable()) {
+    if (!s3Client.isAvailable()) {
       return;
     }
 
@@ -275,11 +272,13 @@ export class FileStorage {
   }
 
   async readFile(filePath: string): Promise<Buffer | null> {
-    if (this.isLambda && s3Client.isAvailable()) {
+    // Unified behavior: use S3 if available (both Lambda and local)
+    if (s3Client.isAvailable()) {
       const s3Key = `${this.basePath}/${filePath}`;
       return await s3Client.download(s3Key);
     }
 
+    // Fallback to local filesystem (local only - Lambda will fail if S3 not available)
     const fullPath = join(process.cwd(), this.basePath, filePath);
     if (!existsSync(fullPath)) {
       return null;
@@ -288,12 +287,14 @@ export class FileStorage {
   }
 
   async writeFile(filePath: string, data: Buffer | string): Promise<void> {
-    if (this.isLambda && s3Client.isAvailable()) {
+    // Unified behavior: use S3 if available (both Lambda and local)
+    if (s3Client.isAvailable()) {
       const s3Key = `${this.basePath}/${filePath}`;
       await s3Client.upload(s3Key, data);
       return;
     }
 
+    // Fallback to local filesystem (local only - Lambda will fail if S3 not available)
     const fullPath = join(process.cwd(), this.basePath, filePath);
     const dir = join(fullPath, '..');
     if (!existsSync(dir)) {
@@ -303,11 +304,13 @@ export class FileStorage {
   }
 
   async fileExists(filePath: string): Promise<boolean> {
-    if (this.isLambda && s3Client.isAvailable()) {
+    // Unified behavior: use S3 if available (both Lambda and local)
+    if (s3Client.isAvailable()) {
       const s3Key = `${this.basePath}/${filePath}`;
       return await s3Client.exists(s3Key);
     }
 
+    // Fallback to local filesystem (local only - Lambda will fail if S3 not available)
     const fullPath = join(process.cwd(), this.basePath, filePath);
     return existsSync(fullPath);
   }
@@ -403,7 +406,8 @@ export class FileStorage {
   }
 
   async syncFromS3(localPath: string): Promise<void> {
-    if (!this.isLambda || !s3Client.isAvailable()) {
+    // Allow sync from both Lambda and local if S3 is configured
+    if (!s3Client.isAvailable()) {
       return;
     }
 
