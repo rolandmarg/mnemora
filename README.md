@@ -16,6 +16,7 @@ Never miss another birthday. Mnemora automatically checks your Google Calendar o
 ## Current Status
 
 **Deployment**: This app is currently running in personal AWS cloud (developer's AWS account).
+
 **Disclaimer**: Project is being actively prototyped with Cursor, while it's very important to verify the output of any AI, currently not every code line is being reviewed - at some point there will be a refactor to minimize the code lines and bring code quality to a higher standard
 
 ## The Problem
