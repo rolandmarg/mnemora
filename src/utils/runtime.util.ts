@@ -20,26 +20,10 @@ export function getLambdaRequestId(): string | undefined {
   return process.env.AWS_REQUEST_ID;
 }
 
-export function getXRayTraceId(): string | undefined {
-  const traceId = process.env._X_AMZN_TRACE_ID;
-  if (traceId) {
-    const match = traceId.match(/Root=([^;]+)/);
-    if (match) {
-      return match[1];
-    }
-  }
-  return undefined;
-}
-
 class CorrelationContext {
   private static storage = new Map<string, string>();
 
   static getCorrelationId(): string | undefined {
-    const traceId = getXRayTraceId();
-    if (traceId) {
-      return traceId;
-    }
-
     return this.storage.get('correlationId');
   }
 
@@ -74,4 +58,3 @@ export function setCorrelationId(id: string): void {
 export function initializeCorrelationId(): string {
   return CorrelationContext.initializeCorrelationId();
 }
-

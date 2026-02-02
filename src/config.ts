@@ -21,9 +21,6 @@ export interface ScheduleConfig {
 export interface AWSConfig {
   region: string;
   s3Bucket: string | undefined;
-  snsTopicArn: string | undefined;
-  cloudWatchLogGroup: string | undefined;
-  enableXRay: boolean;
 }
 
 export interface TwilioConfig {
@@ -39,10 +36,6 @@ export interface AppConfig {
   schedule: ScheduleConfig;
   aws: AWSConfig;
   twilio: TwilioConfig;
-  metrics: {
-    namespace: string;
-    enabled: boolean;
-  };
   logging: {
     level: string;
   };
@@ -93,19 +86,12 @@ export const config: AppConfig = {
   aws: {
     region: process.env.AWS_REGION ?? process.env.AWS_DEFAULT_REGION ?? 'us-west-1',
     s3Bucket: process.env.AWS_S3_BUCKET,
-    snsTopicArn: process.env.SNS_TOPIC_ARN,
-    cloudWatchLogGroup: process.env.AWS_CLOUDWATCH_LOG_GROUP,
-    enableXRay: process.env.AWS_XRAY_ENABLED !== 'false',
   },
   twilio: {
     accountSid: process.env.TWILIO_ACCOUNT_SID,
     authToken: process.env.TWILIO_AUTH_TOKEN,
     fromNumber: process.env.TWILIO_FROM_NUMBER,
     toNumber: process.env.TWILIO_TO_NUMBER,
-  },
-  metrics: {
-    namespace: process.env.METRICS_NAMESPACE ?? 'Mnemora/BirthdayBot',
-    enabled: process.env.ENABLE_CLOUDWATCH_METRICS !== 'false',
   },
   logging: {
     level: process.env.LOG_LEVEL ?? 'info',

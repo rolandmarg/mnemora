@@ -1,6 +1,5 @@
 import twilio from 'twilio';
 import { config } from '../config.js';
-import xrayClient from './xray.client.js';
 import type { Logger } from '../types/logger.types.js';
 
 export class TwilioClientWrapper {
@@ -42,32 +41,13 @@ export class TwilioClientWrapper {
       throw new Error('Twilio client not initialized. Check TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER, and TWILIO_TO_NUMBER environment variables.');
     }
 
-    // Wrap X-Ray segment in try-catch to ensure X-Ray errors don't break SMS sending
-    try {
-      return await xrayClient.captureAsyncSegment('Twilio.sendSMS', async () => {
-        const response = await this.client!.messages.create({
-          body: message,
-          from: this.fromNumber!,
-          to: this.toNumber!,
-        });
+    const response = await this.client.messages.create({
+      body: message,
+      from: this.fromNumber,
+      to: this.toNumber,
+    });
 
-        return response.sid;
-      }, {
-        fromNumber: this.fromNumber,
-        toNumber: this.toNumber,
-        messageLength: message.length,
-      });
-    } catch (_xrayError) {
-      // If X-Ray fails, still try to send SMS without tracing
-      // This ensures X-Ray issues don't prevent SMS delivery
-      const response = await this.client!.messages.create({
-        body: message,
-        from: this.fromNumber!,
-        to: this.toNumber!,
-      });
-
-      return response.sid;
-    }
+    return response.sid;
   }
 }
 
