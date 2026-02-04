@@ -1,6 +1,5 @@
 import { google, type sheets_v4 } from 'googleapis';
 import { config } from '../config.js';
-import xrayClient from './xray.client.js';
 
 class GoogleSheetsClient {
   private readonly sheets: sheets_v4.Sheets;
@@ -35,58 +34,48 @@ class GoogleSheetsClient {
       return this.cachedSheetName;
     }
 
-    return xrayClient.captureAsyncSegment('GoogleSheets.getFirstSheetName', async () => {
-      try {
-        const response = await this.sheets.spreadsheets.get({
-          spreadsheetId: this.spreadsheetId,
-        });
+    try {
+      const response = await this.sheets.spreadsheets.get({
+        spreadsheetId: this.spreadsheetId,
+      });
 
-        const sheets = response.data.sheets;
-        if (!sheets || sheets.length === 0) {
-          throw new Error('No sheets found in spreadsheet');
-        }
-
-        this.cachedSheetName = sheets[0]?.properties?.title ?? 'Sheet1';
-        return this.cachedSheetName;
-      } catch (error) {
-        throw error instanceof Error ? error : new Error(String(error));
+      const sheets = response.data.sheets;
+      if (!sheets || sheets.length === 0) {
+        throw new Error('No sheets found in spreadsheet');
       }
-    }, {
-      spreadsheetId: this.spreadsheetId,
-    });
+
+      this.cachedSheetName = sheets[0]?.properties?.title ?? 'Sheet1';
+      return this.cachedSheetName;
+    } catch (error) {
+      throw error instanceof Error ? error : new Error(String(error));
+    }
   }
 
   async readRows(options?: {
     skipHeaderRow?: boolean;
     sheetName?: string;
   }): Promise<string[][]> {
-    return xrayClient.captureAsyncSegment('GoogleSheets.readRows', async () => {
-      try {
-        const sheetName = options?.sheetName ?? await this.getFirstSheetName();
-        const skipHeaderRow = options?.skipHeaderRow ?? true;
+    try {
+      const sheetName = options?.sheetName ?? await this.getFirstSheetName();
+      const skipHeaderRow = options?.skipHeaderRow ?? true;
 
-        const response = await this.sheets.spreadsheets.values.get({
-          spreadsheetId: this.spreadsheetId,
-          range: sheetName,
-        });
+      const response = await this.sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: sheetName,
+      });
 
-        const rows = response.data.values;
-        if (!rows || rows.length === 0) {
-          return [];
-        }
-
-        const startIndex = skipHeaderRow ? 1 : 0;
-        const result = rows.slice(startIndex);
-        
-        return result;
-      } catch (error) {
-        throw error instanceof Error ? error : new Error(String(error));
+      const rows = response.data.values;
+      if (!rows || rows.length === 0) {
+        return [];
       }
-    }, {
-      spreadsheetId: this.spreadsheetId,
-      sheetName: options?.sheetName ?? 'auto-detect',
-      skipHeaderRow: options?.skipHeaderRow ?? true,
-    });
+
+      const startIndex = skipHeaderRow ? 1 : 0;
+      const result = rows.slice(startIndex);
+
+      return result;
+    } catch (error) {
+      throw error instanceof Error ? error : new Error(String(error));
+    }
   }
 }
 

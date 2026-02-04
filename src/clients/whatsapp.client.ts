@@ -11,7 +11,6 @@ import { existsSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import qrcode from 'qrcode-terminal';
 import { isLambda } from '../utils/runtime.util.js';
-import xrayClient from './xray.client.js';
 import { QRAuthenticationRequiredError } from '../types/qr-auth-error.js';
 
 function displayQRCode(qrCode: string): void {
@@ -90,41 +89,40 @@ class WhatsAppClient {
   }
 
   async initialize(): Promise<void> {
-    return xrayClient.captureAsyncSegment('WhatsApp.initialize', async () => {
-      if (this.isReady && this.sock) {
-        try {
-          const state = this.sock.user;
-          if (state) {
-            return;
-          }
-        } catch (_error) {
-          this.sock = null;
-          this.isReady = false;
+    if (this.isReady && this.sock) {
+      try {
+        const state = this.sock.user;
+        if (state) {
+          return;
         }
+      } catch (_error) {
+        this.sock = null;
+        this.isReady = false;
       }
+    }
 
-      if (this.isInitializing) {
-        return new Promise((resolve, reject) => {
-          const checkReady = setInterval(() => {
-            if (this.isReady && this.sock) {
-              clearInterval(checkReady);
-              resolve();
-            } else if (!this.isInitializing) {
-              clearInterval(checkReady);
-              reject(new Error('Initialization failed'));
-            }
-          }, 100);
-          
-          setTimeout(() => {
-            clearInterval(checkReady);
-            reject(new Error('Initialization timeout'));
-          }, 180000);
-        });
-      }
-
-      this.isInitializing = true;
-
+    if (this.isInitializing) {
       return new Promise((resolve, reject) => {
+        const checkReady = setInterval(() => {
+          if (this.isReady && this.sock) {
+            clearInterval(checkReady);
+            resolve();
+          } else if (!this.isInitializing) {
+            clearInterval(checkReady);
+            reject(new Error('Initialization failed'));
+          }
+        }, 100);
+
+        setTimeout(() => {
+          clearInterval(checkReady);
+          reject(new Error('Initialization timeout'));
+        }, 180000);
+      });
+    }
+
+    this.isInitializing = true;
+
+    return new Promise((resolve, reject) => {
       (async () => {
         try {
           if (this.sock) {
@@ -138,7 +136,7 @@ class WhatsAppClient {
 
           // Fetch latest version
           const { version } = await fetchLatestBaileysVersion();
-          
+
           // Create socket
           // Note: Some decryption errors from libsignal (the underlying encryption library)
           // may appear in console output. These are expected and non-fatal - they occur
@@ -159,20 +157,20 @@ class WhatsAppClient {
             fireInitQueries: false,               // Don't fire initialization queries
             shouldSyncHistoryMessage: () => false, // Don't sync history messages
             getMessage: async () => undefined,    // Don't fetch messages (but allow protocol processing)
-            
+
             // JID filtering to reduce session file bloat
             // Only process our active group and essential protocol messages
             // Protocol messages (pre-keys, sender keys) are not JIDs and are always processed
             shouldIgnoreJid: (jid: string) => this.shouldIgnoreJid(jid),
-            
+
             // Lambda-optimized timeouts (fail fast)
             connectTimeoutMs: 30000,              // 30s connection timeout (reduced from 60s)
             defaultQueryTimeoutMs: 30000,         // 30s query timeout (reduced from 60s)
-            
+
             // Message retry settings (fail fast for Lambda)
             maxMsgRetryCount: 1,                  // Only retry once
             retryRequestDelayMs: 1000,            // 1s delay between retries
-            
+
             // Disable unnecessary features
             emitOwnEvents: false,                 // Don't emit events for our own actions
             generateHighQualityLinkPreview: false, // We don't send links
@@ -194,10 +192,6 @@ class WhatsAppClient {
           reject(error instanceof Error ? error : new Error(String(error)));
         }
       })();
-    });
-    }, {
-      isLambda: this.isLambda,
-      sessionPath: this.sessionPath,
     });
   }
 
@@ -410,74 +404,64 @@ class WhatsAppClient {
   }
 
   async findGroupByName(groupName: string): Promise<{ id: string; name: string } | null> {
-    return xrayClient.captureAsyncSegment('WhatsApp.findGroupByName', async () => {
-      const sock = this.getClient();
-      
-      try {
-        const groups = await sock.groupFetchAllParticipating();
-        
-        for (const [groupId, group] of Object.entries(groups)) {
-          const groupData = group as { subject?: string };
-          if (groupData.subject === groupName) {
-            return {
-              id: groupId,
-              name: groupData.subject ?? groupName,
-            };
-          }
+    const sock = this.getClient();
+
+    try {
+      const groups = await sock.groupFetchAllParticipating();
+
+      for (const [groupId, group] of Object.entries(groups)) {
+        const groupData = group as { subject?: string };
+        if (groupData.subject === groupName) {
+          return {
+            id: groupId,
+            name: groupData.subject ?? groupName,
+          };
         }
-        
-        return null;
-      } catch (error) {
-        throw new Error(`Failed to find group: ${error instanceof Error ? error.message : String(error)}`);
       }
-    }, {
-      groupName,
-    });
+
+      return null;
+    } catch (error) {
+      throw new Error(`Failed to find group: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   async sendMessage(chatId: string, message: string): Promise<{ id: string; from: string }> {
-    return xrayClient.captureAsyncSegment('WhatsApp.sendMessage', async () => {
-      const sock = this.getClient();
-      
-      try {
-        // Ensure chatId has @g.us suffix for groups
-        const normalizedChatId = chatId.includes('@g.us') ? chatId : `${chatId}@g.us`;
-        
-        // For groups, fetch group metadata first to ensure sender keys are available
-        // This is necessary for proper message encryption when fireInitQueries is disabled
-        if (normalizedChatId.includes('@g.us')) {
-          try {
-            await sock.groupMetadata(normalizedChatId);
-            // Give Baileys a moment to process sender keys if needed
-            await new Promise(resolve => setTimeout(resolve, 500));
-          } catch (metadataError) {
-            // Log but don't fail - metadata fetch might fail but message sending could still work
-            // if sender keys are already cached
-            const errorMessage = metadataError instanceof Error ? metadataError.message : String(metadataError);
-            if (!errorMessage.includes('not found') && !errorMessage.includes('404')) {
-              console.warn(`Warning: Could not fetch group metadata: ${errorMessage}`);
-            }
+    const sock = this.getClient();
+
+    try {
+      // Ensure chatId has @g.us suffix for groups
+      const normalizedChatId = chatId.includes('@g.us') ? chatId : `${chatId}@g.us`;
+
+      // For groups, fetch group metadata first to ensure sender keys are available
+      // This is necessary for proper message encryption when fireInitQueries is disabled
+      if (normalizedChatId.includes('@g.us')) {
+        try {
+          await sock.groupMetadata(normalizedChatId);
+          // Give Baileys a moment to process sender keys if needed
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } catch (metadataError) {
+          // Log but don't fail - metadata fetch might fail but message sending could still work
+          // if sender keys are already cached
+          const errorMessage = metadataError instanceof Error ? metadataError.message : String(metadataError);
+          if (!errorMessage.includes('not found') && !errorMessage.includes('404')) {
+            console.warn(`Warning: Could not fetch group metadata: ${errorMessage}`);
           }
         }
-        
-        const result = await sock.sendMessage(normalizedChatId, { text: message });
-        
-        if (!result) {
-          throw new Error('Failed to send message: no result returned');
-        }
-        
-        return {
-          id: result.key.id ?? '',
-          from: result.key.remoteJid ?? normalizedChatId,
-        };
-      } catch (error) {
-        throw new Error(`Failed to send message: ${error instanceof Error ? error.message : String(error)}`);
       }
-    }, {
-      chatId,
-      messageLength: message.length,
-      isGroup: chatId.includes('@g.us'),
-    });
+
+      const result = await sock.sendMessage(normalizedChatId, { text: message });
+
+      if (!result) {
+        throw new Error('Failed to send message: no result returned');
+      }
+
+      return {
+        id: result.key.id ?? '',
+        from: result.key.remoteJid ?? normalizedChatId,
+      };
+    } catch (error) {
+      throw new Error(`Failed to send message: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   async destroy(): Promise<void> {

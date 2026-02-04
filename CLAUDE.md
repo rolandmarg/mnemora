@@ -61,8 +61,6 @@ Entry Point (index.ts or lambda/handler.ts)
     -> DataSourceFactory -> CalendarDataSource/SheetsDataSource
     -> BirthdayService (filter today's birthdays, monthly digest on 1st)
     -> OutputChannelFactory -> WhatsAppOutputChannel/ConsoleOutputChannel
-    -> MetricsCollector -> CloudWatch
-    -> AlertingService -> SNS (on errors)
 ```
 
 ### Key Patterns
@@ -76,8 +74,8 @@ Entry Point (index.ts or lambda/handler.ts)
 ### Persistence
 
 - **Google Calendar/Sheets**: Birthday data (read-only via service account)
-- **AWS S3**: WhatsApp session files, message logs, execution records, alert state
-- **CloudWatch**: Metrics and structured logs (Pino)
+- **AWS S3**: WhatsApp session files, message logs, execution records
+- **CloudWatch Logs**: Structured logs via Pino (sole observability mechanism)
 
 ## Code Conventions
 
@@ -123,8 +121,7 @@ Entry Point (index.ts or lambda/handler.ts)
 ### Error Handling
 
 - Wrap async operations in try/catch with meaningful error messages
-- Use `AlertingService` for critical failure notifications (deduplicates within 60-min window)
-- Use structured logging via Pino (not `console.log`)
+- Use structured logging via Pino (not `console.log`) - logs go to CloudWatch Logs
 
 ## Critical Warnings
 
@@ -154,7 +151,6 @@ Required variables (see `.env.example` for full list):
 | `WHATSAPP_GROUP_ID` | Target WhatsApp group |
 | `AWS_REGION` | AWS region (default: us-west-1) |
 | `AWS_S3_BUCKET` | S3 bucket for session storage |
-| `SNS_TOPIC_ARN` | SNS topic for alerts |
 | `TIMEZONE` | Timezone (default: America/Los_Angeles) |
 
 ## CI/CD
@@ -176,7 +172,7 @@ yarn deploy  # Runs scripts/deploy.sh - builds, packages, and deploys via SAM
 
 Prerequisites: AWS CLI, SAM CLI >= 1.148.0, configured AWS credentials.
 
-Infrastructure is defined in `infrastructure/template.yaml` (SAM/CloudFormation): Lambda, S3, SNS, CloudWatch, EventBridge, X-Ray, IAM.
+Infrastructure is defined in `infrastructure/template.yaml` (SAM/CloudFormation): Lambda, S3, CloudWatch Logs, EventBridge, IAM.
 
 Estimated cost: ~$1/month.
 

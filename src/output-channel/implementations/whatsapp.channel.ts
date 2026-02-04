@@ -1,8 +1,8 @@
 /**
  * WhatsApp Output Channel
- * 
+ *
  * Implementation using Baileys to send messages to WhatsApp groups
- * 
+ *
  * Login flow:
  * 1. Displays QR code in terminal
  * 2. Prompts user to scan with WhatsApp mobile app
@@ -11,13 +11,10 @@
  */
 
 import { BaseOutputChannel } from '../output-channel.base.js';
-import type { AlertingService } from '../../services/alerting.service.js';
-import { MetricsCollector, trackWhatsAppMessageSent, trackWhatsAppAuthRequired, trackOperationDuration } from '../../services/metrics.service.js';
 import { AuthReminderService } from '../../services/auth-reminder.service.js';
 import { WhatsAppSessionManagerService } from '../../services/whatsapp-session-manager.service.js';
 import { logSentMessage } from '../../services/message-logger.service.js';
 import { QRAuthenticationRequiredError } from '../../types/qr-auth-error.js';
-import { isLambda } from '../../utils/runtime.util.js';
 import type { SendOptions, SendResult, OutputChannelMetadata } from '../output-channel.interface.js';
 import type { Logger } from '../../types/logger.types.js';
 import type { AppConfig } from '../../config.js';
@@ -27,28 +24,17 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
   private readonly logger: Logger;
   private readonly config: AppConfig;
   private readonly whatsappClient: WhatsAppClient;
-  private readonly alerting: AlertingService;
-  private readonly metrics: MetricsCollector;
   private readonly authReminder: AuthReminderService;
   private readonly sessionManager: WhatsAppSessionManagerService;
 
   constructor(options: WhatsAppOutputChannelOptions) {
     super();
-    const { logger, config, whatsappClient, alerting, cloudWatchClient } = options;
+    const { logger, config, whatsappClient } = options;
     this.logger = logger;
     this.config = config;
     this.whatsappClient = whatsappClient;
-    this.alerting = alerting;
-    this.metrics = new MetricsCollector({
-      logger,
-      config,
-      cloudWatchClient,
-      alerting,
-    });
     this.authReminder = new AuthReminderService({
       logger,
-      config,
-      cloudWatchClient,
     });
     this.sessionManager = new WhatsAppSessionManagerService(logger);
   }
@@ -80,49 +66,29 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
       // Only sync once at startup - if client is already ready, skip sync
       const sessionPath = this.getSessionPath();
       await this.sessionManager.syncSessionFromS3(sessionPath);
-      
+
       // Set active group ID to optimize JID filtering and reduce session file bloat
       const activeGroupId = this.config.whatsapp.groupId;
       if (activeGroupId) {
         // Normalize group ID (ensure it has @g.us suffix)
-        const normalizedGroupId = activeGroupId.includes('@g.us') 
-          ? activeGroupId 
+        const normalizedGroupId = activeGroupId.includes('@g.us')
+          ? activeGroupId
           : `${activeGroupId}@g.us`;
         this.whatsappClient.setActiveGroupId(normalizedGroupId);
       }
-      
+
       await this.whatsappClient.initialize();
-      
-      if (this.whatsappClient.requiresAuth()) {
-        trackWhatsAppAuthRequired(this.metrics);
-        await this.alerting.sendWhatsAppAuthRequiredAlert({
-          qrCodeAvailable: true,
-          environment: isLambda() ? 'lambda' : 'local',
-        });
-      }
-      
+
       if (this.whatsappClient.isClientReady()) {
         this.authReminder.recordAuthentication();
       }
     } catch (error) {
       // Re-throw QR authentication required error so it bubbles up to handler
-      // But send alert first to ensure it's sent even if Lambda exits quickly
       if (error instanceof QRAuthenticationRequiredError) {
-        // Send alert immediately when QR auth is required
-        // This ensures the alert is sent even if Lambda exits before handler catches it
-        trackWhatsAppAuthRequired(this.metrics);
-        await this.alerting.sendWhatsAppAuthRequiredAlert({
-          qrCodeAvailable: true,
-          environment: isLambda() ? 'lambda' : 'local',
-          errorMessage: error.message,
-        });
         throw error;
       }
-      
+
       this.logger.error('Failed to initialize WhatsApp client', error);
-      this.alerting.sendWhatsAppClientInitFailedAlert(error instanceof Error ? error : new Error(String(error)), {
-        reason: 'initialization_error',
-      });
       throw error;
     }
   }
@@ -133,13 +99,6 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
 
     try {
       await this.authReminder.checkAndEmitReminder().catch(() => {});
-      
-      const authStatus = await this.authReminder.getAuthStatus().catch(() => null);
-      if (authStatus?.needsRefresh) {
-        this.alerting.sendWhatsAppAuthRefreshNeededAlert(authStatus.daysSinceAuth, {
-          lastAuthDate: authStatus.lastAuthDate?.toISOString(),
-        });
-      }
 
       // Resolve group identifier from recipients or config (this also initializes the client)
       const identifier = options?.recipients?.[0];
@@ -160,10 +119,10 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
       }
 
       const chatId = resolvedGroupId.includes('@g.us') ? resolvedGroupId : `${resolvedGroupId}@g.us`;
-      
+
       let lastError: Error | null = null;
       const maxRetries = 3;
-      
+
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
           if (!this.whatsappClient.isClientReady()) {
@@ -173,8 +132,6 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
           const result = await this.whatsappClient.sendMessage(chatId, message);
 
           const duration = Date.now() - startTime;
-          trackWhatsAppMessageSent(this.metrics, true);
-          trackOperationDuration(this.metrics, 'whatsapp.send', duration, { success: 'true', attempt: attempt.toString() });
 
           this.logger.info('WhatsApp message sent successfully', {
             groupId: chatId,
@@ -212,29 +169,29 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
           };
         } catch (sendError) {
           lastError = sendError instanceof Error ? sendError : new Error(String(sendError));
-          
-          const isProtocolError = lastError.message.includes('Protocol error') || 
+
+          const isProtocolError = lastError.message.includes('Protocol error') ||
                                   lastError.message.includes('Execution context') ||
                                   lastError.message.includes('Target closed');
-          
+
           if (isProtocolError && attempt < maxRetries) {
             this.logger.warn(`WhatsApp send attempt ${attempt} failed, retrying...`, {
               error: lastError.message,
             });
-            
+
             if (!this.whatsappClient.isClientReady()) {
               this.logger.info('Client invalid after protocol error, reinitializing...');
               await this.initializeClient();
             }
-            
+
             await new Promise(resolve => setTimeout(resolve, 3000));
             continue;
           }
-          
+
           throw lastError;
         }
       }
-      
+
       throw lastError ?? new Error('Failed to send message after retries');
     } catch (error) {
       // Re-throw QR authentication required error so it bubbles up to handler
@@ -242,18 +199,11 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
       if (error instanceof QRAuthenticationRequiredError) {
         throw error;
       }
-      
+
       const duration = Date.now() - startTime;
-      trackWhatsAppMessageSent(this.metrics, false);
-      trackOperationDuration(this.metrics, 'whatsapp.send', duration, { success: 'false' });
       this.logger.error('Error sending WhatsApp message', {
         error,
         groupId: resolvedGroupId,
-      });
-      
-      this.alerting.sendWhatsAppMessageFailedAlert(error, {
-        groupId: resolvedGroupId ?? options?.recipients?.[0] ?? this.config.whatsapp.groupId,
-        retries: 3,
       });
 
       await logSentMessage(
@@ -269,7 +219,7 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
           retries: 3,
         }
       ).catch(() => {});
-      
+
       return {
         success: false,
         error: error instanceof Error ? error : new Error(String(error)),
@@ -296,7 +246,7 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
   /**
    * Resolves a group identifier (name or ID) to a groupId.
    * Falls back to config.whatsapp.groupId if identifier is undefined.
-   * 
+   *
    * @param identifier - Group name, group ID, or undefined
    * @returns Resolved groupId string (normalized with @g.us suffix if needed)
    * @throws Error if group not found or client not ready
@@ -326,9 +276,6 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
 
     if (!foundGroup) {
       const error = new Error(`Group "${inputIdentifier}" not found`);
-      this.alerting.sendWhatsAppGroupNotFoundAlert(inputIdentifier, {
-        searchedName: inputIdentifier,
-      });
       throw error;
     }
 
@@ -354,7 +301,7 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
   }> {
     const authStatus = await this.authReminder.getAuthStatus();
     const clientStatus = this.whatsappClient.getAuthStatus();
-    
+
     return {
       isReady: clientStatus.isReady,
       requiresAuth: await this.requiresAuth(),
@@ -387,11 +334,11 @@ export class WhatsAppOutputChannel extends BaseOutputChannel {
     try {
       // Flush pending S3 writes (auth reminder) before session sync
       await this.flushPendingWrites();
-      
+
       // Sync session to S3 before destroying (if S3 is configured)
       // This saves session to S3 after any changes during execution
       await this.syncSessionToS3();
-      
+
       await this.whatsappClient.destroy();
     } catch (error) {
       this.logger.error('Error destroying WhatsApp client', error);

@@ -10,47 +10,36 @@ Parameters:
       - dev
       - prod
     Description: Environment name
-  
+
   GoogleCalendarId:
     Type: String
     Description: Google Calendar ID
     NoEcho: false
-  
+
   GoogleClientEmail:
     Type: String
     Description: Google Service Account Email
     NoEcho: false
-  
+
   GooglePrivateKey:
     Type: String
     Description: Google Service Account Private Key (base64 encoded)
     NoEcho: true
-  
+
   GoogleProjectId:
     Type: String
     Description: Google Cloud Project ID
     NoEcho: false
-  
+
   GoogleSpreadsheetId:
     Type: String
     Default: ''
     Description: Google Spreadsheet ID (optional)
     NoEcho: false
-  
+
   WhatsAppGroupId:
     Type: String
     Description: WhatsApp Group Name or ID
-    NoEcho: false
-  
-  AlertEmail:
-    Type: String
-    Description: Email address for receiving alerts
-    NoEcho: false
-  
-  AlertPhone:
-    Type: String
-    Default: ''
-    Description: Phone number for SMS alerts (optional, e.g., +1234567890)
     NoEcho: false
 
 Globals:
@@ -62,39 +51,11 @@ Globals:
       Variables:
         NODE_ENV: production
         LOG_LEVEL: info
-        METRICS_NAMESPACE: !Sub 'Mnemora/BirthdayBot/${Environment}'
-        ENABLE_CLOUDWATCH_METRICS: 'true'
-        AWS_XRAY_ENABLED: 'true'
 
 Conditions:
   HasSpreadsheetId: !Not [!Equals [!Ref GoogleSpreadsheetId, '']]
-  HasPhoneNumber: !Not [!Equals [!Ref AlertPhone, '']]
 
 Resources:
-  AlertTopic:
-    Type: AWS::SNS::Topic
-    Properties:
-      TopicName: !Sub 'mnemora-alerts-${Environment}'
-      DisplayName: Mnemora Birthday Bot Alerts
-
-  AlertEmailSubscription:
-    Type: AWS::SNS::Subscription
-    Properties:
-      TopicArn: !Ref AlertTopic
-      Protocol: email
-      Endpoint: !Ref AlertEmail
-
-  AlertSMSSubscription:
-    Type: AWS::SNS::Subscription
-    Condition: HasPhoneNumber
-    Properties:
-      TopicArn: !Ref AlertTopic
-      Protocol: sms
-      Endpoint: !Ref AlertPhone
-      FilterPolicy:
-        SendSMS:
-          - 'true'
-
   SessionStorageBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -144,9 +105,6 @@ Resources:
           WHATSAPP_GROUP_ID: !Ref WhatsAppGroupId
           TIMEZONE: 'America/Los_Angeles'
           AWS_S3_BUCKET: !Ref SessionStorageBucket
-          AWS_CLOUDWATCH_LOG_GROUP: !Sub '/aws/lambda/mnemora-birthday-bot-${Environment}'
-          AWS_XRAY_ENABLED: 'true'
-          SNS_TOPIC_ARN: !Ref AlertTopic
       Policies:
         - Version: '2012-10-17'
           Statement:
@@ -166,28 +124,6 @@ Resources:
                 - logs:CreateLogStream
                 - logs:PutLogEvents
               Resource: '*'
-        - Statement:
-            - Effect: Allow
-              Action:
-                - cloudwatch:PutMetricData
-              Resource: '*'
-              Condition:
-                StringEquals:
-                  'cloudwatch:namespace': !Sub 'Mnemora/BirthdayBot/${Environment}'
-        - Statement:
-            - Effect: Allow
-              Action:
-                - xray:PutTraceSegments
-                - xray:PutTelemetryRecords
-                - xray:GetSamplingRules
-                - xray:GetSamplingTargets
-              Resource: '*'
-        - Version: '2012-10-17'
-          Statement:
-            - Effect: Allow
-              Action:
-                - sns:Publish
-              Resource: !Ref AlertTopic
       Events:
         DailySchedule:
           Type: Schedule
@@ -197,7 +133,6 @@ Resources:
             Description: Daily birthday check at 10 AM Pacific time (17:00 UTC, ~10 AM PDT most of year)
             Enabled: true
             Input: '{}'
-      Tracing: Active
 
 Outputs:
   BirthdayBotFunctionArn:
@@ -217,10 +152,3 @@ Outputs:
     Value: !Ref BirthdayBotLogGroup
     Export:
       Name: !Sub '${AWS::StackName}-LogGroup'
-
-  AlertTopicArn:
-    Description: ARN of the SNS topic for alerts
-    Value: !Ref AlertTopic
-    Export:
-      Name: !Sub '${AWS::StackName}-AlertTopic'
-

@@ -1,6 +1,6 @@
 import pino from 'pino';
 import { config } from '../config.js';
-import { getCorrelationId, getLambdaFunctionName, getLambdaFunctionVersion, getLambdaRequestId, getXRayTraceId } from './runtime.util.js';
+import { getCorrelationId, getLambdaFunctionName, getLambdaFunctionVersion, getLambdaRequestId } from './runtime.util.js';
 import type { Logger } from '../types/logger.types.js';
 
 enum LogLevel {
@@ -18,11 +18,6 @@ function getRequestContext(): Record<string, unknown> {
   const correlationId = getCorrelationId();
   if (correlationId) {
     context.correlationId = correlationId;
-  }
-
-  const traceId = getXRayTraceId();
-  if (traceId) {
-    context.traceId = traceId;
   }
 
   const functionName = getLambdaFunctionName();

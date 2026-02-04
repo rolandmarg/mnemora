@@ -1,38 +1,30 @@
 import { StorageService } from './storage.service.js';
 import { isLambda } from '../utils/runtime.util.js';
 import type { Logger } from '../types/logger.types.js';
-import type { AppConfig } from '../config.js';
-import cloudWatchMetricsClient from '../clients/cloudwatch.client.js';
 
 interface AuthReminderServiceOptions {
   logger: Logger;
-  config: AppConfig;
-  cloudWatchClient: typeof cloudWatchMetricsClient;
 }
 
 class AuthReminderService {
   private readonly logger: Logger;
-  private readonly config: AppConfig;
-  private readonly cloudWatchClient: typeof cloudWatchMetricsClient;
   private readonly storage = StorageService.getAppStorage();
   private readonly reminderDays: number = 7;
   private readonly authKey: string = 'whatsapp-auth.json';
   private pendingAuthTimestamp: string | null = null;
 
   constructor(options: AuthReminderServiceOptions) {
-    const { logger, config, cloudWatchClient } = options;
+    const { logger } = options;
     this.logger = logger;
-    this.config = config;
-    this.cloudWatchClient = cloudWatchClient;
   }
 
   recordAuthentication(): void {
     const now = new Date();
     const timestamp = now.toISOString();
-    
+
     // Store timestamp in memory for later batch write
     this.pendingAuthTimestamp = timestamp;
-    
+
     if (isLambda()) {
       this.logger.info('WhatsApp authentication recorded (pending S3 write)', { timestamp });
     } else {
@@ -48,7 +40,7 @@ class AuthReminderService {
 
     try {
       const authData = JSON.stringify({ timestamp: this.pendingAuthTimestamp });
-      
+
       if (isLambda()) {
         await this.storage.writeFile(this.authKey, authData);
         this.logger.info('WhatsApp authentication recorded in S3', { timestamp: this.pendingAuthTimestamp });
@@ -56,7 +48,7 @@ class AuthReminderService {
         // Local mode already handled in recordAuthentication
         this.logger.info('WhatsApp authentication recorded (local)', { timestamp: this.pendingAuthTimestamp });
       }
-      
+
       this.pendingAuthTimestamp = null;
     } catch (error) {
       this.logger.error('Error flushing authentication record', error);
@@ -98,7 +90,7 @@ class AuthReminderService {
 
   async checkAndEmitReminder(): Promise<void> {
     const needsRefresh = await this.isRefreshNeeded();
-    
+
     if (needsRefresh) {
       const lastAuth = await this.getLastAuthDate();
       const daysSinceAuth = lastAuth
@@ -109,17 +101,6 @@ class AuthReminderService {
         daysSinceAuth,
         reminderDays: this.reminderDays,
       });
-
-      this.cloudWatchClient.putMetricData(
-        this.config.metrics.namespace,
-        [{
-          MetricName: 'whatsapp.auth.refresh_needed',
-          Value: 1,
-          Unit: 'Count',
-          Timestamp: new Date(),
-          Dimensions: [{ Name: 'DaysSinceAuth', Value: daysSinceAuth?.toString() ?? 'never' }],
-        }]
-      ).catch(() => {});
 
       if (isLambda()) {
         this.logger.warn(
@@ -154,4 +135,3 @@ class AuthReminderService {
 }
 
 export { AuthReminderService };
-
