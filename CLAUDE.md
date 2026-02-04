@@ -37,7 +37,6 @@ infrastructure/     # AWS SAM templates and CloudWatch alarms
 Copy `.env.example` to `.env` and configure:
 - Google Calendar/Sheets API credentials
 - WhatsApp group ID
-- Twilio credentials (for SMS-based QR auth)
 - Timezone (defaults to America/Los_Angeles)
 
 ## Key Files
