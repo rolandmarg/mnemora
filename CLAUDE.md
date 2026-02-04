@@ -4,7 +4,54 @@
 
 Mnemora is a TypeScript birthday notification bot that fetches birthdays from Google Calendar or Google Sheets and sends WhatsApp notifications. It runs as an AWS Lambda function once per day on a scheduled cron.
 
-There are no automated tests. The CI pipeline runs type-check, lint, and build.
+## Commands
+
+```bash
+yarn install          # Install dependencies
+yarn dev              # Start development with watch mode
+yarn build            # Compile TypeScript
+yarn type-check       # Type check without emitting
+yarn lint             # Run ESLint
+yarn lint:fix         # Auto-fix lint issues
+yarn deploy           # Deploy to AWS Lambda
+yarn deploy:force     # Force deploy (clears .aws-sam cache)
+yarn invoke:lambda    # Invoke deployed Lambda function
+```
+
+## Architecture
+
+```
+src/
+├── clients/        # External service clients (Google, WhatsApp)
+├── data-source/    # Birthday data fetching (Calendar, Sheets)
+├── output-channel/ # Notification delivery (WhatsApp)
+├── services/       # Core business logic
+├── lambda/         # AWS Lambda handler
+├── utils/          # Shared utilities
+└── types/          # TypeScript type definitions
+infrastructure/     # AWS SAM templates and CloudWatch alarms
+```
+
+## Environment Setup
+
+Copy `.env.example` to `.env` and configure:
+- Google Calendar/Sheets API credentials
+- WhatsApp group ID
+- Twilio credentials (for SMS-based QR auth)
+- Timezone (defaults to America/Los_Angeles)
+
+## Key Files
+
+- `src/index.ts` - Main entry point (local development)
+- `src/lambda/handler.ts` - AWS Lambda handler
+- `infrastructure/template.yaml` - SAM deployment template
+
+## Gotchas
+
+- Requires Node >= 24.0.0 and Yarn >= 4.11.0
+- No automated tests - CI runs type-check, lint, and build only
+- Lambda deployment uses AWS SAM (`infrastructure/template.yaml`)
+- WhatsApp auth state stored in `auth_info/` (gitignored)
 
 ## Workflow Orchestration
 
@@ -14,16 +61,15 @@ There are no automated tests. The CI pipeline runs type-check, lint, and build.
 - Use plan mode for verification steps, not just building
 - Write detailed specs upfront to reduce ambiguity
 
-### 2. Subagent Strategy to keep main context window clean
+### 2. Subagent Strategy
 - Offload research, exploration, and parallel analysis to subagents
 - For complex problems, throw more compute at it via subagents
 - One task per subagent for focused execution
 
 ### 3. Self-Improvement Loop
-- After ANY correction from the user: update 'tasks/lessons.md' with the pattern
+- After ANY correction from the user: note the pattern to avoid repeating it
 - Write rules for yourself that prevent the same mistake
 - Ruthlessly iterate on these lessons until mistake rate drops
-- Review lessons at session start for relevant project
 
 ### 4. Verification Before Done
 - Never mark a task complete without proving it works
@@ -43,15 +89,8 @@ There are no automated tests. The CI pipeline runs type-check, lint, and build.
 - Zero context switching required from the user
 - Go fix failing CI tests without being told how
 
-## Task Management
-1. **Plan First**: Write plan to 'tasks/todo.md' with checkable items
-2. **Verify Plan**: Check in before starting implementation
-3. **Track Progress**: Mark items complete as you go
-4. **Explain Changes**: High-level summary at each step
-5. **Document Results**: Add review to 'tasks/todo.md'
-6. **Capture Lessons**: Update 'tasks/lessons.md' after corrections
-
 ## Core Principles
+
 - **Simplicity First**: Make every change as simple as possible. Impact minimal code.
 - **No Laziness**: Find root causes. No temporary fixes. Senior developer standards.
 - **Minimal Impact**: Changes should only touch what's necessary. Avoid introducing bugs.
