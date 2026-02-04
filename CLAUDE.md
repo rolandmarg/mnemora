@@ -93,3 +93,4 @@ Copy `.env.example` to `.env` and configure:
 - **Simplicity First**: Make every change as simple as possible. Impact minimal code.
 - **No Laziness**: Find root causes. No temporary fixes. Senior developer standards.
 - **Minimal Impact**: Changes should only touch what's necessary. Avoid introducing bugs.
+- **Local/Lambda Parity**: Local and Lambda environments MUST behave identically. One codebase, one flow. Test locally → deploy with confidence. Any environment-specific branching is a bug waiting to happen.
