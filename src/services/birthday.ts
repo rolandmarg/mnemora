@@ -10,7 +10,9 @@ import {
   isFirstDayOfMonth,
   startOfMonth,
   endOfMonth,
+  formatTimestampHumanReadable,
 } from '../utils/date-helpers.util.js';
+import { config } from '../config.js';
 import { initializeCorrelationId } from '../utils/runtime.util.js';
 import type { Logger, BirthdayRecord } from '../types.js';
 
@@ -49,6 +51,18 @@ function formatBirthdayMessages(birthdays: BirthdayRecord[]): string[] {
       ? `${names[0]} and ${names[1]}`
       : `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}`;
   return [`Happy birthday ${combined}! 🎂`];
+}
+
+function formatHealthCheckMessage(birthdayCount: number, authAgeDays: number | null): string {
+  const now = new Date();
+  const lines = [
+    'Mnemora Health Check',
+    `Status: OK`,
+    `Time: ${formatTimestampHumanReadable(now)}`,
+    `Auth age: ${authAgeDays !== null ? `${authAgeDays} day${authAgeDays !== 1 ? 's' : ''}` : 'unknown'}`,
+    `Birthdays today: ${birthdayCount}`,
+  ];
+  return lines.join('\n');
 }
 
 // --- Sheets → Calendar sync ---
@@ -104,14 +118,25 @@ export async function runBirthdayCheck(logger: Logger): Promise<void> {
     logger.info('Running birthday check...');
     const { todaysBirthdays, monthlyBirthdays } = await getTodaysBirthdaysWithOptionalDigest();
 
-    if (!monthlyBirthdays && todaysBirthdays.length === 0) {
-      logger.info('No birthdays today!');
-      return;
-    }
-
     await whatsapp.initialize(logger);
 
     try {
+      // Always send health check to monitoring group
+      const healthCheckGroupId = config.whatsapp.healthCheckGroupId;
+      if (healthCheckGroupId) {
+        try {
+          const authAgeDays = await whatsapp.getAuthAgeDays();
+          const healthMessage = formatHealthCheckMessage(todaysBirthdays.length, authAgeDays);
+          logger.info('Sending health check...');
+          const result = await whatsapp.sendToGroup(healthCheckGroupId, healthMessage, logger);
+          logger.info('Health check sent', { messageId: result.id });
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
+          logger.warn('Health check failed, continuing with birthday messages', { error: msg });
+        }
+      }
+
+      // Send birthday messages to main group
       if (monthlyBirthdays) {
         const digest = formatMonthlyDigest(monthlyBirthdays);
         logger.info('Sending monthly digest...');
