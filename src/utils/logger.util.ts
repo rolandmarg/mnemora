@@ -1,7 +1,7 @@
 import pino from 'pino';
 import { config } from '../config.js';
 import { getCorrelationId, getLambdaFunctionName, getLambdaFunctionVersion, getLambdaRequestId } from './runtime.util.js';
-import type { Logger } from '../types/logger.types.js';
+import type { Logger } from '../types.js';
 
 enum LogLevel {
   TRACE = 10,

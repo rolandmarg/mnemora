@@ -1,6 +1,6 @@
 import { extractNameParts, sanitizeNames } from './name-helpers.util.js';
 import { parseDateString } from './date-helpers.util.js';
-import type { BirthdayRecord } from '../types/birthday.types.js';
+import type { BirthdayRecord } from '../types.js';
 
 export function parseRowToBirthdays(row: string[]): BirthdayRecord[] {
   const birthdays: BirthdayRecord[] = [];

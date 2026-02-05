@@ -1,6 +1,6 @@
 import { getCorrelationId } from './runtime.util.js';
 import { config } from '../config.js';
-import type { Logger } from '../types/logger.types.js';
+import type { Logger } from '../types.js';
 
 export class SecurityError extends Error {
   constructor(message: string) {
