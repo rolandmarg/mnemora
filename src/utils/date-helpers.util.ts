@@ -99,19 +99,9 @@ export function parseDateString(dateStr: string): Date | null {
   return null;
 }
 
-function normalizeDate(date: Date): Date {
-  return new Date(date);
-}
-
 export function startOfDay(date: Date): Date {
-  const normalized = normalizeDate(date);
+  const normalized = new Date(date);
   normalized.setHours(0, 0, 0, 0);
-  return normalized;
-}
-
-export function endOfDay(date: Date): Date {
-  const normalized = normalizeDate(date);
-  normalized.setHours(23, 59, 59, 999);
   return normalized;
 }
 
@@ -157,10 +147,6 @@ export function formatDateShort(date: Date, includeYear: boolean = false): strin
 
 export function formatDateMonthYear(date: Date): string {
   return date.toLocaleString('default', { month: 'long', year: 'numeric' });
-}
-
-export function formatDateRange(startDate: Date, endDate: Date): string {
-  return `${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`;
 }
 
 export function isFirstDayOfMonth(date: Date): boolean {

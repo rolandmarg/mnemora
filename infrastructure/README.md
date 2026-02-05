@@ -5,16 +5,12 @@ This directory contains all AWS infrastructure-as-code configuration files.
 ## Files
 
 - **`template.yaml`** - AWS SAM (Serverless Application Model) template
-  - Defines Lambda functions, IAM roles, S3 buckets, SNS topics, EventBridge rules
+  - Defines Lambda function, IAM roles, S3 bucket, CloudWatch log group, EventBridge rule
   - Main infrastructure definition
 
 - **`samconfig.toml`** - SAM CLI configuration
   - Deployment parameters (stack name, region, environment variables)
   - Used by `sam deploy` command
-
-- **`cloudwatch-alarms.yaml`** - CloudWatch Alarms configuration
-  - Monitoring and alerting rules
-  - Can be deployed separately or included in main template
 
 ## Usage
 

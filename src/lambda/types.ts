@@ -32,9 +32,3 @@ export interface LambdaResponse {
   body: string;
   headers?: Record<string, string>;
 }
-
-export type LambdaHandler = (
-  event: EventBridgeEvent,
-  context: LambdaContext
-) => Promise<LambdaResponse | void>;
-
