@@ -103,7 +103,7 @@ Before starting any feature work, use the `using-git-worktrees` skill to create 
 
 ## Core Principles
 
-- **Never Leak Secrets**: NEVER log, print, echo, or include in output any secret values from `.env`, `infrastructure/template.yaml`, or environment variables (API keys, private keys, tokens, passwords). When debugging config issues, reference variable *names* only — never their values. Treat all credentials as radioactive.
+- **Never Leak Secrets**: NEVER log, print, or include secrets in any output. When debugging, reference variable *names* only — never values.
 - **Clean Up After Refactors**: After major structural changes, run a cleanup pass for indentation, dead code, redundant checks, and orphaned files. Don't let formatting debt ship.
 - **Simplicity First**: Make every change as simple as possible. Impact minimal code.
 - **No Laziness**: Find root causes. No temporary fixes. Senior developer standards.
