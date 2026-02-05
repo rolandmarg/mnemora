@@ -41,17 +41,10 @@ build/
 # TypeScript build info
 .tsbuildinfo
 
-# WhatsApp session data
-.wwebjs_auth/
-.wwebjs_cache/
+# WhatsApp session data (Baileys)
 auth_info/
 
-# Test coverage
-coverage/
-.nyc_output/
-*.test.ts.snap
-vitest.config.ts.timestamp-*
-
+# AWS SAM
 samconfig.toml
 .aws-sam
 

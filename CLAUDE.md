@@ -28,11 +28,10 @@ src/
 ├── scripts/        # Build, packaging, release, and cleanup scripts
 ├── utils/          # Shared utilities (date, birthday, name helpers, logger, runtime)
 ├── types/          # Third-party type declarations
-├── tests/          # Test files
 ├── config.ts       # Centralized app configuration
 └── types.ts        # Shared type definitions (BirthdayRecord, Logger, QRAuthenticationRequiredError)
-infrastructure/     # AWS SAM templates, CloudWatch alarms, samconfig
-scripts/            # Shell scripts (deploy, cron install/uninstall)
+infrastructure/     # AWS SAM template and samconfig
+scripts/            # Shell scripts (deploy)
 ```
 
 ## Environment Setup

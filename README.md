@@ -28,8 +28,6 @@ cp .env.example .env  # Add your Google & WhatsApp credentials
 yarn start             # Scan QR code to link WhatsApp, then you're live
 ```
 
-See [docs/](./docs/) for Google API setup, environment variables, and AWS deployment.
-
 ## Project Structure
 
 ```

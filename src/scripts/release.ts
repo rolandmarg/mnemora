@@ -350,8 +350,6 @@ async function createGitHubRelease(tag: string, releaseNotes: string): Promise<v
   printInfo('Creating GitHub release...');
   
   // Create temporary file for release notes
-  const { writeFileSync, unlinkSync } = await import('node:fs');
-  const { tmpdir } = await import('node:os');
   const notesFile = join(tmpdir(), `release-notes-${Date.now()}.txt`);
   
   try {

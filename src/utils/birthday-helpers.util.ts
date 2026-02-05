@@ -68,23 +68,3 @@ export function parseRowToBirthdays(row: string[]): BirthdayRecord[] {
   return birthdays;
 }
 
-export function getDateRangeForBirthdays(birthdays: BirthdayRecord[]): { minDate: Date; maxDate: Date } | null {
-  if (birthdays.length === 0) {
-    return null;
-  }
-  
-  let minDate = birthdays[0].birthday;
-  let maxDate = birthdays[0].birthday;
-  
-  birthdays.forEach(birthday => {
-    if (birthday.birthday < minDate) {
-      minDate = birthday.birthday;
-    }
-    if (birthday.birthday > maxDate) {
-      maxDate = birthday.birthday;
-    }
-  });
-  
-  return { minDate, maxDate };
-}
-
