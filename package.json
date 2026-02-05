@@ -10,8 +10,6 @@
     "start:prod": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
     "delete-all-events": "tsx src/scripts/delete-all-events.ts",
-    "install-cron": "./scripts/install-cron.sh",
-    "uninstall-cron": "./scripts/uninstall-cron.sh",
     "type-check": "tsc --noEmit --incremental",
     "lint": "eslint --cache --cache-location .eslintcache --max-warnings 0 src/**/*.ts",
     "lint:fix": "eslint --cache --cache-location .eslintcache --max-warnings 0 src/**/*.ts --fix",
@@ -40,23 +38,6 @@
     "node": ">=24.0.0",
     "yarn": ">=4.11.0"
   },
-  "files": [
-    "*.js",
-    "clients/",
-    "data-source/",
-    "lambda/",
-    "output-channel/",
-    "services/",
-    "types/",
-    "utils/",
-    "config.js",
-    "index.js",
-    "package.json",
-    "yarn.lock",
-    ".yarnrc.yml",
-    ".yarn/releases/",
-    "node_modules/"
-  ],
   "_deploymentRequirements": {
     "aws-sam-cli": ">=1.148.0",
     "note": "SAM CLI 1.148.0+ required for nodejs24.x runtime support. Checked automatically in deploy.sh"

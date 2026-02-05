@@ -122,26 +122,6 @@
       "skipFiles": ["<node_internals>/**"]
     },
     {
-      "name": "Install Cron Jobs",
-      "type": "node",
-      "request": "launch",
-      "runtimeExecutable": "yarn",
-      "runtimeArgs": ["install-cron"],
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
-      "skipFiles": ["<node_internals>/**"]
-    },
-    {
-      "name": "Uninstall Cron Jobs",
-      "type": "node",
-      "request": "launch",
-      "runtimeExecutable": "yarn",
-      "runtimeArgs": ["uninstall-cron"],
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
-      "skipFiles": ["<node_internals>/**"]
-    },
-    {
       "name": "Invoke Lambda (Remote)",
       "type": "node",
       "request": "launch",
