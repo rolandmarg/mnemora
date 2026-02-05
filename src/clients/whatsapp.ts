@@ -75,27 +75,34 @@ async function flushAuthWrites(logger: Logger): Promise<void> {
   }
 }
 
-async function checkAuthReminder(logger: Logger): Promise<void> {
+export async function getAuthAgeDays(): Promise<number | null> {
   try {
-    if (!isLambda()) {
-      return;
-    }
     const data = await appStorage.readFile(AUTH_KEY);
     if (!data) {
-      logger.warn('WhatsApp authentication refresh needed - never authenticated');
-      return;
+      return null;
     }
     const authData = JSON.parse(data.toString('utf-8'));
     const lastAuth = new Date(authData.timestamp);
     if (isNaN(lastAuth.getTime())) {
-      return;
+      return null;
     }
-    const daysSince = Math.floor((Date.now() - lastAuth.getTime()) / (1000 * 60 * 60 * 24));
-    if (daysSince >= REMINDER_DAYS) {
-      logger.warn(`WhatsApp authentication refresh needed! Last auth: ${daysSince} days ago.`);
-    }
+    return Math.floor((Date.now() - lastAuth.getTime()) / (1000 * 60 * 60 * 24));
   } catch {
-    // Ignore errors in reminder check
+    return null;
+  }
+}
+
+async function checkAuthReminder(logger: Logger): Promise<void> {
+  if (!isLambda()) {
+    return;
+  }
+  const daysSince = await getAuthAgeDays();
+  if (daysSince === null) {
+    logger.warn('WhatsApp authentication refresh needed - never authenticated');
+    return;
+  }
+  if (daysSince >= REMINDER_DAYS) {
+    logger.warn(`WhatsApp authentication refresh needed! Last auth: ${daysSince} days ago.`);
   }
 }
 
@@ -413,7 +420,10 @@ export async function sendMessage(message: string, logger: Logger): Promise<{ id
   if (!groupId) {
     throw new Error('No WhatsApp group ID configured. Set WHATSAPP_GROUP_ID.');
   }
+  return sendToGroup(groupId, message, logger);
+}
 
+export async function sendToGroup(groupId: string, message: string, logger: Logger): Promise<{ id: string }> {
   const chatId = groupId.includes('@g.us') ? groupId : `${groupId}@g.us`;
 
   let lastError: Error | null = null;
@@ -426,7 +436,7 @@ export async function sendMessage(message: string, logger: Logger): Promise<{ id
       }
 
       const result = await socket.sendToGroup(chatId, message);
-      logger.info('WhatsApp message sent', { messageId: result.id, attempt });
+      logger.info('WhatsApp message sent to group', { groupId, messageId: result.id, attempt });
       return { id: result.id };
     } catch (error) {
       if (error instanceof QRAuthenticationRequiredError) {
