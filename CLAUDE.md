@@ -99,6 +99,7 @@ Copy `.env.example` to `.env` and configure:
 Before starting any feature work, use the `using-git-worktrees` skill to create an isolated worktree. This ensures multiple Claude Code sessions can work in parallel without conflicts.
 - Never commit directly to main
 - Clean up worktrees after merging: `git worktree remove <path>`
+- When finishing a branch: push and create a PR against `main` by default — don't ask
 
 ## Core Principles
 
