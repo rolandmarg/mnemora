@@ -47,15 +47,15 @@ class S3ClientWrapper {
 
   async download(key: string): Promise<Buffer | null> {
     if (!this.s3Client || !this.bucketName) {
-return null;
-}
+      return null;
+    }
 
     try {
       const input: GetObjectCommandInput = { Bucket: this.bucketName, Key: key };
       const result = await this.s3Client.send(new GetObjectCommand(input));
       if (!result.Body) {
-return null;
-}
+        return null;
+      }
 
       const chunks: Uint8Array[] = [];
       if (result.Body && typeof result.Body === 'object' && Symbol.asyncIterator in result.Body) {
@@ -67,29 +67,33 @@ return null;
     } catch (error: unknown) {
       const awsError = error as { name?: string; $metadata?: { httpStatusCode?: number } };
       if (awsError.name === 'NoSuchKey' || awsError.$metadata?.httpStatusCode === 404) {
-return null;
-}
+        return null;
+      }
       throw error;
     }
   }
 
   async exists(key: string): Promise<boolean> {
     if (!this.s3Client || !this.bucketName) {
-return false;
-}
+      return false;
+    }
 
     try {
       await this.s3Client.send(new HeadObjectCommand({ Bucket: this.bucketName, Key: key }));
       return true;
-    } catch {
-      return false;
+    } catch (error: unknown) {
+      const awsError = error as { name?: string; $metadata?: { httpStatusCode?: number } };
+      if (awsError.name === 'NotFound' || awsError.$metadata?.httpStatusCode === 404) {
+        return false;
+      }
+      throw error;
     }
   }
 
   async listObjects(prefix: string, maxKeys?: number): Promise<string[]> {
     if (!this.s3Client || !this.bucketName) {
-return [];
-}
+      return [];
+    }
 
     const result = await this.s3Client.send(
       new ListObjectsV2Command({ Bucket: this.bucketName, Prefix: prefix, MaxKeys: maxKeys })
@@ -148,21 +152,21 @@ export class FileStorage {
 
   private async loadSyncMetadata(): Promise<SyncMetadata | null> {
     if (!s3Client.isAvailable()) {
-return null;
-}
+      return null;
+    }
     try {
       const content = await s3Client.download(`${this.basePath}/${this.METADATA_KEY}`);
       if (content) {
-return JSON.parse(content.toString()) as SyncMetadata;
-}
+        return JSON.parse(content.toString()) as SyncMetadata;
+      }
     } catch { /* first sync */ }
     return null;
   }
 
   private async saveSyncMetadata(metadata: SyncMetadata): Promise<void> {
     if (!s3Client.isAvailable()) {
-return;
-}
+      return;
+    }
     await s3Client.upload(`${this.basePath}/${this.METADATA_KEY}`, JSON.stringify(metadata, null, 2), 'application/json');
   }
 
@@ -172,8 +176,8 @@ return;
     }
     const fullPath = join(process.cwd(), this.basePath, filePath);
     if (!existsSync(fullPath)) {
-return null;
-}
+      return null;
+    }
     return readFileSync(fullPath);
   }
 
@@ -185,8 +189,8 @@ return null;
     const fullPath = join(process.cwd(), this.basePath, filePath);
     const dir = join(fullPath, '..');
     if (!existsSync(dir)) {
-mkdirSync(dir, { recursive: true });
-}
+      mkdirSync(dir, { recursive: true });
+    }
     writeFileSync(fullPath, data);
   }
 
@@ -199,8 +203,8 @@ mkdirSync(dir, { recursive: true });
 
   async syncToS3(localPath: string): Promise<void> {
     if (!s3Client.isAvailable() || !existsSync(localPath)) {
-return;
-}
+      return;
+    }
 
     if (this.isSessionStorage) {
       const archiveBuffer = await this.createSessionArchive(localPath);
@@ -221,15 +225,15 @@ return;
         const currentRelativePath = relativePath ? `${relativePath}/${file}` : file;
 
         if (currentRelativePath === this.METADATA_KEY) {
-continue;
-}
+          continue;
+        }
 
         if (stat.isDirectory()) {
           collectFiles(filePath, currentRelativePath);
         } else {
           if (now - stat.mtimeMs > MAX_AGE_MS) {
-continue;
-}
+            continue;
+          }
 
           const fileContent = readFileSync(filePath);
           const hash = this.getFileHash(fileContent);
@@ -255,12 +259,12 @@ continue;
 
   async syncFromS3(localPath: string): Promise<void> {
     if (!s3Client.isAvailable()) {
-return;
-}
+      return;
+    }
 
     if (!existsSync(localPath)) {
-mkdirSync(localPath, { recursive: true });
-}
+      mkdirSync(localPath, { recursive: true });
+    }
 
     if (this.isSessionStorage) {
       const archiveKey = `${this.basePath}/${this.ARCHIVE_NAME}`;
@@ -269,8 +273,8 @@ mkdirSync(localPath, { recursive: true });
       }
       const archiveBuffer = await s3Client.download(archiveKey);
       if (!archiveBuffer) {
-throw new Error('WhatsApp session archive is empty or unreadable in S3');
-}
+        throw new Error('WhatsApp session archive is empty or unreadable in S3');
+      }
       await this.extractSessionArchive(localPath, archiveBuffer);
       return;
     }
@@ -281,8 +285,8 @@ throw new Error('WhatsApp session archive is empty or unreadable in S3');
     for (const s3Key of s3Keys) {
       const relativePath = s3Key.startsWith(`${this.basePath}/`) ? s3Key.slice(this.basePath.length + 1) : s3Key;
       if (!relativePath || relativePath === this.basePath) {
-continue;
-}
+        continue;
+      }
       const localFilePath = join(localPath, relativePath);
       downloadTasks.push({ s3Key, localFilePath, localFileDir: join(localFilePath, '..') });
     }
@@ -292,12 +296,12 @@ continue;
       await Promise.all(
         batch.map(async ({ s3Key, localFilePath, localFileDir }) => {
           if (!existsSync(localFileDir)) {
-mkdirSync(localFileDir, { recursive: true });
-}
+            mkdirSync(localFileDir, { recursive: true });
+          }
           const fileContent = await s3Client.download(s3Key);
           if (fileContent) {
-writeFileSync(localFilePath, fileContent);
-}
+            writeFileSync(localFilePath, fileContent);
+          }
         })
       );
     }

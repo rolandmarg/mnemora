@@ -9,8 +9,8 @@ let resolvedSpreadsheetId: string | null = null;
 
 function getClient(): sheets_v4.Sheets {
   if (sheetsClient) {
-return sheetsClient;
-}
+    return sheetsClient;
+  }
 
   const { clientEmail, privateKey, spreadsheetId } = config.google;
   if (!clientEmail || !privateKey) {
@@ -34,8 +34,8 @@ return sheetsClient;
 
 async function getFirstSheetName(): Promise<string> {
   if (cachedSheetName) {
-return cachedSheetName;
-}
+    return cachedSheetName;
+  }
 
   const client = getClient();
   const response = await client.spreadsheets.get({ spreadsheetId: resolvedSpreadsheetId! });
@@ -59,8 +59,8 @@ export async function fetchBirthdays(): Promise<BirthdayRecord[]> {
 
   const rows = response.data.values;
   if (!rows || rows.length === 0) {
-return [];
-}
+    return [];
+  }
 
   // Skip header row
   return rows.slice(1).flatMap((row) => parseRowToBirthdays(row));

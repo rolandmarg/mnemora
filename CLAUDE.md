@@ -22,13 +22,11 @@ yarn invoke:lambda    # Invoke deployed Lambda function
 
 ```
 src/
-├── clients/        # External service clients (Google, WhatsApp)
-├── data-source/    # Birthday data fetching (Calendar, Sheets)
-├── output-channel/ # Notification delivery (WhatsApp)
-├── services/       # Core business logic
+├── clients/        # External service clients (googleCalendar, googleSheets, whatsapp, s3)
+├── services/       # Core business logic (birthday check orchestration)
 ├── lambda/         # AWS Lambda handler
 ├── utils/          # Shared utilities
-└── types/          # TypeScript type definitions
+└── types.ts        # Shared type definitions (BirthdayRecord, Logger, QRAuthenticationRequiredError)
 infrastructure/     # AWS SAM templates and CloudWatch alarms
 ```
 
@@ -90,6 +88,7 @@ Copy `.env.example` to `.env` and configure:
 
 ## Core Principles
 
+- **Clean Up After Refactors**: After major structural changes, run a cleanup pass for indentation, dead code, redundant checks, and orphaned files. Don't let formatting debt ship.
 - **Simplicity First**: Make every change as simple as possible. Impact minimal code.
 - **No Laziness**: Find root causes. No temporary fixes. Senior developer standards.
 - **Minimal Impact**: Changes should only touch what's necessary. Avoid introducing bugs.

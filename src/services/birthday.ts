@@ -37,11 +37,11 @@ function formatMonthlyDigest(birthdays: BirthdayRecord[]): string {
 
 function formatBirthdayMessages(birthdays: BirthdayRecord[]): string[] {
   if (birthdays.length === 0) {
-return [];
-}
+    return [];
+  }
   if (birthdays.length === 1) {
-return [`Happy birthday ${birthdays[0].firstName}! 🎂`];
-}
+    return [`Happy birthday ${birthdays[0].firstName}! 🎂`];
+  }
 
   const names = birthdays.map(r => r.firstName);
   const combined =
@@ -128,9 +128,6 @@ export async function runBirthdayCheck(logger: Logger): Promise<void> {
         for (const message of messages) {
           const result = await whatsapp.sendMessage(message, logger);
           logger.info('Birthday message sent', { messageId: result.id });
-          if (messages.length > 1) {
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-          }
         }
       }
 

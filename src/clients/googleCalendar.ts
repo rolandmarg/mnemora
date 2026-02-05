@@ -31,8 +31,8 @@ let readWriteClient: CalendarClient | null = null;
 
 function getReadOnlyClient(): CalendarClient {
   if (readOnlyClient) {
-return readOnlyClient;
-}
+    return readOnlyClient;
+  }
 
   const { clientEmail, privateKey } = config.google;
   if (!clientEmail || !privateKey) {
@@ -51,8 +51,8 @@ return readOnlyClient;
 
 function getReadWriteClient(): CalendarClient {
   if (readWriteClient) {
-return readWriteClient;
-}
+    return readWriteClient;
+  }
 
   const { clientEmail, privateKey } = config.google;
   if (!clientEmail || !privateKey) {
@@ -76,20 +76,20 @@ function isBirthdayEvent(event: CalendarEvent): boolean {
   const description = (event.description ?? '').toLowerCase();
 
   if (summary.includes('birthday') || description.includes('birthday')) {
-return true;
-}
+    return true;
+  }
 
   const hasYearlyRecurrence = event.recurrence?.some(
     (r) => r.includes('YEARLY') || r.includes('FREQ=YEARLY')
   );
   if (!hasYearlyRecurrence) {
-return false;
-}
+    return false;
+  }
 
   const isAllDay = !!event.start?.date && !event.start?.dateTime;
   if (isAllDay) {
-return true;
-}
+    return true;
+  }
 
   const excludedKeywords = ['meeting', 'reminder', 'appointment'];
   return summary.length > 0 && !excludedKeywords.some((k) => summary.includes(k));
@@ -109,8 +109,8 @@ function extractNameFromEvent(event: CalendarEvent): string {
 function eventToBirthdayRecord(event: CalendarEvent): BirthdayRecord | null {
   const startDate = event.start?.date ?? event.start?.dateTime;
   if (!startDate) {
-return null;
-}
+    return null;
+  }
 
   try {
     const birthday = parseDateFromString(startDate);
@@ -199,8 +199,8 @@ function createDuplicateKey(date: Date, name: string): string {
 
 async function buildExistingBirthdayMap(birthdays: BirthdayRecord[]): Promise<Map<string, boolean>> {
   if (birthdays.length === 0) {
-return new Map();
-}
+    return new Map();
+  }
 
   const currentYear = today().getFullYear();
   const yearStart = startOfYear(new Date(currentYear, 0, 1));
@@ -215,8 +215,8 @@ return new Map();
     const day = getDateInTimezone(birthday.birthday);
     const key = `${month}-${day}`;
     if (!uniqueDates.has(key)) {
-uniqueDates.set(key, []);
-}
+      uniqueDates.set(key, []);
+    }
     uniqueDates.get(key)!.push(birthday.birthday);
   }
 
@@ -225,21 +225,21 @@ uniqueDates.set(key, []);
   for (const event of birthdayEvents) {
     const startDate = event.start?.date ?? event.start?.dateTime;
     if (!startDate) {
-continue;
-}
+      continue;
+    }
 
     const eventDate = parseDateFromString(startDate);
     const eventName = extractNameFromEvent(event);
     if (!eventDate || !eventName) {
-continue;
-}
+      continue;
+    }
 
     const eventMonth = getMonthInTimezone(eventDate);
     const eventDay = getDateInTimezone(eventDate);
     const matchingDates = uniqueDates.get(`${eventMonth}-${eventDay}`);
     if (!matchingDates) {
-continue;
-}
+      continue;
+    }
 
     const isRecurring = !!event.recurrence || !!event.recurringEventId;
 
@@ -263,8 +263,8 @@ export async function syncBirthdaysToCalendar(
   birthdays: BirthdayRecord[]
 ): Promise<{ added: number; skipped: number; errors: number }> {
   if (birthdays.length === 0) {
-return { added: 0, skipped: 0, errors: 0 };
-}
+    return { added: 0, skipped: 0, errors: 0 };
+  }
 
   const existingMap = await buildExistingBirthdayMap(birthdays);
 

@@ -62,8 +62,8 @@ function recordAuthentication(logger: Logger): void {
 
 async function flushAuthWrites(logger: Logger): Promise<void> {
   if (!pendingAuthTimestamp) {
-return;
-}
+    return;
+  }
   try {
     const data = JSON.stringify({ timestamp: pendingAuthTimestamp });
     if (isLambda()) {
@@ -78,8 +78,8 @@ return;
 async function checkAuthReminder(logger: Logger): Promise<void> {
   try {
     if (!isLambda()) {
-return;
-}
+      return;
+    }
     const data = await appStorage.readFile(AUTH_KEY);
     if (!data) {
       logger.warn('WhatsApp authentication refresh needed - never authenticated');
@@ -88,8 +88,8 @@ return;
     const authData = JSON.parse(data.toString('utf-8'));
     const lastAuth = new Date(authData.timestamp);
     if (isNaN(lastAuth.getTime())) {
-return;
-}
+      return;
+    }
     const daysSince = Math.floor((Date.now() - lastAuth.getTime()) / (1000 * 60 * 60 * 24));
     if (daysSince >= REMINDER_DAYS) {
       logger.warn(`WhatsApp authentication refresh needed! Last auth: ${daysSince} days ago.`);
@@ -130,14 +130,14 @@ class WhatsAppSocket {
 
   private shouldIgnoreJid(jid: string): boolean {
     if (this.activeGroupId && jid.includes(this.activeGroupId)) {
-return false;
-}
+      return false;
+    }
     if (jid.includes('@s.whatsapp.net') || jid.includes('@lid')) {
-return true;
-}
+      return true;
+    }
     if (jid.includes('@g.us')) {
-return true;
-}
+      return true;
+    }
     return false;
   }
 
@@ -145,8 +145,8 @@ return true;
     if (this.isReady && this.sock) {
       try {
         if (this.sock.user) {
-return;
-}
+          return;
+        }
       } catch {
         this.sock = null;
         this.isReady = false;
@@ -157,14 +157,17 @@ return;
       return new Promise((resolve, reject) => {
         const checkReady = setInterval(() => {
           if (this.isReady && this.sock) {
- clearInterval(checkReady); resolve(); 
-} else if (!this.isInitializing) {
- clearInterval(checkReady); reject(new Error('Initialization failed')); 
-}
+            clearInterval(checkReady);
+            resolve();
+          } else if (!this.isInitializing) {
+            clearInterval(checkReady);
+            reject(new Error('Initialization failed'));
+          }
         }, 100);
         setTimeout(() => {
- clearInterval(checkReady); reject(new Error('Initialization timeout')); 
-}, 180000);
+          clearInterval(checkReady);
+          reject(new Error('Initialization timeout'));
+        }, 180000);
       });
     }
 
@@ -183,8 +186,9 @@ return;
       (async () => {
         try {
           if (this.sock) {
- this.sock.end(undefined); this.sock = null; 
-}
+            this.sock.end(undefined);
+            this.sock = null;
+          }
 
           const { state, saveCreds } = await useMultiFileAuthState(this.sessionPath);
           this.saveCreds = saveCreds;
@@ -213,8 +217,8 @@ return;
 
           this.sock.ev.on('creds.update', async () => {
             if (this.saveCreds) {
-await this.saveCreds();
-}
+              await this.saveCreds();
+            }
           });
 
           this.setupEvents(logger, resolve, reject);
@@ -229,24 +233,27 @@ await this.saveCreds();
 
   private setupEvents(logger: Logger, resolve: () => void, reject: (error: Error) => void): void {
     if (!this.sock) {
- reject(new Error('Failed to create WhatsApp socket')); return; 
-}
+      reject(new Error('Failed to create WhatsApp socket'));
+      return;
+    }
 
     let initTimeout: ReturnType<typeof setTimeout> | null = setTimeout(() => {
       if (!this.isReady) {
         this.isInitializing = false;
         if (this.sock) {
- this.sock.end(undefined); this.sock = null; 
-}
+          this.sock.end(undefined);
+          this.sock = null;
+        }
         reject(new Error('WhatsApp client initialization timeout'));
       }
     }, 180000);
 
     const clearInitTimeout = () => {
- if (initTimeout) {
- clearTimeout(initTimeout); initTimeout = null; 
-} 
-};
+      if (initTimeout) {
+        clearTimeout(initTimeout);
+        initTimeout = null;
+      }
+    };
 
     this.sock.ev.on('connection.update', (update: Partial<ConnectionState>) => {
       try {
@@ -257,15 +264,16 @@ await this.saveCreds();
             clearInitTimeout();
             this.isInitializing = false;
             if (this.sock) {
- this.sock.end(undefined); this.sock = null; 
-}
+              this.sock.end(undefined);
+              this.sock = null;
+            }
             console.log('QR_CODE_FOR_SCANNING:', JSON.stringify({ qrCode: qr }));
             reject(new QRAuthenticationRequiredError(qr,
               'WhatsApp authentication required but QR code scanning is not possible in Lambda. ' +
               'Please authenticate locally first, then sync the session to S3.'));
             return;
           }
-          console.log(`\n${  '='.repeat(60)}`);
+          console.log(`\n${'='.repeat(60)}`);
           console.log('WHATSAPP AUTHENTICATION REQUIRED');
           console.log('='.repeat(60));
           console.log('\nPlease scan the QR code below with your WhatsApp mobile app:');
@@ -299,33 +307,37 @@ await this.saveCreds();
             this.isInitializing = false;
             this.isReady = false;
             if (this.sock) {
- this.sock.end(undefined); this.sock = null; 
-}
+              this.sock.end(undefined);
+              this.sock = null;
+            }
             try {
               if (existsSync(this.sessionPath)) {
-rmSync(this.sessionPath, { recursive: true, force: true });
-}
+                rmSync(this.sessionPath, { recursive: true, force: true });
+              }
             } catch { /* ignore */ }
             setTimeout(async () => {
               try {
- await this.initialize(logger); resolve(); 
-} catch (e) {
- reject(e instanceof Error ? e : new Error(String(e))); 
-}
+                await this.initialize(logger);
+                resolve();
+              } catch (e) {
+                reject(e instanceof Error ? e : new Error(String(e)));
+              }
             }, 1000);
           } else if (statusCode === DisconnectReason.restartRequired) {
             clearInitTimeout();
             this.isInitializing = false;
             this.isReady = false;
             if (this.sock) {
- this.sock.end(undefined); this.sock = null; 
-}
+              this.sock.end(undefined);
+              this.sock = null;
+            }
             setTimeout(async () => {
               try {
- await this.initialize(logger); resolve(); 
-} catch (e) {
- reject(e instanceof Error ? e : new Error(String(e))); 
-}
+                await this.initialize(logger);
+                resolve();
+              } catch (e) {
+                reject(e instanceof Error ? e : new Error(String(e)));
+              }
             }, 1000);
           } else {
             this.isReady = false;
@@ -347,22 +359,20 @@ rmSync(this.sessionPath, { recursive: true, force: true });
     const normalizedChatId = chatId.includes('@g.us') ? chatId : `${chatId}@g.us`;
 
     // Fetch group metadata for sender keys
-    if (normalizedChatId.includes('@g.us')) {
-      try {
-        await this.sock.groupMetadata(normalizedChatId);
-        await new Promise(resolve => setTimeout(resolve, 500));
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        if (!msg.includes('not found') && !msg.includes('404')) {
-          console.warn(`Warning: Could not fetch group metadata: ${msg}`);
-        }
+    try {
+      await this.sock.groupMetadata(normalizedChatId);
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!msg.includes('not found') && !msg.includes('404')) {
+        console.warn(`Warning: Could not fetch group metadata: ${msg}`);
       }
     }
 
     const result = await this.sock.sendMessage(normalizedChatId, { text: message });
     if (!result) {
-throw new Error('Failed to send message: no result returned');
-}
+      throw new Error('Failed to send message: no result returned');
+    }
     return { id: result.key.id ?? '' };
   }
 
@@ -401,8 +411,8 @@ export async function initialize(logger: Logger): Promise<void> {
 export async function sendMessage(message: string, logger: Logger): Promise<{ id: string }> {
   const groupId = config.whatsapp.groupId;
   if (!groupId) {
-throw new Error('No WhatsApp group ID configured. Set WHATSAPP_GROUP_ID.');
-}
+    throw new Error('No WhatsApp group ID configured. Set WHATSAPP_GROUP_ID.');
+  }
 
   const chatId = groupId.includes('@g.us') ? groupId : `${groupId}@g.us`;
 
@@ -412,16 +422,16 @@ throw new Error('No WhatsApp group ID configured. Set WHATSAPP_GROUP_ID.');
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       if (!socket.isClientReady()) {
-throw new Error('Client is not ready');
-}
+        throw new Error('Client is not ready');
+      }
 
       const result = await socket.sendToGroup(chatId, message);
       logger.info('WhatsApp message sent', { messageId: result.id, attempt });
       return { id: result.id };
     } catch (error) {
       if (error instanceof QRAuthenticationRequiredError) {
-throw error;
-}
+        throw error;
+      }
 
       lastError = error instanceof Error ? error : new Error(String(error));
       const isProtocolError = lastError.message.includes('Protocol error') ||
