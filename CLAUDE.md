@@ -95,10 +95,9 @@ Copy `.env.example` to `.env` and configure:
 
 ## Git Workflow
 
-Before starting any feature work:
-1. `git checkout main && git pull origin main`
-2. `git checkout -b <descriptive-branch-name>` (e.g., `add-sheets-fallback`, `fix-whatsapp-reconnect`)
-3. Never commit directly to main
+Before starting any feature work, use the `using-git-worktrees` skill to create an isolated worktree. This ensures multiple Claude Code sessions can work in parallel without conflicts.
+- Never commit directly to main
+- Clean up worktrees after merging: `git worktree remove <path>`
 
 ## Core Principles
 
