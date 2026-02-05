@@ -24,10 +24,15 @@ yarn invoke:lambda    # Invoke deployed Lambda function
 src/
 ├── clients/        # External service clients (googleCalendar, googleSheets, whatsapp, s3)
 ├── services/       # Core business logic (birthday check orchestration)
-├── lambda/         # AWS Lambda handler
-├── utils/          # Shared utilities
+├── lambda/         # AWS Lambda handler and types
+├── scripts/        # Build, packaging, release, and cleanup scripts
+├── utils/          # Shared utilities (date, birthday, name helpers, logger, runtime)
+├── types/          # Third-party type declarations
+├── tests/          # Test files
+├── config.ts       # Centralized app configuration
 └── types.ts        # Shared type definitions (BirthdayRecord, Logger, QRAuthenticationRequiredError)
-infrastructure/     # AWS SAM templates and CloudWatch alarms
+infrastructure/     # AWS SAM templates, CloudWatch alarms, samconfig
+scripts/            # Shell scripts (deploy, cron install/uninstall)
 ```
 
 ## Environment Setup
@@ -41,6 +46,7 @@ Copy `.env.example` to `.env` and configure:
 
 - `src/index.ts` - Main entry point (local development)
 - `src/lambda/handler.ts` - AWS Lambda handler
+- `src/config.ts` - Centralized configuration (env vars, private key decoding)
 - `infrastructure/template.yaml` - SAM deployment template
 
 ## Gotchas
@@ -49,6 +55,7 @@ Copy `.env.example` to `.env` and configure:
 - No automated tests - CI runs type-check, lint, and build only
 - Lambda deployment uses AWS SAM (`infrastructure/template.yaml`)
 - WhatsApp auth state stored in `auth_info/` (gitignored)
+- `@whiskeysockets/baileys` MUST be locked to exactly `6.7.21` (no ^ or ~) — newer versions add ~25MB of unused dependencies
 
 ## Workflow Orchestration
 
@@ -85,6 +92,13 @@ Copy `.env.example` to `.env` and configure:
 - Point at logs, errors, failing tests -> then resolve them
 - Zero context switching required from the user
 - Go fix failing CI tests without being told how
+
+## Git Workflow
+
+Before starting any feature work:
+1. `git checkout main && git pull origin main`
+2. `git checkout -b <descriptive-branch-name>` (e.g., `add-sheets-fallback`, `fix-whatsapp-reconnect`)
+3. Never commit directly to main
 
 ## Core Principles
 
