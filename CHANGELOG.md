@@ -22,6 +22,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+---
+## [1.1.0] - 2026-02-05
+
+## What's Changed
+
+### ✨ Features
+
+- Add deploying-to-aws skill for one-shot Lambda deploys (#13) (de0c4a5)
+- Resolve WhatsApp group names to JIDs at send time (be178e7)
+- Always send health check message on every Lambda run (030bbae)
+- Expose sendToGroup and getAuthAgeDays on WhatsApp client (d8fa2c7)
+- Add WHATSAPP_HEALTH_CHECK_GROUP_ID configuration (27445b5)
+
+### ♻️  Refactoring
+
+- Address code review feedback (44d740e)
+- Rename WhatsApp group ID params to group name in infrastructure (b9027da)
+- Rename WhatsApp group ID config fields to group names (c5d948d)
+
+### 📝 Documentation
+
+- Default to push+PR when finishing a branch (7be0dd3)
+- Add plan file cleanup rule to workflow orchestration (d97d76d)
+
+### 🔧 Chores
+
+- Add .worktrees/ to gitignore (cd68383)
+
+### 📦 Other Changes
+
+- Merge pull request #12 from rolandmarg/claude-md-default-pr-workflow (1dbf94f)
+- Merge pull request #11 from rolandmarg/whatsapp-group-names (42a5d79)
+- Merge pull request #10 from rolandmarg/claude-md-stale-plans-cleanup (ca2d69b)
+- Merge pull request #9 from rolandmarg/whatsapp-health-check (5e98127)
+- Merge pull request #8 from rolandmarg/claude-md-worktree-policy (909cac0)
+- Update git workflow to use worktrees for session isolation (f0573b5)
+- Merge pull request #7 from rolandmarg/improve-claude-md (bc80ba9)
+- Improve CLAUDE.md: fix stale architecture, add git workflow and gotchas (20f95ba)
+- Merge pull request #6 from rolandmarg/deduplicate-lambda-scripts (ae26aa0)
+- Deduplicate Lambda build scripts and remove stale security.util.ts (765330e)
+- Delete cursorrules (372c871)
+- Merge pull request #5 from rolandmarg/claude/simplify-codebase-flatten-abstractions (08b1a4a)
+- Fix code review issues: indentation, redundant checks, dead code (ffbb601)
+- Flatten codebase: remove abstractions, simplify to flat modules (3931ff9)
+- Update claude.md (505bd70)
+- Merge pull request #4 from rolandmarg/claude/improve-claude-md-documentation (4a9b7f2)
+- Remove all Twilio integration (a9825bd)
+- Improve CLAUDE.md with actionable project documentation (6b7a8c9)
+- Update claude.md (d92bf54)
+- Merge pull request #3 from rolandmarg/claude/simplify-observability-x24Lw (81d5067)
+- Update yarn.lock (f9b93f5)
+- Simplify observability: drop SNS, X-Ray, and CloudWatch Metrics (ad14702)
+- Merge pull request #2 from rolandmarg/claude/add-claude-documentation-SAHvT (2fb2d48)
+- Add CLAUDE.md with codebase guidance for AI assistants (37640bb)
+- Update readme (bc42a1f)
+- Update readme (79ca2dd)
+- Remove Twilio config (6214af7)
+- Drop pino-pretty (269a290)
+
+**Full Changelog**: v1.0.21...v1.1.0
+
 ---
 ## [1.0.21] - 2025-12-13
 
