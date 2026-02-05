@@ -54,3 +54,6 @@ vitest.config.ts.timestamp-*
 
 samconfig.toml
 .aws-sam
+
+# Worktrees
+.worktrees/

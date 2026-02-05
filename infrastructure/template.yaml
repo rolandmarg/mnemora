@@ -37,15 +37,15 @@ Parameters:
     Description: Google Spreadsheet ID (optional)
     NoEcho: false
 
-  WhatsAppGroupId:
+  WhatsAppGroupName:
     Type: String
-    Description: WhatsApp Group Name or ID
+    Description: WhatsApp group name for birthday messages
     NoEcho: false
 
-  WhatsAppHealthCheckGroupId:
+  WhatsAppHealthCheckGroupName:
     Type: String
     Default: ''
-    Description: WhatsApp Group ID for health check messages (optional)
+    Description: WhatsApp group name for health check messages (optional)
     NoEcho: false
 
 Globals:
@@ -60,7 +60,7 @@ Globals:
 
 Conditions:
   HasSpreadsheetId: !Not [!Equals [!Ref GoogleSpreadsheetId, '']]
-  HasHealthCheckGroupId: !Not [!Equals [!Ref WhatsAppHealthCheckGroupId, '']]
+  HasHealthCheckGroupName: !Not [!Equals [!Ref WhatsAppHealthCheckGroupName, '']]
 
 Resources:
   SessionStorageBucket:
@@ -109,8 +109,8 @@ Resources:
           GOOGLE_PRIVATE_KEY: !Ref GooglePrivateKey
           GOOGLE_PROJECT_ID: !Ref GoogleProjectId
           GOOGLE_SPREADSHEET_ID: !If [HasSpreadsheetId, !Ref GoogleSpreadsheetId, '']
-          WHATSAPP_GROUP_ID: !Ref WhatsAppGroupId
-          WHATSAPP_HEALTH_CHECK_GROUP_ID: !If [HasHealthCheckGroupId, !Ref WhatsAppHealthCheckGroupId, '']
+          WHATSAPP_GROUP_NAME: !Ref WhatsAppGroupName
+          WHATSAPP_HEALTH_CHECK_GROUP_NAME: !If [HasHealthCheckGroupName, !Ref WhatsAppHealthCheckGroupName, '']
           TIMEZONE: 'America/Los_Angeles'
           AWS_S3_BUCKET: !Ref SessionStorageBucket
       Policies:

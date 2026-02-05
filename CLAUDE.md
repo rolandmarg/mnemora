@@ -39,7 +39,7 @@ scripts/            # Shell scripts (deploy, cron install/uninstall)
 
 Copy `.env.example` to `.env` and configure:
 - Google Calendar/Sheets API credentials
-- WhatsApp group ID
+- WhatsApp group name
 - Timezone (defaults to America/Los_Angeles)
 
 ## Key Files
