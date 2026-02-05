@@ -20,14 +20,9 @@ class S3ClientWrapper {
 
   constructor() {
     this.bucketName = config.aws.s3Bucket;
-
     const region = config.aws.region;
-    // Initialize S3 client if we have bucket and region
-    // Allow local testing when S3_BUCKET is explicitly set (like SNS client pattern)
     if (this.bucketName && region) {
-      this.s3Client = new S3Client({
-        region,
-      });
+      this.s3Client = new S3Client({ region });
     }
   }
 
@@ -35,11 +30,7 @@ class S3ClientWrapper {
     return this.s3Client !== null && this.bucketName !== undefined;
   }
 
-  async upload(
-    key: string,
-    data: Buffer | string,
-    contentType?: string
-  ): Promise<void> {
+  async upload(key: string, data: Buffer | string, contentType?: string): Promise<void> {
     if (!this.s3Client || !this.bucketName) {
       throw new Error('S3 client not initialized. Check AWS_S3_BUCKET and AWS_REGION environment variables.');
     }
@@ -51,7 +42,7 @@ class S3ClientWrapper {
       ContentType: contentType ?? 'application/octet-stream',
     };
 
-    await this.s3Client!.send(new PutObjectCommand(input));
+    await this.s3Client.send(new PutObjectCommand(input));
   }
 
   async download(key: string): Promise<Buffer | null> {
@@ -60,13 +51,8 @@ class S3ClientWrapper {
     }
 
     try {
-      const input: GetObjectCommandInput = {
-        Bucket: this.bucketName,
-        Key: key,
-      };
-
-      const result = await this.s3Client!.send(new GetObjectCommand(input));
-
+      const input: GetObjectCommandInput = { Bucket: this.bucketName, Key: key };
+      const result = await this.s3Client.send(new GetObjectCommand(input));
       if (!result.Body) {
         return null;
       }
@@ -77,8 +63,7 @@ class S3ClientWrapper {
           chunks.push(chunk);
         }
       }
-      const buffer = Buffer.concat(chunks);
-      return buffer;
+      return Buffer.concat(chunks);
     } catch (error: unknown) {
       const awsError = error as { name?: string; $metadata?: { httpStatusCode?: number } };
       if (awsError.name === 'NoSuchKey' || awsError.$metadata?.httpStatusCode === 404) {
@@ -94,19 +79,14 @@ class S3ClientWrapper {
     }
 
     try {
-      await this.s3Client!.send(
-        new HeadObjectCommand({
-          Bucket: this.bucketName,
-          Key: key,
-        })
-      );
+      await this.s3Client.send(new HeadObjectCommand({ Bucket: this.bucketName, Key: key }));
       return true;
     } catch (error: unknown) {
       const awsError = error as { name?: string; $metadata?: { httpStatusCode?: number } };
       if (awsError.name === 'NotFound' || awsError.$metadata?.httpStatusCode === 404) {
         return false;
       }
-      return false;
+      throw error;
     }
   }
 
@@ -115,34 +95,21 @@ class S3ClientWrapper {
       return [];
     }
 
-    const result = await this.s3Client!.send(
-      new ListObjectsV2Command({
-        Bucket: this.bucketName,
-        Prefix: prefix,
-        MaxKeys: maxKeys,
-      })
+    const result = await this.s3Client.send(
+      new ListObjectsV2Command({ Bucket: this.bucketName, Prefix: prefix, MaxKeys: maxKeys })
     );
-
-    const keys = result.Contents?.map(obj => obj.Key ?? '').filter(Boolean) ?? [];
-    return keys;
+    return result.Contents?.map(obj => obj.Key ?? '').filter(Boolean) ?? [];
   }
 
   async delete(key: string): Promise<void> {
     if (!this.s3Client || !this.bucketName) {
       throw new Error('S3 client not initialized. Check AWS_S3_BUCKET and AWS_REGION environment variables.');
     }
-
-    await this.s3Client!.send(
-      new DeleteObjectCommand({
-        Bucket: this.bucketName,
-        Key: key,
-      })
-    );
+    await this.s3Client.send(new DeleteObjectCommand({ Bucket: this.bucketName, Key: key }));
   }
 }
 
 const s3Client = new S3ClientWrapper();
-export default s3Client;
 
 interface SyncMetadata {
   files: Record<string, { hash: string; mtime: number }>;
@@ -161,95 +128,52 @@ export class FileStorage {
     this.isSessionStorage = basePath === 'auth_info';
   }
 
-  /**
-   * Compute SHA-256 hash of file content
-   */
   private getFileHash(content: Buffer): string {
     return createHash('sha256').update(content).digest('hex');
   }
 
-  /**
-   * Create a gzipped tar archive of the given local directory.
-   * Used for WhatsApp session storage (auth_info).
-   */
   private async createSessionArchive(localPath: string): Promise<Buffer> {
     const archivePath = `/tmp/mnemora-${this.basePath}.tar.gz`;
-
-    await tar.create(
-      {
-        gzip: true,
-        file: archivePath,
-        cwd: localPath,
-      },
-      ['.']
-    );
-
+    await tar.create({ gzip: true, file: archivePath, cwd: localPath }, ['.']);
     return readFileSync(archivePath);
   }
 
-  /**
-   * Extract a gzipped tar archive buffer into the given local directory.
-   * Used for WhatsApp session storage (auth_info).
-   */
   private async extractSessionArchive(localPath: string, archiveBuffer: Buffer): Promise<void> {
     const archivePath = `/tmp/mnemora-${this.basePath}.tar.gz`;
     writeFileSync(archivePath, archiveBuffer);
-
     try {
-      await tar.extract({
-        file: archivePath,
-        cwd: localPath,
-      });
+      await tar.extract({ file: archivePath, cwd: localPath });
     } catch (error) {
       throw new Error(
-        `Failed to extract WhatsApp session archive from S3: ${
-          error instanceof Error ? error.message : String(error)
-        }`
+        `Failed to extract WhatsApp session archive from S3: ${error instanceof Error ? error.message : String(error)}`
       );
     }
   }
 
-  /**
-   * Load sync metadata from S3
-   */
   private async loadSyncMetadata(): Promise<SyncMetadata | null> {
     if (!s3Client.isAvailable()) {
       return null;
     }
-
     try {
-      const metadataKey = `${this.basePath}/${this.METADATA_KEY}`;
-      const metadataContent = await s3Client.download(metadataKey);
-      if (metadataContent) {
-        return JSON.parse(metadataContent.toString()) as SyncMetadata;
+      const content = await s3Client.download(`${this.basePath}/${this.METADATA_KEY}`);
+      if (content) {
+        return JSON.parse(content.toString()) as SyncMetadata;
       }
-    } catch (_error) {
-      // Metadata doesn't exist yet (first sync) - this is expected
-    }
+    } catch { /* first sync */ }
     return null;
   }
 
-  /**
-   * Save sync metadata to S3
-   */
   private async saveSyncMetadata(metadata: SyncMetadata): Promise<void> {
     if (!s3Client.isAvailable()) {
       return;
     }
-
-    const metadataKey = `${this.basePath}/${this.METADATA_KEY}`;
-    const metadataJson = JSON.stringify(metadata, null, 2);
-    await s3Client.upload(metadataKey, metadataJson, 'application/json');
+    await s3Client.upload(`${this.basePath}/${this.METADATA_KEY}`, JSON.stringify(metadata, null, 2), 'application/json');
   }
 
   async readFile(filePath: string): Promise<Buffer | null> {
-    // Unified behavior: use S3 if available (both Lambda and local)
     if (s3Client.isAvailable()) {
-      const s3Key = `${this.basePath}/${filePath}`;
-      return await s3Client.download(s3Key);
+      return await s3Client.download(`${this.basePath}/${filePath}`);
     }
-
-    // Fallback to local filesystem (local only - Lambda will fail if S3 not available)
     const fullPath = join(process.cwd(), this.basePath, filePath);
     if (!existsSync(fullPath)) {
       return null;
@@ -258,14 +182,10 @@ export class FileStorage {
   }
 
   async writeFile(filePath: string, data: Buffer | string): Promise<void> {
-    // Unified behavior: use S3 if available (both Lambda and local)
     if (s3Client.isAvailable()) {
-      const s3Key = `${this.basePath}/${filePath}`;
-      await s3Client.upload(s3Key, data);
+      await s3Client.upload(`${this.basePath}/${filePath}`, data);
       return;
     }
-
-    // Fallback to local filesystem (local only - Lambda will fail if S3 not available)
     const fullPath = join(process.cwd(), this.basePath, filePath);
     const dir = join(fullPath, '..');
     if (!existsSync(dir)) {
@@ -275,47 +195,31 @@ export class FileStorage {
   }
 
   async fileExists(filePath: string): Promise<boolean> {
-    // Unified behavior: use S3 if available (both Lambda and local)
     if (s3Client.isAvailable()) {
-      const s3Key = `${this.basePath}/${filePath}`;
-      return await s3Client.exists(s3Key);
+      return await s3Client.exists(`${this.basePath}/${filePath}`);
     }
-
-    // Fallback to local filesystem (local only - Lambda will fail if S3 not available)
-    const fullPath = join(process.cwd(), this.basePath, filePath);
-    return existsSync(fullPath);
+    return existsSync(join(process.cwd(), this.basePath, filePath));
   }
 
   async syncToS3(localPath: string): Promise<void> {
-    // Allow sync from both Lambda and local if S3 is configured
-    if (!s3Client.isAvailable()) {
-      return;
-    }
-
-    if (!existsSync(localPath)) {
+    if (!s3Client.isAvailable() || !existsSync(localPath)) {
       return;
     }
 
     if (this.isSessionStorage) {
       const archiveBuffer = await this.createSessionArchive(localPath);
-      const archiveKey = `${this.basePath}/${this.ARCHIVE_NAME}`;
-      await s3Client.upload(archiveKey, archiveBuffer, 'application/gzip');
+      await s3Client.upload(`${this.basePath}/${this.ARCHIVE_NAME}`, archiveBuffer, 'application/gzip');
       return;
     }
 
-    // Legacy incremental sync for non-session storage
-    // Only sync files modified within the last 30 days to avoid old data
-    const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+    const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
     const now = Date.now();
-
     const previousMetadata = await this.loadSyncMetadata();
     const currentFiles: Record<string, { hash: string; mtime: number }> = {};
     const filesToUpload: Array<{ s3Key: string; content: Buffer }> = [];
 
     const collectFiles = (dirPath: string, relativePath: string = ''): void => {
-      const files = readdirSync(dirPath);
-
-      for (const file of files) {
+      for (const file of readdirSync(dirPath)) {
         const filePath = join(dirPath, file);
         const stat = statSync(filePath);
         const currentRelativePath = relativePath ? `${relativePath}/${file}` : file;
@@ -327,26 +231,17 @@ export class FileStorage {
         if (stat.isDirectory()) {
           collectFiles(filePath, currentRelativePath);
         } else {
-          const fileAge = now - stat.mtimeMs;
-
-          if (fileAge > MAX_AGE_MS) {
+          if (now - stat.mtimeMs > MAX_AGE_MS) {
             continue;
           }
 
           const fileContent = readFileSync(filePath);
           const hash = this.getFileHash(fileContent);
-          const mtime = stat.mtimeMs;
-          const s3Key = `${this.basePath}/${currentRelativePath}`;
-
-          currentFiles[currentRelativePath] = { hash, mtime };
+          currentFiles[currentRelativePath] = { hash, mtime: stat.mtimeMs };
 
           const previousFile = previousMetadata?.files[currentRelativePath];
-          const needsUpload = !previousFile ||
-            previousFile?.hash !== hash ||
-            previousFile?.mtime !== mtime;
-
-          if (needsUpload) {
-            filesToUpload.push({ s3Key, content: fileContent });
+          if (previousFile?.hash !== hash || previousFile.mtime !== stat.mtimeMs) {
+            filesToUpload.push({ s3Key: `${this.basePath}/${currentRelativePath}`, content: fileContent });
           }
         }
       }
@@ -354,25 +249,15 @@ export class FileStorage {
 
     collectFiles(localPath);
 
-    if (filesToUpload.length > 0) {
-      const BATCH_SIZE = 10;
-      for (let i = 0; i < filesToUpload.length; i += BATCH_SIZE) {
-        const batch = filesToUpload.slice(i, i + BATCH_SIZE);
-        await Promise.all(
-          batch.map(({ s3Key, content }) => s3Client.upload(s3Key, content))
-        );
-      }
+    for (let i = 0; i < filesToUpload.length; i += 10) {
+      const batch = filesToUpload.slice(i, i + 10);
+      await Promise.all(batch.map(({ s3Key, content }) => s3Client.upload(s3Key, content)));
     }
 
-    const newMetadata: SyncMetadata = {
-      files: currentFiles,
-      lastSyncTime: Date.now(),
-    };
-    await this.saveSyncMetadata(newMetadata);
+    await this.saveSyncMetadata({ files: currentFiles, lastSyncTime: Date.now() });
   }
 
   async syncFromS3(localPath: string): Promise<void> {
-    // Allow sync from both Lambda and local if S3 is configured
     if (!s3Client.isAvailable()) {
       return;
     }
@@ -383,39 +268,27 @@ export class FileStorage {
 
     if (this.isSessionStorage) {
       const archiveKey = `${this.basePath}/${this.ARCHIVE_NAME}`;
-      const existsInS3 = await s3Client.exists(archiveKey);
-
-      if (!existsInS3) {
+      if (!(await s3Client.exists(archiveKey))) {
         throw new Error('WhatsApp session archive not found in S3');
       }
-
       const archiveBuffer = await s3Client.download(archiveKey);
       if (!archiveBuffer) {
         throw new Error('WhatsApp session archive is empty or unreadable in S3');
       }
-
       await this.extractSessionArchive(localPath, archiveBuffer);
       return;
     }
 
-    // Legacy behavior for non-session storage: list and download all objects under basePath
     const s3Keys = await s3Client.listObjects(this.basePath);
-
     const downloadTasks: Array<{ s3Key: string; localFilePath: string; localFileDir: string }> = [];
 
     for (const s3Key of s3Keys) {
-      const relativePath = s3Key.startsWith(`${this.basePath}/`)
-        ? s3Key.slice(this.basePath.length + 1)
-        : s3Key;
-
+      const relativePath = s3Key.startsWith(`${this.basePath}/`) ? s3Key.slice(this.basePath.length + 1) : s3Key;
       if (!relativePath || relativePath === this.basePath) {
         continue;
       }
-
       const localFilePath = join(localPath, relativePath);
-      const localFileDir = join(localFilePath, '..');
-
-      downloadTasks.push({ s3Key, localFilePath, localFileDir });
+      downloadTasks.push({ s3Key, localFilePath, localFileDir: join(localFilePath, '..') });
     }
 
     for (let i = 0; i < downloadTasks.length; i += this.DOWNLOAD_BATCH_SIZE) {
@@ -425,7 +298,6 @@ export class FileStorage {
           if (!existsSync(localFileDir)) {
             mkdirSync(localFileDir, { recursive: true });
           }
-
           const fileContent = await s3Client.download(s3Key);
           if (fileContent) {
             writeFileSync(localFilePath, fileContent);
@@ -435,4 +307,3 @@ export class FileStorage {
     }
   }
 }
-
