@@ -57,7 +57,7 @@ GOOGLE_PROJECT_ID=your-project-id
 GOOGLE_SPREADSHEET_ID=your-spreadsheet-id
 
 # WhatsApp
-WHATSAPP_GROUP_ID=your-group-name
+WHATSAPP_GROUP_NAME=your-group-name
 
 # AWS Configuration (for S3 session storage, CloudWatch, and SNS alerts)
 AWS_REGION=us-west-1

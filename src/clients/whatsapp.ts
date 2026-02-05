@@ -364,29 +364,35 @@ class WhatsAppSocket {
     }
 
     const groups = await this.sock.groupFetchAllParticipating();
-    const matches = Object.entries(groups).filter(
-      ([, meta]) => meta.subject.toLowerCase() === groupName.toLowerCase(),
-    );
 
-    if (matches.length === 0) {
+    // Cache all groups at once to avoid redundant API calls
+    const matchesByName = new Map<string, string[]>();
+    for (const [jid, meta] of Object.entries(groups)) {
+      const key = meta.subject.toLowerCase();
+      this.groupNameCache.set(key, jid);
+      const existing = matchesByName.get(key) ?? [];
+      existing.push(jid);
+      matchesByName.set(key, existing);
+    }
+
+    const targetKey = groupName.toLowerCase();
+    const jid = this.groupNameCache.get(targetKey);
+    if (!jid) {
       const available = Object.values(groups).map(m => m.subject).join(', ');
       throw new Error(
         `No WhatsApp group found with name "${groupName}". Available groups: ${available}`,
       );
     }
 
-    if (matches.length > 1) {
-      const jids = matches.map(([jid]) => jid).join(', ');
+    const duplicates = matchesByName.get(targetKey);
+    if (duplicates && duplicates.length > 1) {
       throw new Error(
-        `Multiple WhatsApp groups found with name "${groupName}": ${jids}. Use a unique group name.`,
+        `Multiple WhatsApp groups found with name "${groupName}": ${duplicates.join(', ')}. Use a unique group name.`,
       );
     }
 
-    const [jid] = matches[0];
-    this.groupNameCache.set(groupName.toLowerCase(), jid);
-
     // Set activeGroupId for shouldIgnoreJid when resolving the main group
-    if (config.whatsapp.groupName?.toLowerCase() === groupName.toLowerCase()) {
+    if (config.whatsapp.groupName?.toLowerCase() === targetKey) {
       this.activeGroupId = jid;
     }
 
@@ -448,6 +454,12 @@ export async function initialize(logger: Logger): Promise<void> {
   await checkAuthReminder(logger);
   await socket.initialize(logger);
   recordAuthentication(logger);
+
+  // Eagerly resolve main group name to fail fast on misconfiguration
+  // and set activeGroupId for JID filtering from connection start
+  if (config.whatsapp.groupName) {
+    await socket.resolveGroupJid(config.whatsapp.groupName);
+  }
 }
 
 export async function sendMessage(message: string, logger: Logger): Promise<{ id: string }> {
