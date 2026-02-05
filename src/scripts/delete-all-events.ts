@@ -12,7 +12,6 @@
  */
 
 import { logger } from '../utils/logger.util.js';
-import { auditDeletionAttempt } from '../utils/security.util.js';
 import { google } from 'googleapis';
 import { config } from '../config.js';
 
@@ -175,7 +174,7 @@ function isAlreadyDeletedError(error: unknown): boolean {
  * Returns true if deleted successfully or already deleted (410), false otherwise
  */
 async function deleteEvent(eventId: string, summary: string, maxRetries = 5): Promise<boolean> {
-  auditDeletionAttempt(logger, 'delete-all-events.ts', { eventId });
+  logger.warn('Deletion attempt', { eventId });
 
   const clientEmail = config.google.clientEmail;
   const privateKey = config.google.privateKey;
