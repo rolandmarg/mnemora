@@ -11,7 +11,7 @@
 
 Birthday notifications on autopilot. Fetches birthdays from Google Calendar or Sheets, sends WhatsApp messages to your group chat.
 
-Built for a 50-member beach volleyball community that kept forgetting each other's birthdays.
+Built for a 50+ member beach volleyball community for automated birthday reminders.
 
 ## Features
 
