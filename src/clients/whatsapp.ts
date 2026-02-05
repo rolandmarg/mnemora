@@ -116,6 +116,7 @@ class WhatsAppSocket {
   private readonly runningInLambda: boolean;
   private saveCreds: (() => Promise<void>) | null = null;
   private activeGroupId: string | undefined = undefined;
+  private readonly groupNameCache = new Map<string, string>();
 
   constructor() {
     this.runningInLambda = isLambda();
@@ -182,12 +183,6 @@ class WhatsAppSocket {
 
     // Sync session from S3 before init
     await syncSessionFromS3(this.sessionPath, logger);
-
-    // Set active group ID
-    const groupId = config.whatsapp.groupId;
-    if (groupId) {
-      this.activeGroupId = groupId.includes('@g.us') ? groupId : `${groupId}@g.us`;
-    }
 
     return new Promise((resolve, reject) => {
       (async () => {
@@ -358,6 +353,46 @@ class WhatsAppSocket {
     });
   }
 
+  async resolveGroupJid(groupName: string): Promise<string> {
+    const cached = this.groupNameCache.get(groupName.toLowerCase());
+    if (cached) {
+      return cached;
+    }
+
+    if (!this.sock || !this.isReady) {
+      throw new Error('WhatsApp client is not initialized. Call initialize() first.');
+    }
+
+    const groups = await this.sock.groupFetchAllParticipating();
+    const matches = Object.entries(groups).filter(
+      ([, meta]) => meta.subject.toLowerCase() === groupName.toLowerCase(),
+    );
+
+    if (matches.length === 0) {
+      const available = Object.values(groups).map(m => m.subject).join(', ');
+      throw new Error(
+        `No WhatsApp group found with name "${groupName}". Available groups: ${available}`,
+      );
+    }
+
+    if (matches.length > 1) {
+      const jids = matches.map(([jid]) => jid).join(', ');
+      throw new Error(
+        `Multiple WhatsApp groups found with name "${groupName}": ${jids}. Use a unique group name.`,
+      );
+    }
+
+    const [jid] = matches[0];
+    this.groupNameCache.set(groupName.toLowerCase(), jid);
+
+    // Set activeGroupId for shouldIgnoreJid when resolving the main group
+    if (config.whatsapp.groupName?.toLowerCase() === groupName.toLowerCase()) {
+      this.activeGroupId = jid;
+    }
+
+    return jid;
+  }
+
   async sendToGroup(chatId: string, message: string): Promise<{ id: string }> {
     if (!this.sock || !this.isReady) {
       throw new Error('WhatsApp client is not initialized. Call initialize() first.');
@@ -416,16 +451,14 @@ export async function initialize(logger: Logger): Promise<void> {
 }
 
 export async function sendMessage(message: string, logger: Logger): Promise<{ id: string }> {
-  const groupId = config.whatsapp.groupId;
-  if (!groupId) {
-    throw new Error('No WhatsApp group ID configured. Set WHATSAPP_GROUP_ID.');
+  const groupName = config.whatsapp.groupName;
+  if (!groupName) {
+    throw new Error('No WhatsApp group name configured. Set WHATSAPP_GROUP_NAME.');
   }
-  return sendToGroup(groupId, message, logger);
+  return sendToGroup(groupName, message, logger);
 }
 
-export async function sendToGroup(groupId: string, message: string, logger: Logger): Promise<{ id: string }> {
-  const chatId = groupId.includes('@g.us') ? groupId : `${groupId}@g.us`;
-
+export async function sendToGroup(groupName: string, message: string, logger: Logger): Promise<{ id: string }> {
   let lastError: Error | null = null;
   const maxRetries = 3;
 
@@ -435,8 +468,9 @@ export async function sendToGroup(groupId: string, message: string, logger: Logg
         throw new Error('Client is not ready');
       }
 
-      const result = await socket.sendToGroup(chatId, message);
-      logger.info('WhatsApp message sent to group', { groupId, messageId: result.id, attempt });
+      const groupJid = await socket.resolveGroupJid(groupName);
+      const result = await socket.sendToGroup(groupJid, message);
+      logger.info('WhatsApp message sent to group', { groupName, groupJid, messageId: result.id, attempt });
       return { id: result.id };
     } catch (error) {
       if (error instanceof QRAuthenticationRequiredError) {
@@ -468,5 +502,5 @@ export async function destroy(logger: Logger): Promise<void> {
 }
 
 export function isAvailable(): boolean {
-  return !!config.whatsapp.groupId;
+  return !!config.whatsapp.groupName;
 }

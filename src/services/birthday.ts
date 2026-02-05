@@ -122,13 +122,13 @@ export async function runBirthdayCheck(logger: Logger): Promise<void> {
 
     try {
       // Always send health check to monitoring group
-      const healthCheckGroupId = config.whatsapp.healthCheckGroupId;
-      if (healthCheckGroupId) {
+      const healthCheckGroupName = config.whatsapp.healthCheckGroupName;
+      if (healthCheckGroupName) {
         try {
           const authAgeDays = await whatsapp.getAuthAgeDays();
           const healthMessage = formatHealthCheckMessage(todaysBirthdays.length, authAgeDays);
           logger.info('Sending health check...');
-          const result = await whatsapp.sendToGroup(healthCheckGroupId, healthMessage, logger);
+          const result = await whatsapp.sendToGroup(healthCheckGroupName, healthMessage, logger);
           logger.info('Health check sent', { messageId: result.id });
         } catch (error) {
           const msg = error instanceof Error ? error.message : String(error);
