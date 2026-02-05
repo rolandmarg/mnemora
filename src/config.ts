@@ -12,6 +12,7 @@ export interface GoogleConfig {
 
 export interface WhatsAppConfig {
   groupId: string | undefined;
+  healthCheckGroupId: string | undefined;
 }
 
 export interface ScheduleConfig {
@@ -71,6 +72,7 @@ export const config: AppConfig = {
   },
   whatsapp: {
     groupId: process.env.WHATSAPP_GROUP_ID,
+    healthCheckGroupId: process.env.WHATSAPP_HEALTH_CHECK_GROUP_ID,
   },
   schedule: {
     timezone: process.env.TIMEZONE ?? process.env.TZ ?? 'America/Los_Angeles',

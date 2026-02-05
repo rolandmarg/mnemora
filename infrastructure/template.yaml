@@ -42,6 +42,12 @@ Parameters:
     Description: WhatsApp Group Name or ID
     NoEcho: false
 
+  WhatsAppHealthCheckGroupId:
+    Type: String
+    Default: ''
+    Description: WhatsApp Group ID for health check messages (optional)
+    NoEcho: false
+
 Globals:
   Function:
     Timeout: 900
@@ -54,6 +60,7 @@ Globals:
 
 Conditions:
   HasSpreadsheetId: !Not [!Equals [!Ref GoogleSpreadsheetId, '']]
+  HasHealthCheckGroupId: !Not [!Equals [!Ref WhatsAppHealthCheckGroupId, '']]
 
 Resources:
   SessionStorageBucket:
@@ -103,6 +110,7 @@ Resources:
           GOOGLE_PROJECT_ID: !Ref GoogleProjectId
           GOOGLE_SPREADSHEET_ID: !If [HasSpreadsheetId, !Ref GoogleSpreadsheetId, '']
           WHATSAPP_GROUP_ID: !Ref WhatsAppGroupId
+          WHATSAPP_HEALTH_CHECK_GROUP_ID: !If [HasHealthCheckGroupId, !Ref WhatsAppHealthCheckGroupId, '']
           TIMEZONE: 'America/Los_Angeles'
           AWS_S3_BUCKET: !Ref SessionStorageBucket
       Policies:
