@@ -5,7 +5,6 @@ import { getFullName } from '../utils/name-helpers.util.js';
 import {
   today,
   formatDateShort,
-  formatDateMonthYear,
   startOfDay,
   isFirstDayOfMonth,
   startOfMonth,
@@ -18,9 +17,9 @@ import type { Logger, BirthdayRecord } from '../types.js';
 
 // --- Message formatting ---
 
-function formatMonthlyDigest(birthdays: BirthdayRecord[]): string {
+function formatMonthlyDigest(birthdays: BirthdayRecord[]): string | null {
   if (birthdays.length === 0) {
-    return `📅 No birthdays scheduled for ${formatDateMonthYear(today())}.`;
+    return null;
   }
 
   const sorted = [...birthdays].sort((a, b) => a.birthday.getTime() - b.birthday.getTime());
@@ -34,15 +33,16 @@ function formatMonthlyDigest(birthdays: BirthdayRecord[]): string {
   const maxWidth = Math.max(...dates.map(d => `${d}: `.length));
   const lines = dates.map(d => `${`${d}: `.padEnd(maxWidth)}${byDate[d].join(', ')}`);
 
-  return `Upcoming birthdays 🎂\n\n${lines.join('\n')}`;
+  const monthName = today().toLocaleString('en-US', { month: 'long' });
+  return `${monthName} birthdays 🎂\n\n${lines.join('\n')}`;
 }
 
-function formatBirthdayMessages(birthdays: BirthdayRecord[]): string[] {
+function formatBirthdayMessages(birthdays: BirthdayRecord[]): string {
   if (birthdays.length === 0) {
-    return [];
+    return '';
   }
   if (birthdays.length === 1) {
-    return [`Happy birthday ${birthdays[0].firstName}! 🎂`];
+    return `Happy birthday ${birthdays[0].firstName}! 🎂`;
   }
 
   const names = birthdays.map(r => r.firstName);
@@ -50,7 +50,7 @@ function formatBirthdayMessages(birthdays: BirthdayRecord[]): string[] {
     names.length === 2
       ? `${names[0]} and ${names[1]}`
       : `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}`;
-  return [`Happy birthday ${combined}! 🎂`];
+  return `Happy birthday ${combined}! 🎂`;
 }
 
 function formatHealthCheckMessage(birthdayCount: number, authAgeDays: number | null): string {
@@ -136,23 +136,23 @@ export async function runBirthdayCheck(logger: Logger): Promise<void> {
         }
       }
 
-      // Send birthday messages to main group
-      if (monthlyBirthdays) {
-        const digest = formatMonthlyDigest(monthlyBirthdays);
-        logger.info('Sending monthly digest...');
-        const result = await whatsapp.sendMessage(digest, logger);
-        logger.info('Monthly digest sent', { messageId: result.id });
-      }
-
       if (todaysBirthdays.length > 0) {
         logger.info(`Found ${todaysBirthdays.length} birthday(s) today`, {
           birthdays: todaysBirthdays.map((r) => getFullName(r.firstName, r.lastName)),
         });
 
-        const messages = formatBirthdayMessages(todaysBirthdays);
-        for (const message of messages) {
-          const result = await whatsapp.sendMessage(message, logger);
-          logger.info('Birthday message sent', { messageId: result.id });
+        const message = formatBirthdayMessages(todaysBirthdays);
+        logger.info('Sending birthday message...', { message });
+        const result = await whatsapp.sendMessage(message, logger);
+        logger.info('Birthday message sent', { messageId: result.id });
+      }
+
+      if (monthlyBirthdays) {
+        const digest = formatMonthlyDigest(monthlyBirthdays);
+        if (digest) {
+          logger.info('Sending monthly digest...', { digest });
+          const result = await whatsapp.sendMessage(digest, logger);
+          logger.info('Monthly digest sent', { messageId: result.id });
         }
       }
 
