@@ -1,7 +1,7 @@
 {
   "name": "mnemora",
   "version": "1.1.0",
-  "description": "Bot that fetches Google Calendar birthdays and sends WhatsApp notifications",
+  "description": "Bot that fetches Google Sheets birthdays and sends WhatsApp notifications",
   "main": "src/index.ts",
   "type": "module",
   "scripts": {
@@ -9,7 +9,6 @@
     "start": "tsx src/index.ts",
     "start:prod": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
-    "delete-all-events": "tsx src/scripts/delete-all-events.ts",
     "type-check": "tsc --noEmit --incremental",
     "lint": "eslint --cache --cache-location .eslintcache --max-warnings 0 src/**/*.ts",
     "lint:fix": "eslint --cache --cache-location .eslintcache --max-warnings 0 src/**/*.ts --fix",
@@ -27,7 +26,6 @@
     "prepare": "husky"
   },
   "keywords": [
-    "calendar",
     "birthday",
     "whatsapp",
     "bot"

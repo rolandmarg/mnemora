@@ -78,7 +78,7 @@ const UNUSED_AWS_PROVIDERS = [
   '@aws-sdk/client-sso'
 ];
 
-const APIS_TO_KEEP = ['calendar', 'sheets'];
+const APIS_TO_KEEP = ['sheets'];
 
 /**
  * Tree-shake googleapis: remove unused API modules and patch index files.
@@ -165,7 +165,7 @@ function treeShakeGoogleapis(nodeModulesDir: string, apisIndexFallbackDirs: stri
       } else if (!indexContent.includes('class GeneratedAPIs')) {
         console.log(`${indent}⚠️  Warning: apis/index.js structure corrupted (missing GeneratedAPIs class), restoring original...`);
         indexContent = originalContent;
-      } else if (!indexContent.includes('calendar_1') || !indexContent.includes('sheets_1')) {
+      } else if (!indexContent.includes('sheets_1')) {
         console.log(`${indent}⚠️  Warning: Required APIs missing from apis/index.js, restoring original...`);
         indexContent = originalContent;
       } else {
@@ -226,7 +226,7 @@ function treeShakeGoogleapis(nodeModulesDir: string, apisIndexFallbackDirs: stri
       } else if (!mainIndexContent.includes('require("./googleapis")')) {
         console.log(`${indent}⚠️  Warning: main index.js structure corrupted (missing googleapis require), restoring original...`);
         mainIndexContent = originalMainContent;
-      } else if (!mainIndexContent.includes('calendar_v3') || !mainIndexContent.includes('sheets_v4')) {
+      } else if (!mainIndexContent.includes('sheets_v4')) {
         console.log(`${indent}⚠️  Warning: Required APIs missing from main index.js, restoring original...`);
         mainIndexContent = originalMainContent;
       } else {

@@ -3,8 +3,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 export interface GoogleConfig {
-  calendarId: string;
-  spreadsheetId: string | undefined;
+  spreadsheetId: string;
   clientEmail: string | undefined;
   privateKey: string | undefined;
   projectId: string | undefined;
@@ -64,8 +63,7 @@ function processPrivateKey(rawKey: string | undefined): string | undefined {
 
 export const config: AppConfig = {
   google: {
-    calendarId: process.env.GOOGLE_CALENDAR_ID ?? 'primary',
-    spreadsheetId: process.env.GOOGLE_SPREADSHEET_ID,
+    spreadsheetId: process.env.GOOGLE_SPREADSHEET_ID ?? '',
     clientEmail: process.env.GOOGLE_CLIENT_EMAIL,
     privateKey: processPrivateKey(process.env.GOOGLE_PRIVATE_KEY),
     projectId: process.env.GOOGLE_PROJECT_ID,

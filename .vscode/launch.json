@@ -12,26 +12,6 @@
       "skipFiles": ["<node_internals>/**"]
     },
     {
-      "name": "Delete All Events (Dry Run)",
-      "type": "node",
-      "request": "launch",
-      "runtimeExecutable": "yarn",
-      "runtimeArgs": ["delete-all-events"],
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
-      "skipFiles": ["<node_internals>/**"]
-    },
-    {
-      "name": "Delete All Events (Confirm) - DESTRUCTIVE",
-      "type": "node",
-      "request": "launch",
-      "runtimeExecutable": "yarn",
-      "runtimeArgs": ["delete-all-events", "--confirm"],
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
-      "skipFiles": ["<node_internals>/**"]
-    },
-    {
       "name": "Start (Dev Watch)",
       "type": "node",
       "request": "launch",

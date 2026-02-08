@@ -1,14 +1,12 @@
-import * as googleCalendar from '../clients/googleCalendar.js';
 import * as googleSheets from '../clients/googleSheets.js';
 import * as whatsapp from '../clients/whatsapp.js';
 import { getFullName } from '../utils/name-helpers.util.js';
 import {
   today,
   formatDateShort,
-  startOfDay,
   isFirstDayOfMonth,
-  startOfMonth,
-  endOfMonth,
+  getMonthInTimezone,
+  getDateInTimezone,
   formatTimestampHumanReadable,
 } from '../utils/date-helpers.util.js';
 import { config } from '../config.js';
@@ -65,45 +63,29 @@ function formatHealthCheckMessage(birthdayCount: number, authAgeDays: number | n
   return lines.join('\n');
 }
 
-// --- Sheets → Calendar sync ---
-
-async function trySyncFromSheets(logger: Logger): Promise<void> {
-  if (!googleSheets.isAvailable()) {
-    logger.info('Sheets not configured, skipping sync');
-    return;
-  }
-
-  try {
-    logger.info('Syncing birthdays from Sheets to Calendar...');
-    const sheetBirthdays = await googleSheets.fetchBirthdays();
-    const result = await googleCalendar.syncBirthdaysToCalendar(sheetBirthdays);
-    logger.info('Synced birthdays from Sheets to Calendar', result);
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    logger.warn('Failed to sync from Sheets to Calendar', { error: msg });
-  }
-}
-
 // --- Birthday fetching ---
 
 async function getTodaysBirthdaysWithOptionalDigest(): Promise<{
   todaysBirthdays: BirthdayRecord[];
   monthlyBirthdays?: BirthdayRecord[];
 }> {
+  const allBirthdays = await googleSheets.fetchBirthdays();
   const todayDate = today();
+  const todayMonth = getMonthInTimezone(todayDate);
+  const todayDay = getDateInTimezone(todayDate);
+
+  const todaysBirthdays = allBirthdays.filter(
+    (r) => getMonthInTimezone(r.birthday) === todayMonth
+        && getDateInTimezone(r.birthday) === todayDay,
+  );
 
   if (isFirstDayOfMonth(todayDate)) {
-    const monthStart = startOfMonth(todayDate);
-    const monthEnd = endOfMonth(todayDate);
-    const monthRecords = await googleCalendar.fetchBirthdaysInRange(monthStart, monthEnd);
-    const todayStart = startOfDay(todayDate);
-    const todaysBirthdays = monthRecords.filter(
-      (r) => startOfDay(r.birthday).getTime() === todayStart.getTime()
+    const monthlyBirthdays = allBirthdays.filter(
+      (r) => getMonthInTimezone(r.birthday) === todayMonth,
     );
-    return { todaysBirthdays, monthlyBirthdays: monthRecords };
+    return { todaysBirthdays, monthlyBirthdays };
   }
 
-  const todaysBirthdays = await googleCalendar.fetchBirthdays(todayDate);
   return { todaysBirthdays };
 }
 
@@ -113,8 +95,6 @@ export async function runBirthdayCheck(logger: Logger): Promise<void> {
   initializeCorrelationId();
 
   try {
-    await trySyncFromSheets(logger);
-
     logger.info('Running birthday check...');
     const { todaysBirthdays, monthlyBirthdays } = await getTodaysBirthdaysWithOptionalDigest();
 
