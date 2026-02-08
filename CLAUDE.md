@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Mnemora is a TypeScript birthday notification bot that fetches birthdays from Google Calendar or Google Sheets and sends WhatsApp notifications. It runs as an AWS Lambda function once per day on a scheduled cron.
+Mnemora is a TypeScript birthday notification bot that fetches birthdays from Google Sheets and sends WhatsApp notifications. It runs as an AWS Lambda function once per day on a scheduled cron.
 
 ## Commands
 
@@ -22,7 +22,7 @@ yarn invoke:lambda    # Invoke deployed Lambda function
 
 ```
 src/
-├── clients/        # External service clients (googleCalendar, googleSheets, whatsapp, s3)
+├── clients/        # External service clients (googleSheets, whatsapp, s3)
 ├── services/       # Core business logic (birthday check orchestration)
 ├── lambda/         # AWS Lambda handler and types
 ├── scripts/        # Build, packaging, release, and cleanup scripts
@@ -37,7 +37,7 @@ scripts/            # Shell scripts (deploy)
 ## Environment Setup
 
 Copy `.env.example` to `.env` and configure:
-- Google Calendar/Sheets API credentials
+- Google Sheets API credentials
 - WhatsApp group name
 - Timezone (defaults to America/Los_Angeles)
 

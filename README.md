@@ -9,13 +9,13 @@
 
 </div>
 
-Birthday notifications on autopilot. Fetches birthdays from Google Calendar or Sheets, sends WhatsApp messages to your group chat.
+Birthday notifications on autopilot. Fetches birthdays from Google Sheets, sends WhatsApp messages to your group chat.
 
 Built for a 50+ member beach volleyball community for automated birthday reminders.
 
 ## Features
 
-- **Daily checks** — scans Google Calendar or Sheets every morning
+- **Daily checks** — scans Google Sheets every morning
 - **WhatsApp notifications** — sends birthday messages to your group chat
 - **Monthly digests** — posts upcoming birthdays on the 1st of each month
 - **Serverless** — runs as an AWS Lambda on a schedule, ~$1/month
@@ -32,7 +32,7 @@ yarn start             # Scan QR code to link WhatsApp, then you're live
 
 ```
 src/
-├── clients/     # Google Calendar, Sheets, WhatsApp, S3
+├── clients/     # Google Sheets, WhatsApp, S3
 ├── services/    # Birthday check orchestration
 ├── lambda/      # AWS Lambda handler
 ├── utils/       # Date, name, and logging helpers
