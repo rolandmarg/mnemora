@@ -17,6 +17,7 @@
     "package:lambda": "tsx src/scripts/package-lambda.ts",
     "deploy": "./scripts/deploy.sh",
     "deploy:lambda": "./scripts/deploy.sh",
+    "deploy:config": "sam deploy --template-file infrastructure/template.yaml --config-file infrastructure/samconfig.toml",
     "deploy:force": "rm -rf .aws-sam && ./scripts/deploy.sh --force-upload",
     "invoke:lambda": "aws lambda invoke --function-name mnemora-birthday-bot-prod --payload '{}' /dev/stdout | cat",
     "release:patch": "tsx src/scripts/release.ts patch",
