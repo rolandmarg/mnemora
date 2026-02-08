@@ -37,9 +37,9 @@ function formatMonthlyDigest(birthdays: BirthdayRecord[]): string | null {
   return `${monthName} birthdays 🎂\n\n${lines.join('\n')}`;
 }
 
-function formatBirthdayMessages(birthdays: BirthdayRecord[]): string {
+function formatBirthdayMessages(birthdays: BirthdayRecord[]): string | null {
   if (birthdays.length === 0) {
-    return '';
+    return null;
   }
   if (birthdays.length === 1) {
     return `Happy birthday ${birthdays[0].firstName}! 🎂`;
@@ -142,9 +142,11 @@ export async function runBirthdayCheck(logger: Logger): Promise<void> {
         });
 
         const message = formatBirthdayMessages(todaysBirthdays);
-        logger.info('Sending birthday message...', { message });
-        const result = await whatsapp.sendMessage(message, logger);
-        logger.info('Birthday message sent', { messageId: result.id });
+        if (message) {
+          logger.info('Sending birthday message...', { message });
+          const result = await whatsapp.sendMessage(message, logger);
+          logger.info('Birthday message sent', { messageId: result.id });
+        }
       }
 
       if (monthlyBirthdays) {
