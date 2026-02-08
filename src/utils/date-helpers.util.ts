@@ -95,7 +95,7 @@ export function formatDateShort(date: Date, includeYear: boolean = false): strin
 }
 
 export function isFirstDayOfMonth(date: Date): boolean {
-  return date.getDate() === 1;
+  return getDateInTimezone(date) === 1;
 }
 
 /**

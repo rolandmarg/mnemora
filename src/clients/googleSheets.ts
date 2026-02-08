@@ -65,7 +65,3 @@ export async function fetchBirthdays(): Promise<BirthdayRecord[]> {
   // Skip header row
   return rows.slice(1).flatMap((row) => parseRowToBirthdays(row));
 }
-
-export function isAvailable(): boolean {
-  return !!(config.google.clientEmail && config.google.privateKey && config.google.spreadsheetId);
-}
