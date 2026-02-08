@@ -5,7 +5,6 @@ import { getFullName } from '../utils/name-helpers.util.js';
 import {
   today,
   formatDateShort,
-  formatDateMonthYear,
   startOfDay,
   isFirstDayOfMonth,
   startOfMonth,
@@ -18,9 +17,9 @@ import type { Logger, BirthdayRecord } from '../types.js';
 
 // --- Message formatting ---
 
-function formatMonthlyDigest(birthdays: BirthdayRecord[]): string {
+function formatMonthlyDigest(birthdays: BirthdayRecord[]): string | null {
   if (birthdays.length === 0) {
-    return `📅 No birthdays scheduled for ${formatDateMonthYear(today())}.`;
+    return null;
   }
 
   const sorted = [...birthdays].sort((a, b) => a.birthday.getTime() - b.birthday.getTime());
@@ -34,7 +33,8 @@ function formatMonthlyDigest(birthdays: BirthdayRecord[]): string {
   const maxWidth = Math.max(...dates.map(d => `${d}: `.length));
   const lines = dates.map(d => `${`${d}: `.padEnd(maxWidth)}${byDate[d].join(', ')}`);
 
-  return `Upcoming birthdays 🎂\n\n${lines.join('\n')}`;
+  const monthName = today().toLocaleString('en-US', { month: 'long' });
+  return `${monthName} birthdays 🎂\n\n${lines.join('\n')}`;
 }
 
 function formatBirthdayMessages(birthdays: BirthdayRecord[]): string[] {
@@ -136,14 +136,7 @@ export async function runBirthdayCheck(logger: Logger): Promise<void> {
         }
       }
 
-      // Send birthday messages to main group
-      if (monthlyBirthdays) {
-        const digest = formatMonthlyDigest(monthlyBirthdays);
-        logger.info('Sending monthly digest...');
-        const result = await whatsapp.sendMessage(digest, logger);
-        logger.info('Monthly digest sent', { messageId: result.id });
-      }
-
+      // Send birthday messages first so personal greetings aren't spoiled by the digest
       if (todaysBirthdays.length > 0) {
         logger.info(`Found ${todaysBirthdays.length} birthday(s) today`, {
           birthdays: todaysBirthdays.map((r) => getFullName(r.firstName, r.lastName)),
@@ -153,6 +146,25 @@ export async function runBirthdayCheck(logger: Logger): Promise<void> {
         for (const message of messages) {
           const result = await whatsapp.sendMessage(message, logger);
           logger.info('Birthday message sent', { messageId: result.id });
+        }
+      }
+
+      // Send monthly digest (excluding today's birthdays to avoid duplication)
+      if (monthlyBirthdays) {
+        try {
+          const todaySet = new Set(todaysBirthdays);
+          const upcomingBirthdays = monthlyBirthdays.filter(b => !todaySet.has(b));
+          const digest = formatMonthlyDigest(upcomingBirthdays);
+          if (digest) {
+            logger.info('Sending monthly digest...');
+            const result = await whatsapp.sendMessage(digest, logger);
+            logger.info('Monthly digest sent', { messageId: result.id });
+          } else {
+            logger.info('No upcoming birthdays this month, skipping digest');
+          }
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
+          logger.warn('Failed to send monthly digest, continuing', { error: msg });
         }
       }
 
