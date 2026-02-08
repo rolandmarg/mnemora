@@ -48,22 +48,6 @@ function createDateFromMonthName(monthName: string, day: number, year?: number):
   return createDate(monthIndex + 1, day, year);
 }
 
-export function parseDateFromString(dateString: string): Date {
-  const dateOnlyMatch = dateString.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-  if (dateOnlyMatch) {
-    const year = parseInt(dateOnlyMatch[1], 10);
-    const month = parseInt(dateOnlyMatch[2], 10);
-    const day = parseInt(dateOnlyMatch[3], 10);
-    return createDateInTimezone(year, month, day);
-  }
-
-  const date = new Date(dateString);
-  if (isNaN(date.getTime())) {
-    throw new Error(`Invalid date string: "${dateString}"`);
-  }
-  return date;
-}
-
 export function parseDateString(dateStr: string): Date | null {
   const trimmed = dateStr.trim();
 
@@ -99,41 +83,6 @@ export function parseDateString(dateStr: string): Date | null {
   return null;
 }
 
-export function startOfDay(date: Date): Date {
-  const normalized = new Date(date);
-  normalized.setHours(0, 0, 0, 0);
-  return normalized;
-}
-
-export function startOfYear(date: Date): Date {
-  return new Date(date.getFullYear(), 0, 1);
-}
-
-export function endOfYear(date: Date): Date {
-  return new Date(date.getFullYear(), 11, 31, 23, 59, 59, 999);
-}
-
-export function startOfMonth(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
-}
-
-export function endOfMonth(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth() + 1, 0);
-}
-
-export function formatDateISO(date: Date): string {
-  // Format using the configured timezone to get the correct calendar date
-  // This ensures birthdays are formatted as the date they represent in the configured timezone
-  const tz = getTimezone();
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: tz,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-  return formatter.format(date);
-}
-
 export function formatDateShort(date: Date, includeYear: boolean = false): string {
   const options: Intl.DateTimeFormatOptions = {
     month: 'short',
@@ -145,37 +94,8 @@ export function formatDateShort(date: Date, includeYear: boolean = false): strin
   return date.toLocaleDateString('en-US', options);
 }
 
-export function formatDateMonthYear(date: Date): string {
-  return date.toLocaleString('default', { month: 'long', year: 'numeric' });
-}
-
 export function isFirstDayOfMonth(date: Date): boolean {
   return date.getDate() === 1;
-}
-
-/**
- * Get the year of a date in the configured timezone.
- * This ensures we extract date components correctly regardless of system timezone.
- */
-export function getYearInTimezone(date: Date): number {
-  const tz = getTimezone();
-  const zonedDate = dayjs(date).tz(tz);
-  return zonedDate.year();
-}
-
-/**
- * Convert a date at midnight in the configured timezone to UTC.
- * This is used for querying APIs that expect UTC timestamps.
- * Example: Dec 4 00:00:00 PST -> Dec 4 08:00:00 UTC
- */
-export function convertMidnightToUTC(date: Date): Date {
-  const tz = getTimezone();
-  // Get the date components in the configured timezone
-  const zonedDate = dayjs(date).tz(tz);
-  // Create a date string at midnight in the configured timezone
-  const midnightInTz = zonedDate.startOf('day');
-  // Convert to UTC
-  return midnightInTz.utc().toDate();
 }
 
 /**
