@@ -13,6 +13,12 @@ import { config } from '../config.js';
 import { initializeCorrelationId } from '../utils/runtime.util.js';
 import type { Logger, BirthdayRecord } from '../types.js';
 
+const MESSAGE_DELAY_MS = 2000;
+
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 // --- Message formatting ---
 
 function formatMonthlyDigest(birthdays: BirthdayRecord[]): string | null {
@@ -110,6 +116,7 @@ export async function runBirthdayCheck(logger: Logger): Promise<void> {
           logger.info('Sending health check...');
           const result = await whatsapp.sendToGroup(healthCheckGroupName, healthMessage, logger);
           logger.info('Health check sent', { messageId: result.id });
+          await delay(MESSAGE_DELAY_MS);
         } catch (error) {
           const msg = error instanceof Error ? error.message : String(error);
           logger.warn('Health check failed, continuing with birthday messages', { error: msg });
@@ -126,6 +133,7 @@ export async function runBirthdayCheck(logger: Logger): Promise<void> {
           logger.info('Sending birthday message...', { message });
           const result = await whatsapp.sendMessage(message, logger);
           logger.info('Birthday message sent', { messageId: result.id });
+          await delay(MESSAGE_DELAY_MS);
         }
       }
 
