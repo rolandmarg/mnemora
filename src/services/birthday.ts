@@ -68,6 +68,7 @@ function formatHealthCheckMessage(birthdayCount: number, authAgeDays: number | n
 async function getTodaysBirthdaysWithOptionalDigest(): Promise<{
   todaysBirthdays: BirthdayRecord[];
   monthlyBirthdays?: BirthdayRecord[];
+  totalBirthdayRecords: number;
 }> {
   const allBirthdays = await googleSheets.fetchBirthdays();
   const todayDate = today();
@@ -83,10 +84,10 @@ async function getTodaysBirthdaysWithOptionalDigest(): Promise<{
     const monthlyBirthdays = allBirthdays.filter(
       (r) => getMonthInTimezone(r.birthday) === todayMonth,
     );
-    return { todaysBirthdays, monthlyBirthdays };
+    return { todaysBirthdays, monthlyBirthdays, totalBirthdayRecords: allBirthdays.length };
   }
 
-  return { todaysBirthdays };
+  return { todaysBirthdays, totalBirthdayRecords: allBirthdays.length };
 }
 
 // --- Main entry point ---
@@ -96,7 +97,11 @@ export async function runBirthdayCheck(logger: Logger): Promise<void> {
 
   try {
     logger.info('Running birthday check...');
-    const { todaysBirthdays, monthlyBirthdays } = await getTodaysBirthdaysWithOptionalDigest();
+    const { todaysBirthdays, monthlyBirthdays, totalBirthdayRecords } = await getTodaysBirthdaysWithOptionalDigest();
+
+    if (totalBirthdayRecords === 0) {
+      logger.warn('Google Sheets returned zero birthday records — verify sheet data and permissions');
+    }
 
     await whatsapp.initialize(logger);
 
