@@ -84,9 +84,11 @@ export function parseDateString(dateStr: string): Date | null {
 }
 
 export function formatDateShort(date: Date, includeYear: boolean = false): string {
+  const tz = getTimezone();
   const options: Intl.DateTimeFormatOptions = {
     month: 'short',
     day: 'numeric',
+    timeZone: tz,
   };
   if (includeYear) {
     options.year = 'numeric';
