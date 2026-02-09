@@ -128,9 +128,11 @@ Resources:
         DailySchedule:
           Type: Schedule
           Properties:
-            # Runs at 17:00 UTC (~10 AM PDT / ~9 AM PST)
+            # EventBridge cron runs in UTC (no DST support)
+            # PST (Nov-Mar): 17:00 UTC = 9:00 AM Pacific
+            # PDT (Mar-Nov): 17:00 UTC = 10:00 AM Pacific
             Schedule: cron(0 17 * * ? *)
-            Description: Daily birthday check at 10 AM Pacific time (17:00 UTC, ~10 AM PDT most of year)
+            Description: Daily birthday check (~9-10 AM Pacific depending on DST)
             Enabled: true
             Input: '{}'
 
