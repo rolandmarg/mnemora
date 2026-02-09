@@ -31,7 +31,7 @@ function formatMonthlyDigest(birthdays: BirthdayRecord[]): string | null {
   const maxWidth = Math.max(...dates.map(d => `${d}: `.length));
   const lines = dates.map(d => `${`${d}: `.padEnd(maxWidth)}${byDate[d].join(', ')}`);
 
-  const monthName = today().toLocaleString('en-US', { month: 'long' });
+  const monthName = today().toLocaleString('en-US', { month: 'long', timeZone: config.schedule.timezone });
   return `${monthName} birthdays 🎂\n\n${lines.join('\n')}`;
 }
 
