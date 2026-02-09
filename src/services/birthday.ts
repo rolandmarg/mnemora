@@ -96,6 +96,11 @@ export async function runBirthdayCheck(logger: Logger): Promise<void> {
 
   try {
     logger.info('Running birthday check...');
+
+    if (!config.whatsapp.groupName) {
+      throw new Error('WHATSAPP_GROUP_NAME is not configured. Cannot send birthday messages.');
+    }
+
     const { todaysBirthdays, monthlyBirthdays } = await getTodaysBirthdaysWithOptionalDigest();
 
     await whatsapp.initialize(logger);
