@@ -39,8 +39,16 @@ function createDate(month: number, day: number, year?: number): Date {
 function createDateFromMonthName(monthName: string, day: number, year?: number): Date | null {
   const monthNames = ['january', 'february', 'march', 'april', 'may', 'june',
                       'july', 'august', 'september', 'october', 'november', 'december'];
-  const monthIndex = monthNames.findIndex(m => m.startsWith(monthName.toLowerCase()));
-  
+  const input = monthName.toLowerCase();
+
+  // Try exact match first
+  let monthIndex = monthNames.indexOf(input);
+
+  // Then try prefix match, but only if input is at least 3 chars (standard abbreviation)
+  if (monthIndex === -1 && input.length >= 3) {
+    monthIndex = monthNames.findIndex(m => m.startsWith(input));
+  }
+
   if (monthIndex === -1) {
     return null;
   }
