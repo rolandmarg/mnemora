@@ -429,9 +429,9 @@ class WhatsAppSocket {
       await flushAuthWrites(logger);
       await syncSessionToS3(this.sessionPath, logger);
       if (this.sock) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise(resolve => setTimeout(resolve, 500));
         this.sock.end(undefined);
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
