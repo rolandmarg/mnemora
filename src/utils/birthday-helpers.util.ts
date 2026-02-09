@@ -42,12 +42,12 @@ export function parseRowToBirthdays(row: string[]): BirthdayRecord[] {
       continue;
     }
     
-    // Skip if name is a month name (header row)
-    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
-                        'July', 'August', 'September', 'October', 'November', 'December',
-                        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    if (monthNames.includes(name)) {
+    // Skip if name is a month name (header row) — case insensitive
+    const monthNames = ['january', 'february', 'march', 'april', 'may', 'june',
+                        'july', 'august', 'september', 'october', 'november', 'december',
+                        'jan', 'feb', 'mar', 'apr', 'may', 'jun',
+                        'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+    if (monthNames.includes(name.toLowerCase())) {
       continue;
     }
     
