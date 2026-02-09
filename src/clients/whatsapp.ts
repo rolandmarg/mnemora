@@ -469,34 +469,28 @@ export async function sendMessage(message: string, logger: Logger): Promise<{ id
 }
 
 export async function sendToGroup(groupName: string, message: string, logger: Logger): Promise<{ id: string }> {
+  // Phase 1: Ensure client is ready and resolve group (retryable)
+  let groupJid!: string;
   let lastError: Error | null = null;
   const maxRetries = 3;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       if (!socket.isClientReady()) {
-        throw new Error('Client is not ready');
+        if (attempt === 1) {
+          throw new Error('Client is not ready');
+        }
+        await socket.initialize(logger);
       }
-
-      const groupJid = await socket.resolveGroupJid(groupName);
-      const result = await socket.sendToGroup(groupJid, message);
-      logger.info('WhatsApp message sent to group', { groupName, groupJid, messageId: result.id, attempt });
-      return { id: result.id };
+      groupJid = await socket.resolveGroupJid(groupName);
+      break; // Ready to send
     } catch (error) {
       if (error instanceof QRAuthenticationRequiredError) {
         throw error;
       }
-
       lastError = error instanceof Error ? error : new Error(String(error));
-      const isProtocolError = lastError.message.includes('Protocol error') ||
-        lastError.message.includes('Execution context') ||
-        lastError.message.includes('Target closed');
-
-      if (isProtocolError && attempt < maxRetries) {
-        logger.warn(`Send attempt ${attempt} failed, retrying...`, { error: lastError.message });
-        if (!socket.isClientReady()) {
-          await socket.initialize(logger);
-        }
+      if (attempt < maxRetries) {
+        logger.warn(`Pre-send attempt ${attempt} failed, retrying...`, { error: lastError.message });
         await new Promise(resolve => setTimeout(resolve, 3000));
         continue;
       }
@@ -504,7 +498,17 @@ export async function sendToGroup(groupName: string, message: string, logger: Lo
     }
   }
 
-  throw lastError ?? new Error('Failed to send message after retries');
+  // Phase 2: Send message (NOT retried — message may have been delivered)
+  try {
+    const result = await socket.sendToGroup(groupJid, message);
+    logger.info('WhatsApp message sent to group', { groupName, groupJid, messageId: result.id });
+    return { id: result.id };
+  } catch (error) {
+    // Do NOT retry — the message may have been delivered despite the error
+    const sendError = error instanceof Error ? error : new Error(String(error));
+    logger.error('Message send failed (not retrying to avoid duplicates)', { error: sendError.message, groupName });
+    throw sendError;
+  }
 }
 
 export async function destroy(logger: Logger): Promise<void> {
