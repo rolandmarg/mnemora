@@ -49,6 +49,7 @@ async function getFirstSheetName(): Promise<string> {
 }
 
 export async function fetchBirthdays(): Promise<BirthdayRecord[]> {
+  cachedSheetName = null; // Re-fetch sheet name each invocation
   const client = getClient();
   const sheetName = await getFirstSheetName();
 
