@@ -453,8 +453,6 @@ const socket = new WhatsAppSocket();
 export async function initialize(logger: Logger): Promise<void> {
   await checkAuthReminder(logger);
   await socket.initialize(logger);
-  recordAuthentication(logger);
-
   // Eagerly resolve main group name to fail fast on misconfiguration
   // and set activeGroupId for JID filtering from connection start
   if (config.whatsapp.groupName) {
@@ -510,6 +508,7 @@ export async function sendToGroup(groupName: string, message: string, logger: Lo
 }
 
 export async function destroy(logger: Logger): Promise<void> {
+  recordAuthentication(logger);
   await socket.destroy(logger);
 }
 
