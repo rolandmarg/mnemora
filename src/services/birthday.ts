@@ -1,5 +1,9 @@
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc.js';
+import timezone from 'dayjs/plugin/timezone.js';
 import * as googleSheets from '../clients/googleSheets.js';
 import * as whatsapp from '../clients/whatsapp.js';
+import { FileStorage } from '../clients/s3.js';
 import { getFullName } from '../utils/name-helpers.util.js';
 import {
   today,
@@ -12,6 +16,34 @@ import {
 import { config } from '../config.js';
 import { initializeCorrelationId } from '../utils/runtime.util.js';
 import type { Logger, BirthdayRecord } from '../types.js';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+const executionStorage = new FileStorage('app-data');
+
+// --- Idempotency ---
+
+function getExecutionKey(): string {
+  const tz = config.schedule.timezone;
+  const todayStr = dayjs().tz(tz).format('YYYY-MM-DD');
+  return `executions/birthday-check-${todayStr}.json`;
+}
+
+async function hasAlreadyRunToday(): Promise<boolean> {
+  const key = getExecutionKey();
+  return await executionStorage.fileExists(key);
+}
+
+async function recordExecution(birthdayCount: number, digestSent: boolean): Promise<void> {
+  const key = getExecutionKey();
+  const record = JSON.stringify({
+    timestamp: new Date().toISOString(),
+    birthdayCount,
+    digestSent,
+  });
+  await executionStorage.writeFile(key, record);
+}
 
 // --- Message formatting ---
 
@@ -103,6 +135,11 @@ export async function runBirthdayCheck(logger: Logger): Promise<void> {
 
     const { todaysBirthdays, monthlyBirthdays } = await getTodaysBirthdaysWithOptionalDigest();
 
+    if (await hasAlreadyRunToday()) {
+      logger.warn('Birthday check already completed today, skipping to prevent duplicates');
+      return;
+    }
+
     await whatsapp.initialize(logger);
 
     try {
@@ -120,6 +157,8 @@ export async function runBirthdayCheck(logger: Logger): Promise<void> {
           logger.warn('Health check failed, continuing with birthday messages', { error: msg });
         }
       }
+
+      let digestSent = false;
 
       if (todaysBirthdays.length > 0) {
         logger.info(`Found ${todaysBirthdays.length} birthday(s) today`, {
@@ -140,9 +179,11 @@ export async function runBirthdayCheck(logger: Logger): Promise<void> {
           logger.info('Sending monthly digest...', { digest });
           const result = await whatsapp.sendMessage(digest, logger);
           logger.info('Monthly digest sent', { messageId: result.id });
+          digestSent = true;
         }
       }
 
+      await recordExecution(todaysBirthdays.length, digestSent);
       logger.info('Birthday check completed successfully!');
     } finally {
       await whatsapp.destroy(logger);
