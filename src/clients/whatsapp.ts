@@ -7,8 +7,8 @@ import makeWASocket, {
   type ConnectionState,
 } from '@whiskeysockets/baileys';
 import baileysLogger from '@whiskeysockets/baileys/lib/Utils/logger.js';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import qrcode from 'qrcode-terminal';
 import { config } from '../config.js';
 import { QRAuthenticationRequiredError } from '../types.js';
@@ -41,7 +41,7 @@ export function getAuthAgeDays(): number | null {
     }
     const data = JSON.parse(readFileSync(filePath, 'utf-8'));
     const lastAuth = new Date(data.timestamp);
-    if (isNaN(lastAuth.getTime())) {
+    if (Number.isNaN(lastAuth.getTime())) {
       return null;
     }
     return Math.floor((Date.now() - lastAuth.getTime()) / (1000 * 60 * 60 * 24));

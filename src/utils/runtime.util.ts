@@ -1,40 +1,34 @@
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 
-class CorrelationContext {
-  private static storage = new Map<string, string>();
+const correlationStorage = new Map<string, string>();
 
-  static getCorrelationId(): string | undefined {
-    return this.storage.get('correlationId');
-  }
+function getStoredCorrelationId(): string | undefined {
+  return correlationStorage.get('correlationId');
+}
 
-  static setCorrelationId(id: string): void {
-    this.storage.set('correlationId', id);
-  }
+function setStoredCorrelationId(id: string): void {
+  correlationStorage.set('correlationId', id);
+}
 
-  static generateCorrelationId(): string {
-    return randomUUID();
-  }
-
-  static initializeCorrelationId(): string {
-    const existing = this.getCorrelationId();
-    if (existing) {
-      return existing;
-    }
-
-    const newId = this.generateCorrelationId();
-    this.setCorrelationId(newId);
-    return newId;
-  }
+function generateCorrelationId(): string {
+  return randomUUID();
 }
 
 export function getCorrelationId(): string | undefined {
-  return CorrelationContext.getCorrelationId();
+  return getStoredCorrelationId();
 }
 
 export function setCorrelationId(id: string): void {
-  CorrelationContext.setCorrelationId(id);
+  setStoredCorrelationId(id);
 }
 
 export function initializeCorrelationId(): string {
-  return CorrelationContext.initializeCorrelationId();
+  const existing = getStoredCorrelationId();
+  if (existing) {
+    return existing;
+  }
+
+  const newId = generateCorrelationId();
+  setStoredCorrelationId(newId);
+  return newId;
 }
