@@ -5,25 +5,17 @@
   "main": "src/index.ts",
   "type": "module",
   "scripts": {
-    "build": "tsc",
-    "start": "tsx src/index.ts",
-    "start:prod": "node dist/index.js",
-    "dev": "tsx watch src/index.ts",
-    "type-check": "tsc --noEmit --incremental",
-    "lint": "eslint --cache --cache-location .eslintcache --max-warnings 0 src/**/*.ts",
-    "lint:fix": "eslint --cache --cache-location .eslintcache --max-warnings 0 src/**/*.ts --fix",
-    "build:lambda": "tsx src/scripts/build-lambda.ts",
-    "package:lambda": "tsx src/scripts/package-lambda.ts",
-    "deploy": "./scripts/deploy.sh",
-    "deploy:lambda": "./scripts/deploy.sh",
-    "deploy:config": "sam deploy --template-file infrastructure/template.yaml --config-file infrastructure/samconfig.toml",
-    "deploy:force": "rm -rf .aws-sam && ./scripts/deploy.sh --force-upload",
-    "invoke:lambda": "aws lambda invoke --function-name mnemora-birthday-bot-prod --payload '{}' /dev/stdout | cat",
-    "release:patch": "tsx src/scripts/release.ts patch",
-    "release:minor": "tsx src/scripts/release.ts minor",
-    "release:major": "tsx src/scripts/release.ts major",
-    "release:version": "tsx src/scripts/release.ts version",
-    "prepare": "husky"
+    "start": "bun run src/index.ts",
+    "dev": "bun --watch src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome lint src/",
+    "lint:fix": "biome lint --write src/",
+    "format": "biome format --write src/",
+    "check": "biome check --write src/",
+    "release:patch": "bun run src/scripts/release.ts patch",
+    "release:minor": "bun run src/scripts/release.ts minor",
+    "release:major": "bun run src/scripts/release.ts major",
+    "release:version": "bun run src/scripts/release.ts version"
   },
   "keywords": [
     "birthday",
@@ -32,44 +24,20 @@
   ],
   "author": "",
   "license": "ISC",
-  "packageManager": "yarn@4.11.0",
-  "engines": {
-    "node": ">=24.0.0",
-    "yarn": ">=4.11.0"
-  },
-  "_deploymentRequirements": {
-    "aws-sam-cli": ">=1.148.0",
-    "note": "SAM CLI 1.148.0+ required for nodejs24.x runtime support. Checked automatically in deploy.sh"
-  },
   "_importantNotes": {
-    "@whiskeysockets/baileys": "MUST be locked to exactly 6.7.21 (no ^ or ~). Versions 6.17.16+ add audio decoders (~22MB) and lodash+libphonenumber-js (~10MB), significantly increasing Lambda package size from ~37MB to ~60MB+."
+    "@whiskeysockets/baileys": "MUST be locked to exactly 6.7.21 (no ^ or ~). Versions 6.17.16+ add audio decoders (~22MB) and lodash+libphonenumber-js (~10MB)."
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "3.937.0",
     "@whiskeysockets/baileys": "6.7.21",
     "dayjs": "1.11.19",
-    "dotenv": "17.2.3",
     "google-auth-library": "9.15.1",
     "googleapis": "166.0.0",
     "pino": "10.1.0",
-    "qrcode-terminal": "0.12.0",
-    "tar": "6.2.1"
+    "qrcode-terminal": "0.12.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.4.8",
     "@types/node": "24.10.1",
-    "@types/tar": "6.1.13",
-    "@typescript-eslint/eslint-plugin": "8.47.0",
-    "@typescript-eslint/parser": "8.47.0",
-    "eslint": "9.39.1",
-    "globals": "16.5.0",
-    "husky": "9.1.7",
-    "lint-staged": "15.2.11",
-    "tsx": "4.20.6",
     "typescript": "5.9.3"
-  },
-  "lint-staged": {
-    "*.ts": [
-      "eslint --cache --cache-location .eslintcache --max-warnings 0 --fix"
-    ]
   }
 }
