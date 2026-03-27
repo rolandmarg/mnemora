@@ -1,0 +1,16 @@
+[Unit]
+Description=Mnemora birthday bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=mnemora
+Group=mnemora
+EnvironmentFile=/etc/mnemora/env
+WorkingDirectory=/opt/mnemora
+ExecStart=/usr/bin/op run --env-file=.env.tpl -- bun run src/index.ts
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

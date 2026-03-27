@@ -1,60 +1,34 @@
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 
-export function isLambda(): boolean {
-  return !!(
-    process.env.AWS_LAMBDA_FUNCTION_NAME ??
-    process.env.LAMBDA_TASK_ROOT ??
-    process.env.AWS_EXECUTION_ENV
-  );
+const correlationStorage = new Map<string, string>();
+
+function getStoredCorrelationId(): string | undefined {
+  return correlationStorage.get('correlationId');
 }
 
-export function getLambdaFunctionName(): string | undefined {
-  return process.env.AWS_LAMBDA_FUNCTION_NAME;
+function setStoredCorrelationId(id: string): void {
+  correlationStorage.set('correlationId', id);
 }
 
-export function getLambdaFunctionVersion(): string | undefined {
-  return process.env.AWS_LAMBDA_FUNCTION_VERSION;
-}
-
-export function getLambdaRequestId(): string | undefined {
-  return process.env.AWS_REQUEST_ID;
-}
-
-class CorrelationContext {
-  private static storage = new Map<string, string>();
-
-  static getCorrelationId(): string | undefined {
-    return this.storage.get('correlationId');
-  }
-
-  static setCorrelationId(id: string): void {
-    this.storage.set('correlationId', id);
-  }
-
-  static generateCorrelationId(): string {
-    return randomUUID();
-  }
-
-  static initializeCorrelationId(): string {
-    const existing = this.getCorrelationId();
-    if (existing) {
-      return existing;
-    }
-
-    const newId = this.generateCorrelationId();
-    this.setCorrelationId(newId);
-    return newId;
-  }
+function generateCorrelationId(): string {
+  return randomUUID();
 }
 
 export function getCorrelationId(): string | undefined {
-  return CorrelationContext.getCorrelationId();
+  return getStoredCorrelationId();
 }
 
 export function setCorrelationId(id: string): void {
-  CorrelationContext.setCorrelationId(id);
+  setStoredCorrelationId(id);
 }
 
 export function initializeCorrelationId(): string {
-  return CorrelationContext.initializeCorrelationId();
+  const existing = getStoredCorrelationId();
+  if (existing) {
+    return existing;
+  }
+
+  const newId = generateCorrelationId();
+  setStoredCorrelationId(newId);
+  return newId;
 }

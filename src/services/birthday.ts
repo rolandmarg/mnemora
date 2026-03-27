@@ -1,17 +1,17 @@
 import * as googleSheets from '../clients/googleSheets.js';
 import * as whatsapp from '../clients/whatsapp.js';
-import { getFullName } from '../utils/name-helpers.util.js';
-import {
-  today,
-  formatDateShort,
-  isFirstDayOfMonth,
-  getMonthInTimezone,
-  getDateInTimezone,
-  formatTimestampHumanReadable,
-} from '../utils/date-helpers.util.js';
 import { config } from '../config.js';
+import type { BirthdayRecord, Logger } from '../types.js';
+import {
+  formatDateShort,
+  formatTimestampHumanReadable,
+  getDateInTimezone,
+  getMonthInTimezone,
+  isFirstDayOfMonth,
+  today,
+} from '../utils/date-helpers.util.js';
+import { getFullName } from '../utils/name-helpers.util.js';
 import { initializeCorrelationId } from '../utils/runtime.util.js';
-import type { Logger, BirthdayRecord } from '../types.js';
 
 // --- Message formatting ---
 
@@ -23,13 +23,15 @@ function formatMonthlyDigest(birthdays: BirthdayRecord[]): string | null {
   const sorted = [...birthdays].sort((a, b) => a.birthday.getTime() - b.birthday.getTime());
   const byDate = sorted.reduce<Record<string, string[]>>((acc, r) => {
     const key = formatDateShort(r.birthday);
-    (acc[key] ??= []).push(getFullName(r.firstName, r.lastName));
+    const names = acc[key] ?? [];
+    acc[key] = names;
+    names.push(getFullName(r.firstName, r.lastName));
     return acc;
   }, {});
 
   const dates = Object.keys(byDate);
-  const maxWidth = Math.max(...dates.map(d => `${d}: `.length));
-  const lines = dates.map(d => `${`${d}: `.padEnd(maxWidth)}${byDate[d].join(', ')}`);
+  const maxWidth = Math.max(...dates.map((d) => `${d}: `.length));
+  const lines = dates.map((d) => `${`${d}: `.padEnd(maxWidth)}${byDate[d].join(', ')}`);
 
   const monthName = today().toLocaleString('en-US', { month: 'long', timeZone: config.schedule.timezone });
   return `${monthName} birthdays 🎂\n\n${lines.join('\n')}`;
@@ -43,7 +45,7 @@ function formatBirthdayMessages(birthdays: BirthdayRecord[]): string | null {
     return `Happy birthday ${birthdays[0].firstName}! 🎂`;
   }
 
-  const names = birthdays.map(r => r.firstName);
+  const names = birthdays.map((r) => r.firstName);
   const combined =
     names.length === 2
       ? `${names[0]} and ${names[1]}`
@@ -75,14 +77,11 @@ async function getTodaysBirthdaysWithOptionalDigest(): Promise<{
   const todayDay = getDateInTimezone(todayDate);
 
   const todaysBirthdays = allBirthdays.filter(
-    (r) => getMonthInTimezone(r.birthday) === todayMonth
-        && getDateInTimezone(r.birthday) === todayDay,
+    (r) => getMonthInTimezone(r.birthday) === todayMonth && getDateInTimezone(r.birthday) === todayDay,
   );
 
   if (isFirstDayOfMonth(todayDate)) {
-    const monthlyBirthdays = allBirthdays.filter(
-      (r) => getMonthInTimezone(r.birthday) === todayMonth,
-    );
+    const monthlyBirthdays = allBirthdays.filter((r) => getMonthInTimezone(r.birthday) === todayMonth);
     return { todaysBirthdays, monthlyBirthdays };
   }
 
@@ -110,7 +109,7 @@ export async function runBirthdayCheck(logger: Logger): Promise<void> {
       const healthCheckGroupName = config.whatsapp.healthCheckGroupName;
       if (healthCheckGroupName) {
         try {
-          const authAgeDays = await whatsapp.getAuthAgeDays();
+          const authAgeDays = whatsapp.getAuthAgeDays();
           const healthMessage = formatHealthCheckMessage(todaysBirthdays.length, authAgeDays);
           logger.info('Sending health check...');
           const result = await whatsapp.sendToGroup(healthCheckGroupName, healthMessage, logger);

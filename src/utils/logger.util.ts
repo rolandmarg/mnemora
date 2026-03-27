@@ -1,7 +1,7 @@
 import pino from 'pino';
 import { config } from '../config.js';
-import { getCorrelationId, getLambdaFunctionName, getLambdaFunctionVersion, getLambdaRequestId } from './runtime.util.js';
 import type { Logger } from '../types.js';
+import { getCorrelationId } from './runtime.util.js';
 
 enum LogLevel {
   TRACE = 10,
@@ -18,13 +18,6 @@ function getRequestContext(): Record<string, unknown> {
   const correlationId = getCorrelationId();
   if (correlationId) {
     context.correlationId = correlationId;
-  }
-
-  const functionName = getLambdaFunctionName();
-  if (functionName) {
-    context.functionName = functionName;
-    context.functionVersion = getLambdaFunctionVersion();
-    context.requestId = getLambdaRequestId();
   }
 
   if (process.memoryUsage) {
@@ -108,12 +101,9 @@ class PinoLogger implements Logger {
   }
 }
 
-function createLogger(options?: {
-  level?: LogLevel | string;
-  context?: Record<string, unknown>;
-}): Logger {
+function createLogger(options?: { level?: LogLevel | string; context?: Record<string, unknown> }): Logger {
   const level = options?.level ?? config.logging.level;
-  
+
   let levelString: string;
   if (typeof level === 'string') {
     levelString = level;
@@ -138,9 +128,8 @@ function createLogger(options?: {
   };
 
   const pinoLogger = pino(pinoOptions);
-  
+
   return new PinoLogger(pinoLogger);
 }
 
 export const logger = createLogger();
-

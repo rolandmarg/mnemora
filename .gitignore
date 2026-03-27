@@ -1,9 +1,6 @@
 # Dependencies
 node_modules/
 
-# Lock files (keep yarn.lock, ignore npm lockfile)
-package-lock.json
-
 # Yarn 4
 .yarn/
 
@@ -35,8 +32,8 @@ Thumbs.db
 dist/
 build/
 
-# ESLint cache
-.eslintcache
+# Biome
+.biome/
 
 # TypeScript build info
 .tsbuildinfo
@@ -44,9 +41,8 @@ build/
 # WhatsApp session data (Baileys)
 auth_info/
 
-# AWS SAM
-samconfig.toml
-.aws-sam
-
 # Worktrees
 .worktrees/
+
+# Bun
+bun.lock
