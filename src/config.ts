@@ -1,7 +1,3 @@
-import dotenv from 'dotenv';
-
-dotenv.config();
-
 export interface GoogleConfig {
   spreadsheetId: string;
   clientEmail: string | undefined;
@@ -18,54 +14,31 @@ export interface ScheduleConfig {
   timezone: string;
 }
 
-export interface AWSConfig {
-  region: string;
-  s3Bucket: string | undefined;
-}
-
 export interface AppConfig {
   google: GoogleConfig;
   whatsapp: WhatsAppConfig;
   schedule: ScheduleConfig;
-  aws: AWSConfig;
   logging: {
     level: string;
   };
-  environment: string;
 }
 
 /**
- * Processes the Google private key from environment variable.
- * Handles both base64-encoded keys (from CloudFormation) and raw PEM keys (from .env).
+ * Normalizes the Google private key from environment variable.
+ * Handles escaped newlines from env files (e.g. literal \n -> actual newlines).
  */
-function processPrivateKey(rawKey: string | undefined): string | undefined {
+function normalizePrivateKey(rawKey: string | undefined): string | undefined {
   if (!rawKey) {
     return undefined;
   }
-
-  // First, replace escaped newlines (for .env files)
-  let key = rawKey.replace(/\\n/g, '\n');
-
-  // If the key doesn't start with "-----BEGIN", it's likely base64-encoded
-  // This happens when passed through CloudFormation parameters
-  if (!key.startsWith('-----BEGIN')) {
-    try {
-      // Decode base64 to get the actual PEM key
-      key = Buffer.from(key, 'base64').toString('utf-8');
-    } catch (_error) {
-      // If decoding fails, assume it's already in the correct format
-      console.warn('Failed to decode private key as base64, using as-is');
-    }
-  }
-
-  return key;
+  return rawKey.replace(/\\n/g, '\n');
 }
 
 export const config: AppConfig = {
   google: {
     spreadsheetId: process.env.GOOGLE_SPREADSHEET_ID ?? '',
     clientEmail: process.env.GOOGLE_CLIENT_EMAIL,
-    privateKey: processPrivateKey(process.env.GOOGLE_PRIVATE_KEY),
+    privateKey: normalizePrivateKey(process.env.GOOGLE_PRIVATE_KEY),
     projectId: process.env.GOOGLE_PROJECT_ID,
   },
   whatsapp: {
@@ -73,15 +46,9 @@ export const config: AppConfig = {
     healthCheckGroupName: process.env.WHATSAPP_HEALTH_CHECK_GROUP_NAME,
   },
   schedule: {
-    timezone: process.env.TIMEZONE ?? process.env.TZ ?? 'America/Los_Angeles',
-  },
-  aws: {
-    region: process.env.AWS_REGION ?? process.env.AWS_DEFAULT_REGION ?? 'us-west-1',
-    s3Bucket: process.env.AWS_S3_BUCKET,
+    timezone: 'America/Los_Angeles',
   },
   logging: {
     level: process.env.LOG_LEVEL ?? 'info',
   },
-  environment: process.env.NODE_ENV ?? 'development',
 };
-
